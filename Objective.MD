@@ -47,6 +47,21 @@ The project’s goal is to provide an intuitive, responsive, and multilingual br
 
 ---
 
+## Tech Stack Overview (TBD)
+| Layer | Technology | Purpose |
+|-------|-------------|----------|
+| **Frontend Framework** | **React / Nextjs** | UI composition, component management, and reactivity. |
+| **Rendering Engine** | **SVG (via D3.js / Konva / custom)** | Interactive diagram drawing and manipulation. |
+| **State Management** | **Zustand / Redux / Context API** | Store graph model, history stack (undo/redo), and preferences. |
+| **Styling** | **Tailwind CSS / CSS Modules** | Responsive layout and consistent design system. |
+| **Internationalization** | **i18next / custom JSON bundles** | Support English and Italian interface localization. |
+| **Testing Framework** | **Vitest / Jest / Cypress** | Unit and end-to-end testing for reliability. |
+| **Build & Tooling** | **Vite / Webpack** | Fast dev server and optimized production builds. |
+| **Integration Layer** | **postMessage API** | Enable communication between Moodle host and embedded editor. |
+| **Data Formats** | **XML / JSON / SVG / PNG / JPEG** | Import/export formats for diagrams and image outputs. |
+
+---
+
 ## Technical Overview
 - **Platform:** Pure browser (SPA – Single Page Application)
 - **Rendering:** SVG-based interactive canvas
