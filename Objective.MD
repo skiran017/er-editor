@@ -21,7 +21,7 @@ The project’s goal is to provide an intuitive, responsive, and multilingual br
 ## Functional Features (MVP)
 | Priority | Feature | Description |
 |-----------|----------|-------------|
-| 🥇 **High** | **Canvas Editing (Core)** | Create, move, and connect entities, attributes, and relationships on a zoomable canvas. |
+| **High** | **Canvas Editing (Core)** | Create, move, and connect entities, attributes, and relationships on a zoomable canvas. |
 |  | **Drag-Select / Multi-Select** | Select multiple elements via marquee drag and perform batch operations (move, copy, delete). |
 |  | **Undo / Redo** | Full edit history for reversible actions. |
 |  | **Cut / Copy / Paste** | Duplicate or move diagram elements while maintaining relationships. |
@@ -37,7 +37,7 @@ The project’s goal is to provide an intuitive, responsive, and multilingual br
 ## Good-to-Have Enhancements
 | Priority | Feature | Description |
 |-----------|----------|-------------|
-| 🥈 **Medium** | **Export as Image (PNG / JPEG)** | Export the diagram canvas as a raster image for reports or submissions. |
+| **Medium** | **Export as Image (PNG / JPEG)** | Export the diagram canvas as a raster image for reports or submissions. |
 |  | **SVG Export** | Scalable vector export for printing or publication. |
 |  | **Alternate Notations** | Support additional ER notations (Crow’s Foot, UML). |
 |  | **Mermaid / Markdown Export** | Generate textual representation for integration in documentation or Moodle quizzes. |
