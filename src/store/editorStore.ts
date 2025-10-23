@@ -1,9 +1,7 @@
-// src/store/editorStore.ts
-
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
-import type { Entity, Relationship, Connection, EditorState, Position } from '../types';
+import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape } from '../types';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -15,6 +13,16 @@ interface EditorStore extends EditorState {
   addRelationship: (position: Position) => void;
   updateRelationship: (id: string, updates: Partial<Relationship>) => void;
   deleteRelationship: (id: string) => void;
+
+  // Line actions
+  addLine: (points: number[]) => void;
+  updateLine: (id: string, updates: Partial<LineShape>) => void;
+  deleteLine: (id: string) => void;
+
+  // Arrow actions
+  addArrow: (type: 'arrow-left' | 'arrow-right', points: number[]) => void;
+  updateArrow: (id: string, updates: Partial<ArrowShape>) => void;
+  deleteArrow: (id: string) => void;
 
   // Connection actions
   addConnection: (fromId: string, toId: string) => void;
@@ -33,8 +41,11 @@ interface EditorStore extends EditorState {
   // Mode actions
   setMode: (mode: EditorState['mode']) => void;
 
+  // Drawing state actions
+  setDrawingLine: (isDrawing: boolean, startPoint?: Position | null, currentPoint?: Position | null) => void;
+
   // Utility
-  getElementById: (id: string) => Entity | Relationship | undefined;
+  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | undefined;
 }
 
 // Helper function to generate IDs
@@ -48,6 +59,8 @@ export const useEditorStore = create<EditorStore>()(
         entities: [],
         relationships: [],
         connections: [],
+        lines: [],
+        arrows: [],
       },
       selectedIds: [],
       history: {
@@ -59,6 +72,11 @@ export const useEditorStore = create<EditorStore>()(
         position: { x: 0, y: 0 },
       },
       mode: 'select',
+      drawingLine: {
+        isDrawing: false,
+        startPoint: null,
+        currentPoint: null,
+      },
 
       // Entity actions
       addEntity: (position) => {
@@ -113,7 +131,7 @@ export const useEditorStore = create<EditorStore>()(
             entityIds: [],
             cardinalities: {},
             participations: {},
-            size: { width: 100, height: 60 },
+            size: { width: 120, height: 80 },
           };
           state.diagram.relationships.push(newRelationship);
         });
@@ -170,6 +188,70 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      // Line actions
+      addLine: (points: number[]) => {
+        set((state) => {
+          const newLine: LineShape = {
+            id: generateId(),
+            type: 'line',
+            position: { x: 0, y: 0 },
+            selected: false,
+            points,
+            strokeWidth: 2,
+          };
+          state.diagram.lines.push(newLine);
+        });
+      },
+
+      updateLine: (id: string, updates: Partial<LineShape>) => {
+        set((state) => {
+          const line = state.diagram.lines.find((l) => l.id === id);
+          if (line) {
+            Object.assign(line, updates);
+          }
+        });
+      },
+
+      deleteLine: (id: string) => {
+        set((state) => {
+          state.diagram.lines = state.diagram.lines.filter((l) => l.id !== id);
+          state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
+        });
+      },
+
+      // Arrow actions
+      addArrow: (type: 'arrow-left' | 'arrow-right', points: number[]) => {
+        set((state) => {
+          const newArrow: ArrowShape = {
+            id: generateId(),
+            type,
+            position: { x: 0, y: 0 },
+            selected: false,
+            points,
+            strokeWidth: 2,
+            pointerLength: 15,
+            pointerWidth: 15,
+          };
+          state.diagram.arrows.push(newArrow);
+        });
+      },
+
+      updateArrow: (id: string, updates: Partial<ArrowShape>) => {
+        set((state) => {
+          const arrow = state.diagram.arrows.find((a) => a.id === id);
+          if (arrow) {
+            Object.assign(arrow, updates);
+          }
+        });
+      },
+
+      deleteArrow: (id: string) => {
+        set((state) => {
+          state.diagram.arrows = state.diagram.arrows.filter((a) => a.id !== id);
+          state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
+        });
+      },
+
       // Selection actions
       selectElement: (id, multi = false) => {
         set((state) => {
@@ -183,12 +265,18 @@ export const useEditorStore = create<EditorStore>()(
             state.selectedIds = [id];
           }
 
-          // Update selected flag on elements
+          // Update selected flag on all elements
           state.diagram.entities.forEach((e) => {
             e.selected = state.selectedIds.includes(e.id);
           });
           state.diagram.relationships.forEach((r) => {
             r.selected = state.selectedIds.includes(r.id);
+          });
+          state.diagram.lines.forEach((l) => {
+            l.selected = state.selectedIds.includes(l.id);
+          });
+          state.diagram.arrows.forEach((a) => {
+            a.selected = state.selectedIds.includes(a.id);
           });
         });
       },
@@ -198,6 +286,8 @@ export const useEditorStore = create<EditorStore>()(
           state.selectedIds = [];
           state.diagram.entities.forEach((e) => (e.selected = false));
           state.diagram.relationships.forEach((r) => (r.selected = false));
+          state.diagram.lines.forEach((l) => (l.selected = false));
+          state.diagram.arrows.forEach((a) => (a.selected = false));
         });
       },
 
@@ -209,6 +299,12 @@ export const useEditorStore = create<EditorStore>()(
           });
           state.diagram.relationships.forEach((r) => {
             r.selected = ids.includes(r.id);
+          });
+          state.diagram.lines.forEach((l) => {
+            l.selected = ids.includes(l.id);
+          });
+          state.diagram.arrows.forEach((a) => {
+            a.selected = ids.includes(a.id);
           });
         });
       },
@@ -230,15 +326,33 @@ export const useEditorStore = create<EditorStore>()(
       setMode: (mode) => {
         set((state) => {
           state.mode = mode;
+          // Reset drawing state when changing modes
+          state.drawingLine = {
+            isDrawing: false,
+            startPoint: null,
+            currentPoint: null,
+          };
+        });
+      },
+
+      // Drawing state actions
+      setDrawingLine: (isDrawing: boolean, startPoint: Position | null = null, currentPoint: Position | null = null) => {
+        set((state) => {
+          state.drawingLine.isDrawing = isDrawing;
+          if (startPoint !== undefined) state.drawingLine.startPoint = startPoint;
+          if (currentPoint !== undefined) state.drawingLine.currentPoint = currentPoint;
         });
       },
 
       // Utility
-      getElementById: (id) => {
+      // Utility
+      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | undefined => {
         const state = get();
         return (
           state.diagram.entities.find((e) => e.id === id) ||
-          state.diagram.relationships.find((r) => r.id === id)
+          state.diagram.relationships.find((r) => r.id === id) ||
+          state.diagram.lines.find((l) => l.id === id) ||
+          state.diagram.arrows.find((a) => a.id === id)
         );
       },
     })),

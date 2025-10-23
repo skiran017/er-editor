@@ -10,6 +10,9 @@ import {
 	ZoomOut,
 	Download,
 	Upload,
+	Minus,
+	ArrowLeft,
+	ArrowRight,
 } from "lucide-react";
 import {
 	useEditorStore,
@@ -35,6 +38,9 @@ export const Toolbar: React.FC = () => {
 		{ id: "select", icon: MousePointer2, label: "Select (V)" },
 		{ id: "entity", icon: Square, label: "Entity (E)" },
 		{ id: "relationship", icon: Diamond, label: "Relationship (R)" },
+		{ id: "line", icon: Minus, label: "Line (L)" },
+		{ id: "arrow-left", icon: ArrowLeft, label: "Arrow Left" },
+		{ id: "arrow-right", icon: ArrowRight, label: "Arrow Right" },
 		{ id: "pan", icon: Hand, label: "Pan (Space)" },
 	] as const;
 

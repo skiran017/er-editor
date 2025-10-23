@@ -4,6 +4,8 @@ import Konva from "konva";
 import { useEditorStore } from "../../store/editorStore";
 import { EntityShape } from "./EntityShape";
 import { RelationshipShape } from "./RelationshipShape";
+import { LineShapeComponent } from "./LineShape";
+import { ArrowShapeComponent } from "./ArrowShape";
 
 export const ERCanvas: React.FC = () => {
 	const stageRef = useRef<Konva.Stage>(null);
@@ -17,6 +19,8 @@ export const ERCanvas: React.FC = () => {
 
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
+	const lines = useEditorStore((state) => state.diagram.lines);
+	const arrows = useEditorStore((state) => state.diagram.arrows);
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const viewport = useEditorStore((state) => state.viewport);
 	const mode = useEditorStore((state) => state.mode);
@@ -24,6 +28,12 @@ export const ERCanvas: React.FC = () => {
 	const addRelationship = useEditorStore((state) => state.addRelationship);
 	const setZoom = useEditorStore((state) => state.setZoom);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
+	const addLine = useEditorStore((state) => state.addLine);
+	const addArrow = useEditorStore((state) => state.addArrow);
+
+	// Add these state variables
+	const [isDrawing, setIsDrawing] = useState(false);
+	const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
 
 	// Update transformer when selection changes
 	useEffect(() => {
@@ -32,18 +42,33 @@ export const ERCanvas: React.FC = () => {
 		const transformer = transformerRef.current;
 		const layer = layerRef.current;
 
-		// Find selected nodes
+		// Find selected nodes - filter out null/undefined properly
 		const selectedNodes = selectedIds
-			.map((id) => layer.findOne(`#${id}`))
-			.filter((node): node is Konva.Node => node !== null);
+			.map((id) => {
+				try {
+					return layer.findOne(`#${id}`);
+				} catch (err) {
+					console.warn(`Could not find node with id: ${id}`);
+					console.error(err);
+					return null;
+				}
+			})
+			.filter(
+				(node): node is Konva.Node => node !== null && node !== undefined
+			);
 
+		// Only update if we have valid nodes
 		if (selectedNodes.length > 0) {
-			transformer.nodes(selectedNodes);
-			transformer.getLayer()?.batchDraw();
+			try {
+				transformer.nodes(selectedNodes);
+				transformer.getLayer()?.batchDraw();
+			} catch (e) {
+				console.error("Error setting transformer nodes:", e);
+			}
 		} else {
 			transformer.nodes([]);
 		}
-	}, [selectedIds]);
+	}, [selectedIds, entities, relationships]);
 
 	// Handle window resize
 	useEffect(() => {
@@ -90,7 +115,6 @@ export const ERCanvas: React.FC = () => {
 
 	// Handle canvas click
 	const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-		// Click on empty area
 		if (e.target === e.target.getStage()) {
 			const stage = stageRef.current;
 			if (!stage) return;
@@ -98,7 +122,6 @@ export const ERCanvas: React.FC = () => {
 			const pointer = stage.getPointerPosition();
 			if (!pointer) return;
 
-			// Convert screen coordinates to canvas coordinates
 			const transform = stage.getAbsoluteTransform().copy();
 			transform.invert();
 			const pos = transform.point(pointer);
@@ -107,9 +130,44 @@ export const ERCanvas: React.FC = () => {
 				addEntity(pos);
 			} else if (mode === "relationship") {
 				addRelationship(pos);
+			} else if (mode === "line" || mode === "arrow-left" || mode === "arrow-right") {
+				if (!isDrawing) {
+					// Start drawing
+					setIsDrawing(true);
+					setStartPoint(pos);
+				} else {
+					// Finish drawing
+					if (startPoint) {
+						if (mode === "line") {
+							addLine([startPoint.x, startPoint.y, pos.x, pos.y]);
+						} else {
+							addArrow(mode, [startPoint.x, startPoint.y, pos.x, pos.y]);
+						}
+					}
+					setIsDrawing(false);
+					setStartPoint(null);
+				}
 			} else {
 				clearSelection();
 			}
+		}
+	};
+
+	// Add mouse move handler for preview
+	const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		if (isDrawing && startPoint) {
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			const pointer = stage.getPointerPosition();
+			if (!pointer) return;
+
+			const transform = stage.getAbsoluteTransform().copy();
+			transform.invert();
+			const pos = transform.point(pointer);
+
+			// Update drawing line state for preview
+			// You'll need to add this to your store
 		}
 	};
 
@@ -127,6 +185,7 @@ export const ERCanvas: React.FC = () => {
 				draggable={mode === "pan"}
 				onWheel={handleWheel}
 				onClick={handleStageClick}
+				onMouseMove={handleMouseMove}
 				className="cursor-crosshair"
 			>
 				<Layer ref={layerRef}>
@@ -142,8 +201,16 @@ export const ERCanvas: React.FC = () => {
 							relationship={relationship}
 						/>
 					))}
+					{/* Render lines */}
+					{lines.map((line) => (
+						<LineShapeComponent key={line.id} line={line} />
+					))}
+					{/* Render arrows */}
+					{arrows.map((arrow) => (
+						<ArrowShapeComponent key={arrow.id} arrow={arrow} />
+					))}
 
-					{/* Transformer for resizing */}
+					{/* Transformer for resizing - works for both entities and relationships */}
 					<Transformer
 						ref={transformerRef}
 						boundBoxFunc={(oldBox, newBox) => {
@@ -160,6 +227,7 @@ export const ERCanvas: React.FC = () => {
 							"bottom-right",
 						]}
 						rotateEnabled={false}
+						keepRatio={false}
 					/>
 				</Layer>
 			</Stage>

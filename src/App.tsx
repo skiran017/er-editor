@@ -39,6 +39,9 @@ function App() {
 				case "r":
 					setMode("relationship");
 					break;
+				case "l":
+					setMode("line");
+					break;
 				case " ":
 					e.preventDefault();
 					setMode("pan");
