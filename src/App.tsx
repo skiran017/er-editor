@@ -49,6 +49,32 @@ function App() {
 				case "escape":
 					setMode("select");
 					break;
+				case "delete":
+				case "backspace": {
+					e.preventDefault();
+					// Delete selected elements
+					const state = useEditorStore.getState();
+					const selectedIds = state.selectedIds;
+
+					selectedIds.forEach((id) => {
+						const element = state.getElementById(id);
+						if (element) {
+							if (element.type === "entity") {
+								state.deleteEntity(id);
+							} else if (element.type === "relationship") {
+								state.deleteRelationship(id);
+							} else if (element.type === "line") {
+								state.deleteLine(id);
+							} else if (
+								element.type === "arrow-left" ||
+								element.type === "arrow-right"
+							) {
+								state.deleteArrow(id);
+							}
+						}
+					});
+					break;
+				}
 			}
 		};
 

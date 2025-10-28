@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Stage, Layer, Transformer } from "react-konva";
+import { Stage, Layer, Transformer, Line } from "react-konva";
 import Konva from "konva";
 import { useEditorStore } from "../../store/editorStore";
 import { EntityShape } from "./EntityShape";
@@ -31,9 +31,9 @@ export const ERCanvas: React.FC = () => {
 	const addLine = useEditorStore((state) => state.addLine);
 	const addArrow = useEditorStore((state) => state.addArrow);
 
-	// Add these state variables
-	const [isDrawing, setIsDrawing] = useState(false);
-	const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
+	const drawingLine = useEditorStore((state) => state.drawingLine);
+	const setDrawingLine = useEditorStore((state) => state.setDrawingLine);
+	const setMode = useEditorStore((state) => state.setMode);
 
 	// Update transformer when selection changes
 	useEffect(() => {
@@ -130,22 +130,34 @@ export const ERCanvas: React.FC = () => {
 				addEntity(pos);
 			} else if (mode === "relationship") {
 				addRelationship(pos);
-			} else if (mode === "line" || mode === "arrow-left" || mode === "arrow-right") {
-				if (!isDrawing) {
+			} else if (
+				mode === "line" ||
+				mode === "arrow-left" ||
+				mode === "arrow-right"
+			) {
+				if (!drawingLine.isDrawing) {
 					// Start drawing
-					setIsDrawing(true);
-					setStartPoint(pos);
+					setDrawingLine(true, pos, pos);
 				} else {
 					// Finish drawing
-					if (startPoint) {
+					if (drawingLine.startPoint) {
 						if (mode === "line") {
-							addLine([startPoint.x, startPoint.y, pos.x, pos.y]);
+							addLine([
+								drawingLine.startPoint.x,
+								drawingLine.startPoint.y,
+								pos.x,
+								pos.y,
+							]);
 						} else {
-							addArrow(mode, [startPoint.x, startPoint.y, pos.x, pos.y]);
+							addArrow(mode, [
+								drawingLine.startPoint.x,
+								drawingLine.startPoint.y,
+								pos.x,
+								pos.y,
+							]);
 						}
 					}
-					setIsDrawing(false);
-					setStartPoint(null);
+					setDrawingLine(false, null, null);
 				}
 			} else {
 				clearSelection();
@@ -155,7 +167,7 @@ export const ERCanvas: React.FC = () => {
 
 	// Add mouse move handler for preview
 	const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-		if (isDrawing && startPoint) {
+		if (drawingLine.isDrawing && drawingLine.startPoint) {
 			const stage = stageRef.current;
 			if (!stage) return;
 
@@ -166,8 +178,8 @@ export const ERCanvas: React.FC = () => {
 			transform.invert();
 			const pos = transform.point(pointer);
 
-			// Update drawing line state for preview
-			// You'll need to add this to your store
+			// Update current point for preview
+			setDrawingLine(true, drawingLine.startPoint, pos);
 		}
 	};
 
@@ -209,6 +221,25 @@ export const ERCanvas: React.FC = () => {
 					{arrows.map((arrow) => (
 						<ArrowShapeComponent key={arrow.id} arrow={arrow} />
 					))}
+
+					{/* Preview line while drawing */}
+					{drawingLine.isDrawing &&
+						drawingLine.startPoint &&
+						drawingLine.currentPoint && (
+							<Line
+								points={[
+									drawingLine.startPoint.x,
+									drawingLine.startPoint.y,
+									drawingLine.currentPoint.x,
+									drawingLine.currentPoint.y,
+								]}
+								stroke="#3b82f6"
+								strokeWidth={2}
+								dash={[5, 5]}
+								lineCap="round"
+								listening={false}
+							/>
+						)}
 
 					{/* Transformer for resizing - works for both entities and relationships */}
 					<Transformer
