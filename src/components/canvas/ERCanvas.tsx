@@ -33,7 +33,7 @@ export const ERCanvas: React.FC = () => {
 
 	const drawingLine = useEditorStore((state) => state.drawingLine);
 	const setDrawingLine = useEditorStore((state) => state.setDrawingLine);
-	const setMode = useEditorStore((state) => state.setMode);
+	// const setMode = useEditorStore((state) => state.setMode);
 
 	// Update transformer when selection changes
 	useEffect(() => {
@@ -166,7 +166,7 @@ export const ERCanvas: React.FC = () => {
 	};
 
 	// Add mouse move handler for preview
-	const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+	const handleMouseMove = () => {
 		if (drawingLine.isDrawing && drawingLine.startPoint) {
 			const stage = stageRef.current;
 			if (!stage) return;
