@@ -18,12 +18,23 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 
-	const { id, name, position, selected, size } = relationship;
+	const { id, name, position, selected, size, rotation = 0 } = relationship;
 
 	// Diamond dimensions
 	const width = size.width;
 	const height = size.height;
 
+	// Handle drag move (update position in real-time for smooth dragging)
+	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+		updateRelationship(id, {
+			position: {
+				x: e.target.x(),
+				y: e.target.y(),
+			},
+		});
+	};
+
+	// Handle drag end
 	const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
 		updateRelationship(id, {
 			position: {
@@ -33,13 +44,14 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		});
 	};
 
-	// Handle transform (resize)
+	// Handle transform (resize and rotation)
 	const handleTransformEnd = () => {
 		const node = groupRef.current;
 		if (!node) return;
 
 		const scaleX = node.scaleX();
 		const scaleY = node.scaleY();
+		const newRotation = node.rotation();
 
 		// Reset scale to 1 and update size instead
 		node.scaleX(1);
@@ -50,6 +62,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				width: Math.max(60, size.width * scaleX),
 				height: Math.max(40, size.height * scaleY),
 			},
+			rotation: newRotation,
 		});
 	};
 
@@ -84,7 +97,9 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			id={id}
 			x={position.x}
 			y={position.y}
+			rotation={rotation}
 			draggable={mode === "select"}
+			onDragMove={handleDragMove}
 			onDragEnd={handleDragEnd}
 			onTransformEnd={handleTransformEnd}
 			onClick={handleClick}

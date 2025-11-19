@@ -11,10 +11,11 @@ export const ERCanvas: React.FC = () => {
 	const stageRef = useRef<Konva.Stage>(null);
 	const layerRef = useRef<Konva.Layer>(null);
 	const transformerRef = useRef<Konva.Transformer>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
 
 	const [stageSize, setStageSize] = useState({
 		width: window.innerWidth,
-		height: window.innerHeight - 60,
+		height: window.innerHeight - 56, // 56px = h-14 toolbar height
 	});
 
 	const entities = useEditorStore((state) => state.diagram.entities);
@@ -27,6 +28,9 @@ export const ERCanvas: React.FC = () => {
 	const addEntity = useEditorStore((state) => state.addEntity);
 	const addRelationship = useEditorStore((state) => state.addRelationship);
 	const setZoom = useEditorStore((state) => state.setZoom);
+	const setViewportPosition = useEditorStore(
+		(state) => state.setViewportPosition
+	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 	const addLine = useEditorStore((state) => state.addLine);
 	const addArrow = useEditorStore((state) => state.addArrow);
@@ -70,17 +74,34 @@ export const ERCanvas: React.FC = () => {
 		}
 	}, [selectedIds, entities, relationships]);
 
-	// Handle window resize
+	// Handle window resize and update stage size based on container
 	useEffect(() => {
-		const handleResize = () => {
-			setStageSize({
-				width: window.innerWidth,
-				height: window.innerHeight - 60,
-			});
+		const updateStageSize = () => {
+			if (containerRef.current) {
+				const rect = containerRef.current.getBoundingClientRect();
+				setStageSize({
+					width: rect.width,
+					height: rect.height,
+				});
+			}
 		};
 
-		window.addEventListener("resize", handleResize);
-		return () => window.removeEventListener("resize", handleResize);
+		// Initial size
+		updateStageSize();
+
+		// Resize observer for container size changes
+		const resizeObserver = new ResizeObserver(updateStageSize);
+		if (containerRef.current) {
+			resizeObserver.observe(containerRef.current);
+		}
+
+		// Window resize fallback
+		window.addEventListener("resize", updateStageSize);
+
+		return () => {
+			resizeObserver.disconnect();
+			window.removeEventListener("resize", updateStageSize);
+		};
 	}, []);
 
 	// Handle zoom with mouse wheel
@@ -110,6 +131,8 @@ export const ERCanvas: React.FC = () => {
 		};
 
 		stage.position(newPos);
+		// Sync viewport position to store
+		setViewportPosition(newPos);
 		stage.batchDraw();
 	};
 
@@ -183,8 +206,20 @@ export const ERCanvas: React.FC = () => {
 		}
 	};
 
+	// Initialize stage position from store on mount
+	useEffect(() => {
+		if (stageRef.current) {
+			const currentPos = stageRef.current.position();
+			// Only initialize if stage is at default position (0,0)
+			if (currentPos.x === 0 && currentPos.y === 0) {
+				stageRef.current.position(viewport.position);
+			}
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	return (
-		<div className="relative w-full h-full bg-gray-50">
+		<div ref={containerRef} className="relative w-full h-full bg-gray-50">
 			{/* Grid background */}
 			<div className="absolute inset-0 bg-grid-pattern opacity-20" />
 
@@ -194,10 +229,21 @@ export const ERCanvas: React.FC = () => {
 				height={stageSize.height}
 				scaleX={viewport.scale}
 				scaleY={viewport.scale}
+				x={viewport.position.x}
+				y={viewport.position.y}
 				draggable={mode === "pan"}
 				onWheel={handleWheel}
 				onClick={handleStageClick}
 				onMouseMove={handleMouseMove}
+				onDragEnd={(e) => {
+					if (mode === "pan") {
+						const stage = e.target as Konva.Stage;
+						setViewportPosition({
+							x: stage.x(),
+							y: stage.y(),
+						});
+					}
+				}}
 				className="cursor-crosshair"
 			>
 				<Layer ref={layerRef}>
@@ -241,7 +287,7 @@ export const ERCanvas: React.FC = () => {
 							/>
 						)}
 
-					{/* Transformer for resizing - works for both entities and relationships */}
+					{/* Transformer for resizing and rotating - works for both entities and relationships */}
 					<Transformer
 						ref={transformerRef}
 						boundBoxFunc={(oldBox, newBox) => {
@@ -257,7 +303,8 @@ export const ERCanvas: React.FC = () => {
 							"bottom-left",
 							"bottom-right",
 						]}
-						rotateEnabled={false}
+						rotateEnabled={true}
+						rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
 						keepRatio={false}
 					/>
 				</Layer>

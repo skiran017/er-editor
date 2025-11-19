@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Arrow } from "react-konva";
+import { Arrow, Group } from "react-konva";
 import type { ArrowShape as ArrowShapeType } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import Konva from "konva";
@@ -9,6 +9,7 @@ interface ArrowShapeProps {
 }
 
 export const ArrowShapeComponent: React.FC<ArrowShapeProps> = ({ arrow }) => {
+	const groupRef = useRef<Konva.Group>(null);
 	const arrowRef = useRef<Konva.Arrow>(null);
 	const updateArrow = useEditorStore((state) => state.updateArrow);
 	const selectElement = useEditorStore((state) => state.selectElement);
@@ -16,19 +17,26 @@ export const ArrowShapeComponent: React.FC<ArrowShapeProps> = ({ arrow }) => {
 
 	const {
 		id,
-		type,
 		points,
 		selected,
 		strokeWidth,
 		pointerLength,
 		pointerWidth,
+		position,
 	} = arrow;
 
-	// Determine if arrow points left or right
-	const isLeftArrow = type === "arrow-left";
-
-	// For left arrow, we need to reverse the points so the arrow head is at the start
-	const displayPoints = isLeftArrow ? [...points].reverse() : points;
+	// Convert absolute points to relative points for the group
+	// Note: Points are already stored in the correct order (reversed for left arrows in store)
+	// So we don't need to reverse here - Konva Arrow always puts arrowhead at the end
+	const relativePoints = points.map((point, index) => {
+		if (index % 2 === 0) {
+			// x coordinate - relative to position.x
+			return point - position.x;
+		} else {
+			// y coordinate - relative to position.y
+			return point - position.y;
+		}
+	});
 
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		if (mode === "select") {
@@ -36,13 +44,58 @@ export const ArrowShapeComponent: React.FC<ArrowShapeProps> = ({ arrow }) => {
 		}
 	};
 
+	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+		const group = e.target as Konva.Group;
+		const newX = group.x();
+		const newY = group.y();
+		const deltaX = newX - position.x;
+		const deltaY = newY - position.y;
+
+		// Only update if there's actual movement
+		if (deltaX !== 0 || deltaY !== 0) {
+			// Update points by adding the drag delta
+			const newPoints = points.map((point, index) => {
+				if (index % 2 === 0) {
+					// x coordinate
+					return point + deltaX;
+				} else {
+					// y coordinate
+					return point + deltaY;
+				}
+			});
+
+			updateArrow(id, {
+				position: {
+					x: newX,
+					y: newY,
+				},
+				points: newPoints,
+			});
+		}
+	};
+
 	const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-		const node = e.target;
+		const group = e.target as Konva.Group;
+		const deltaX = group.x() - position.x;
+		const deltaY = group.y() - position.y;
+
+		// Update points by adding the drag delta
+		const newPoints = points.map((point, index) => {
+			if (index % 2 === 0) {
+				// x coordinate
+				return point + deltaX;
+			} else {
+				// y coordinate
+				return point + deltaY;
+			}
+		});
+
 		updateArrow(id, {
 			position: {
-				x: node.x(),
-				y: node.y(),
+				x: group.x(),
+				y: group.y(),
 			},
+			points: newPoints,
 		});
 	};
 
@@ -50,11 +103,13 @@ export const ArrowShapeComponent: React.FC<ArrowShapeProps> = ({ arrow }) => {
 		const node = arrowRef.current;
 		if (!node) return;
 
+		// Get the transformed scale
 		const scaleX = node.scaleX();
 		const scaleY = node.scaleY();
 
-		// Scale the points
-		const newPoints = points.map((point, index) => {
+		// For arrows, we need to work with the original relative points (before reversal for display)
+		// Scale the relative points (not absolute points)
+		const newRelativePoints = relativePoints.map((point, index) => {
 			return index % 2 === 0 ? point * scaleX : point * scaleY;
 		});
 
@@ -62,30 +117,46 @@ export const ArrowShapeComponent: React.FC<ArrowShapeProps> = ({ arrow }) => {
 		node.scaleX(1);
 		node.scaleY(1);
 
+		// Convert back to absolute points for storage
+		const newAbsolutePoints = newRelativePoints.map((point, index) => {
+			if (index % 2 === 0) {
+				return point + position.x;
+			} else {
+				return point + position.y;
+			}
+		});
+
 		updateArrow(id, {
-			points: newPoints,
+			points: newAbsolutePoints,
 		});
 	};
 
 	return (
-		<Arrow
-			ref={arrowRef}
+		<Group
+			ref={groupRef}
 			id={id}
-			points={displayPoints}
-			stroke={selected ? "#3b82f6" : "black"}
-			fill={selected ? "#3b82f6" : "black"}
-			strokeWidth={strokeWidth}
-			pointerLength={pointerLength}
-			pointerWidth={pointerWidth}
-			lineCap="round"
-			lineJoin="round"
+			x={position.x}
+			y={position.y}
 			draggable={mode === "select"}
 			onClick={handleClick}
+			onDragMove={handleDragMove}
 			onDragEnd={handleDragEnd}
-			onTransformEnd={handleTransformEnd}
-			shadowEnabled={selected}
-			shadowBlur={10}
-			shadowOpacity={0.3}
-		/>
+		>
+			<Arrow
+				ref={arrowRef}
+				points={relativePoints}
+				stroke={selected ? "#3b82f6" : "black"}
+				fill={selected ? "#3b82f6" : "black"}
+				strokeWidth={strokeWidth}
+				pointerLength={pointerLength}
+				pointerWidth={pointerWidth}
+				lineCap="round"
+				lineJoin="round"
+				onTransformEnd={handleTransformEnd}
+				shadowEnabled={selected}
+				shadowBlur={10}
+				shadowOpacity={0.3}
+			/>
+		</Group>
 	);
 };

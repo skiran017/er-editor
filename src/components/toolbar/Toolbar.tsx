@@ -63,7 +63,7 @@ export const Toolbar: React.FC = () => {
 	};
 
 	return (
-		<div className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-2">
+		<div className="fixed top-0 left-0 right-0 z-50 h-14 bg-white border-b border-gray-200 flex items-center px-2 sm:px-4 gap-1 sm:gap-2 shadow-sm overflow-x-auto">
 			{/* Mode tools */}
 			<div className="flex items-center gap-1 mr-4 border-r pr-4">
 				{tools.map((tool) => {

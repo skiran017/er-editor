@@ -1,4 +1,4 @@
-import  { useEffect } from "react";
+import { useEffect } from "react";
 import { Toolbar } from "./components/toolbar/Toolbar";
 import { ERCanvas } from "./components/canvas/ERCanvas";
 import { useEditorStore } from "./store/editorStore";
@@ -97,7 +97,9 @@ function App() {
 	return (
 		<div className="h-screen flex flex-col overflow-hidden">
 			<Toolbar />
-			<ERCanvas />
+			<div className="flex-1 relative overflow-hidden mt-14">
+				<ERCanvas />
+			</div>
 		</div>
 	);
 }

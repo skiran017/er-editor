@@ -14,7 +14,26 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 
-	const { id, name, position, size, selected, attributes, isWeak } = entity;
+	const {
+		id,
+		name,
+		position,
+		size,
+		selected,
+		attributes,
+		isWeak,
+		rotation = 0,
+	} = entity;
+
+	// Handle drag move (update position in real-time for smooth dragging)
+	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+		updateEntity(id, {
+			position: {
+				x: e.target.x(),
+				y: e.target.y(),
+			},
+		});
+	};
 
 	// Handle drag end
 	const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -26,13 +45,14 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		});
 	};
 
-	// Handle transform (resize)
+	// Handle transform (resize and rotation)
 	const handleTransformEnd = () => {
 		const node = groupRef.current;
 		if (!node) return;
 
 		const scaleX = node.scaleX();
 		const scaleY = node.scaleY();
+		const newRotation = node.rotation();
 
 		// Reset scale to 1 and update size instead
 		node.scaleX(1);
@@ -43,6 +63,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 				width: Math.max(50, size.width * scaleX),
 				height: Math.max(30, size.height * scaleY),
 			},
+			rotation: newRotation,
 		});
 	};
 
@@ -65,7 +86,9 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 			id={id}
 			x={position.x}
 			y={position.y}
+			rotation={rotation}
 			draggable={mode === "select"}
+			onDragMove={handleDragMove}
 			onDragEnd={handleDragEnd}
 			onTransformEnd={handleTransformEnd}
 			onClick={handleClick}

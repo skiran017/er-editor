@@ -29,6 +29,7 @@ export interface Entity extends BaseElement {
   attributes: Attribute[];
   isWeak: boolean;
   size: Size;
+  rotation?: number;
 }
 
 export interface Relationship extends BaseElement {
@@ -38,6 +39,7 @@ export interface Relationship extends BaseElement {
   cardinalities: Record<string, Cardinality>;
   participations: Record<string, Participation>;
   size: Size;
+  rotation?: number;
 }
 
 export interface Connection {

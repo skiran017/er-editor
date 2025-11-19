@@ -90,6 +90,7 @@ export const useEditorStore = create<EditorStore>()(
             attributes: [],
             isWeak: false,
             size: { width: 150, height: 80 },
+            rotation: 0,
           };
           state.diagram.entities.push(newEntity);
         });
@@ -132,6 +133,7 @@ export const useEditorStore = create<EditorStore>()(
             cardinalities: {},
             participations: {},
             size: { width: 120, height: 80 },
+            rotation: 0,
           };
           state.diagram.relationships.push(newRelationship);
         });
@@ -191,10 +193,19 @@ export const useEditorStore = create<EditorStore>()(
       // Line actions
       addLine: (points: number[]) => {
         set((state) => {
+          // Calculate bounding box from points to set correct position
+          // points array: [x1, y1, x2, y2, ...]
+          let minX = Infinity;
+          let minY = Infinity;
+          for (let i = 0; i < points.length; i += 2) {
+            minX = Math.min(minX, points[i]);
+            minY = Math.min(minY, points[i + 1]);
+          }
+
           const newLine: LineShape = {
             id: generateId(),
             type: 'line',
-            position: { x: 0, y: 0 },
+            position: { x: minX, y: minY },
             selected: false,
             points,
             strokeWidth: 2,
@@ -222,12 +233,49 @@ export const useEditorStore = create<EditorStore>()(
       // Arrow actions
       addArrow: (type: 'arrow-left' | 'arrow-right', points: number[]) => {
         set((state) => {
+          // Calculate bounding box from ORIGINAL points to set correct position
+          // This ensures the position matches where the user actually drew
+          let minX = Infinity;
+          let minY = Infinity;
+          for (let i = 0; i < points.length; i += 2) {
+            minX = Math.min(minX, points[i]);
+            minY = Math.min(minY, points[i + 1]);
+          }
+
+          // Konva Arrow always puts the arrowhead at the END of the points array
+          // Points array is [x1, y1, x2, y2]
+          // For arrow-left: arrowhead should point left (be at the leftmost X coordinate)
+          // For arrow-right: arrowhead should point right (be at the rightmost X coordinate)
+          let finalPoints: number[];
+          const x1 = points[0];
+          const x2 = points[2];
+
+          if (type === 'arrow-left') {
+            // Arrowhead should be at the leftmost point (smaller X)
+            if (x1 < x2) {
+              // x1 is leftmost, so put it at the end: [x2, y2, x1, y1]
+              finalPoints = [points[2], points[3], points[0], points[1]];
+            } else {
+              // x2 is leftmost, so put it at the end: [x1, y1, x2, y2]
+              finalPoints = points;
+            }
+          } else {
+            // arrow-right: arrowhead should be at the rightmost point (larger X)
+            if (x1 > x2) {
+              // x1 is rightmost, so put it at the end: [x2, y2, x1, y1]
+              finalPoints = [points[2], points[3], points[0], points[1]];
+            } else {
+              // x2 is rightmost, so put it at the end: [x1, y1, x2, y2]
+              finalPoints = points;
+            }
+          }
+
           const newArrow: ArrowShape = {
             id: generateId(),
             type,
-            position: { x: 0, y: 0 },
+            position: { x: minX, y: minY },
             selected: false,
-            points,
+            points: finalPoints, // Store points with correct order for arrow direction
             strokeWidth: 2,
             pointerLength: 15,
             pointerWidth: 15,
