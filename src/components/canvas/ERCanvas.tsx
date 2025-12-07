@@ -37,6 +37,9 @@ export const ERCanvas: React.FC = () => {
 	const addLine = useEditorStore((state) => state.addLine);
 	const addArrow = useEditorStore((state) => state.addArrow);
 	const addAttribute = useEditorStore((state) => state.addAttribute);
+	const updateAttributePosition = useEditorStore(
+		(state) => state.updateAttributePosition
+	);
 
 	const drawingLine = useEditorStore((state) => state.drawingLine);
 	const setDrawingLine = useEditorStore((state) => state.setDrawingLine);
@@ -156,7 +159,7 @@ export const ERCanvas: React.FC = () => {
 			// Find the entity that was clicked on or nearest entity
 			let targetEntity = null;
 			const clickedNode = e.target;
-			
+
 			// Check if clicking directly on an entity
 			if (clickedNode && clickedNode.getType() === "Group") {
 				const groupId = clickedNode.id();

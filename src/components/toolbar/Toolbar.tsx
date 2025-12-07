@@ -33,7 +33,9 @@ export const Toolbar: React.FC = () => {
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const getElementById = useEditorStore((state) => state.getElementById);
 	const deleteEntity = useEditorStore((state) => state.deleteEntity);
-	const deleteRelationship = useEditorStore((state) => state.deleteRelationship);
+	const deleteRelationship = useEditorStore(
+		(state) => state.deleteRelationship
+	);
 	const deleteLine = useEditorStore((state) => state.deleteLine);
 	const deleteArrow = useEditorStore((state) => state.deleteArrow);
 	const deleteAttribute = useEditorStore((state) => state.deleteAttribute);

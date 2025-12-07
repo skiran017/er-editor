@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Group, Rect, Text, Circle } from "react-konva";
+import { Group, Rect, Text } from "react-konva";
 import type { Entity } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import Konva from "konva";
@@ -20,7 +20,6 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		position,
 		size,
 		selected,
-		attributes,
 		isWeak,
 		rotation = 0,
 	} = entity;
