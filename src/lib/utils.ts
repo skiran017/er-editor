@@ -46,3 +46,28 @@ export function findElementsInBox(
     })
     .map((element) => element.id);
 }
+
+// Determine which edge of an element a point is closest to
+export function getClosestEdge(
+  point: { x: number; y: number },
+  element: { position: { x: number; y: number }; size: { width: number; height: number } }
+): 'top' | 'right' | 'bottom' | 'left' {
+  const centerX = element.position.x + element.size.width / 2;
+  const centerY = element.position.y + element.size.height / 2;
+
+  const dx = point.x - centerX;
+  const dy = point.y - centerY;
+
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+
+  // Normalize by element dimensions to account for non-square shapes
+  const normalizedDx = absDx / element.size.width;
+  const normalizedDy = absDy / element.size.height;
+
+  if (normalizedDx > normalizedDy) {
+    return dx > 0 ? 'right' : 'left';
+  } else {
+    return dy > 0 ? 'bottom' : 'top';
+  }
+}

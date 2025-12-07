@@ -53,6 +53,9 @@ function App() {
 				case "a":
 					setMode("attribute");
 					break;
+				case "c":
+					setMode("connect");
+					break;
 				case "l":
 					setMode("line");
 					break;

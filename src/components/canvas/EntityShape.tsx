@@ -1,7 +1,8 @@
 import React, { useRef } from "react";
 import { Group, Rect, Text } from "react-konva";
-import type { Entity } from "../../types";
+import type { Entity, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
+import { getClosestEdge } from "../../lib/utils";
 import Konva from "konva";
 
 interface EntityShapeProps {
@@ -14,15 +15,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 
-	const {
-		id,
-		name,
-		position,
-		size,
-		selected,
-		isWeak,
-		rotation = 0,
-	} = entity;
+	const { id, name, position, size, selected, isWeak, rotation = 0 } = entity;
 
 	// Handle drag move (update position in real-time for smooth dragging)
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -66,10 +59,79 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		});
 	};
 
+	const drawingConnection = useEditorStore((state) => state.drawingConnection);
+	const setDrawingConnection = useEditorStore(
+		(state) => state.setDrawingConnection
+	);
+	const addConnection = useEditorStore((state) => state.addConnection);
+
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		if (mode === "connect") {
+			e.cancelBubble = true;
+			const stage = e.target.getStage();
+			if (!stage) return;
+
+			const pointer = stage.getPointerPosition();
+			if (!pointer) return;
+
+			const transform = stage.getAbsoluteTransform().copy();
+			transform.invert();
+			const pos = transform.point(pointer);
+
+			if (!drawingConnection.isDrawing) {
+				// Start connection
+				const edge = getClosestEdge(pos, entity) as ConnectionPoint;
+				// Calculate the actual connection point position
+				const centerX = entity.position.x + entity.size.width / 2;
+				const centerY = entity.position.y + entity.size.height / 2;
+				let connectionPoint: { x: number; y: number };
+				switch (edge) {
+					case "top":
+						connectionPoint = { x: centerX, y: entity.position.y };
+						break;
+					case "right":
+						connectionPoint = {
+							x: entity.position.x + entity.size.width,
+							y: centerY,
+						};
+						break;
+					case "bottom":
+						connectionPoint = {
+							x: centerX,
+							y: entity.position.y + entity.size.height,
+						};
+						break;
+					case "left":
+						connectionPoint = { x: entity.position.x, y: centerY };
+						break;
+					default:
+						connectionPoint = { x: centerX, y: centerY };
+				}
+				setDrawingConnection(true, id, edge, connectionPoint, []);
+			} else {
+				// Complete connection
+				if (drawingConnection.fromId && drawingConnection.fromId !== id) {
+					const toEdge = getClosestEdge(pos, entity) as ConnectionPoint;
+					addConnection(
+						drawingConnection.fromId,
+						id,
+						drawingConnection.fromPoint || "right",
+						toEdge,
+						drawingConnection.waypoints,
+						"straight"
+					);
+					setDrawingConnection(false, null, null, null, []);
+				} else {
+					// Cancel
+					setDrawingConnection(false, null, null, null, []);
+				}
+			}
+			return;
+		}
 		if (mode === "select") {
 			selectElement(id, e.evt.shiftKey);
 		}
+		e.cancelBubble = true;
 	};
 
 	const handleDblClick = () => {

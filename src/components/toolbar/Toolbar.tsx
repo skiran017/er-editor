@@ -15,6 +15,7 @@ import {
 	ArrowRight,
 	Trash2,
 	Circle,
+	Link,
 } from "lucide-react";
 import {
 	useEditorStore,
@@ -39,6 +40,7 @@ export const Toolbar: React.FC = () => {
 	const deleteLine = useEditorStore((state) => state.deleteLine);
 	const deleteArrow = useEditorStore((state) => state.deleteArrow);
 	const deleteAttribute = useEditorStore((state) => state.deleteAttribute);
+	const deleteConnection = useEditorStore((state) => state.deleteConnection);
 
 	const undo = useUndo();
 	const redo = useRedo();
@@ -50,6 +52,7 @@ export const Toolbar: React.FC = () => {
 		{ id: "entity", icon: Square, label: "Entity (E)" },
 		{ id: "relationship", icon: Diamond, label: "Relationship (R)" },
 		{ id: "attribute", icon: Circle, label: "Attribute (A)" },
+		{ id: "connect", icon: Link, label: "Connect (C)" },
 		{ id: "line", icon: Minus, label: "Line (L)" },
 		{ id: "arrow-left", icon: ArrowLeft, label: "Arrow Left" },
 		{ id: "arrow-right", icon: ArrowRight, label: "Arrow Right" },
@@ -94,6 +97,8 @@ export const Toolbar: React.FC = () => {
 				} else if (element.type === "attribute") {
 					// Attributes need entityId to delete
 					deleteAttribute(element.entityId, id);
+				} else if (element.type === "connection") {
+					deleteConnection(id);
 				}
 			}
 		});

@@ -7,6 +7,7 @@ import { RelationshipShape } from "./RelationshipShape";
 import { LineShapeComponent } from "./LineShape";
 import { ArrowShapeComponent } from "./ArrowShape";
 import { AttributeShape } from "./AttributeShape";
+import { ConnectionShape } from "./ConnectionShape";
 
 export const ERCanvas: React.FC = () => {
 	const stageRef = useRef<Konva.Stage>(null);
@@ -24,6 +25,7 @@ export const ERCanvas: React.FC = () => {
 	const lines = useEditorStore((state) => state.diagram.lines);
 	const arrows = useEditorStore((state) => state.diagram.arrows);
 	const attributes = useEditorStore((state) => state.diagram.attributes);
+	const connections = useEditorStore((state) => state.diagram.connections);
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const viewport = useEditorStore((state) => state.viewport);
 	const mode = useEditorStore((state) => state.mode);
@@ -43,6 +45,10 @@ export const ERCanvas: React.FC = () => {
 
 	const drawingLine = useEditorStore((state) => state.drawingLine);
 	const setDrawingLine = useEditorStore((state) => state.setDrawingLine);
+	const drawingConnection = useEditorStore((state) => state.drawingConnection);
+	const setDrawingConnection = useEditorStore(
+		(state) => state.setDrawingConnection
+	);
 	// const setMode = useEditorStore((state) => state.setMode);
 
 	// Update transformer when selection changes
@@ -154,6 +160,23 @@ export const ERCanvas: React.FC = () => {
 		transform.invert();
 		const pos = transform.point(pointer);
 
+		// Handle connection drawing mode - only for empty space clicks
+		// Entity/Relationship clicks are handled in their respective components
+		if (mode === "connect") {
+			// Only handle empty space clicks (for waypoints)
+			if (e.target === e.target.getStage() && drawingConnection.isDrawing) {
+				// Clicked on empty space - add waypoint if in connect mode
+				setDrawingConnection(
+					true,
+					drawingConnection.fromId,
+					drawingConnection.fromPoint,
+					pos,
+					[...drawingConnection.waypoints, pos]
+				);
+			}
+			return;
+		}
+
 		// Check if clicking on an entity (for attribute mode)
 		if (mode === "attribute") {
 			// Find the entity that was clicked on or nearest entity
@@ -256,19 +279,30 @@ export const ERCanvas: React.FC = () => {
 
 	// Add mouse move handler for preview
 	const handleMouseMove = () => {
+		const stage = stageRef.current;
+		if (!stage) return;
+
+		const pointer = stage.getPointerPosition();
+		if (!pointer) return;
+
+		const transform = stage.getAbsoluteTransform().copy();
+		transform.invert();
+		const pos = transform.point(pointer);
+
 		if (drawingLine.isDrawing && drawingLine.startPoint) {
-			const stage = stageRef.current;
-			if (!stage) return;
-
-			const pointer = stage.getPointerPosition();
-			if (!pointer) return;
-
-			const transform = stage.getAbsoluteTransform().copy();
-			transform.invert();
-			const pos = transform.point(pointer);
-
-			// Update current point for preview
+			// Update current point for line preview
 			setDrawingLine(true, drawingLine.startPoint, pos);
+		}
+
+		if (drawingConnection.isDrawing && drawingConnection.fromId) {
+			// Update current point for connection preview
+			setDrawingConnection(
+				true,
+				drawingConnection.fromId,
+				drawingConnection.fromPoint,
+				pos,
+				drawingConnection.waypoints
+			);
 		}
 	};
 
@@ -340,6 +374,11 @@ export const ERCanvas: React.FC = () => {
 						<ArrowShapeComponent key={arrow.id} arrow={arrow} />
 					))}
 
+					{/* Render connections between entities and relationships - render after other shapes but before preview */}
+					{connections.map((connection) => (
+						<ConnectionShape key={connection.id} connection={connection} />
+					))}
+
 					{/* Preview line while drawing */}
 					{drawingLine.isDrawing &&
 						drawingLine.startPoint &&
@@ -357,6 +396,78 @@ export const ERCanvas: React.FC = () => {
 								lineCap="round"
 								listening={false}
 							/>
+						)}
+
+					{/* Preview connection while drawing - only show if no connection exists yet */}
+					{drawingConnection.isDrawing &&
+						drawingConnection.fromId &&
+						drawingConnection.currentPoint && (
+							<>
+								{(() => {
+									// Get connection point from source element
+									const fromElement =
+										entities.find((e) => e.id === drawingConnection.fromId) ||
+										relationships.find(
+											(r) => r.id === drawingConnection.fromId
+										);
+									if (!fromElement) return null;
+
+									// Calculate connection point position (same logic as store)
+									const centerX =
+										fromElement.position.x + fromElement.size.width / 2;
+									const centerY =
+										fromElement.position.y + fromElement.size.height / 2;
+									let fromPoint: { x: number; y: number };
+
+									// For relationships (diamonds), connection points are at diamond vertices
+									// For entities (rectangles), connection points are at rectangle edges
+									// Both use the same calculation since diamonds are rendered within their bounding box
+									switch (drawingConnection.fromPoint) {
+										case "top":
+											fromPoint = { x: centerX, y: fromElement.position.y };
+											break;
+										case "right":
+											fromPoint = {
+												x: fromElement.position.x + fromElement.size.width,
+												y: centerY,
+											};
+											break;
+										case "bottom":
+											fromPoint = {
+												x: centerX,
+												y: fromElement.position.y + fromElement.size.height,
+											};
+											break;
+										case "left":
+											fromPoint = { x: fromElement.position.x, y: centerY };
+											break;
+										default:
+											fromPoint = { x: centerX, y: centerY };
+									}
+
+									// Build preview points: from -> waypoints -> current
+									const previewPoints: number[] = [fromPoint.x, fromPoint.y];
+									drawingConnection.waypoints.forEach((wp) => {
+										previewPoints.push(wp.x, wp.y);
+									});
+									previewPoints.push(
+										drawingConnection.currentPoint.x,
+										drawingConnection.currentPoint.y
+									);
+
+									return (
+										<Line
+											points={previewPoints}
+											stroke="#3b82f6"
+											strokeWidth={2}
+											dash={[5, 5]}
+											lineCap="round"
+											lineJoin="round"
+											listening={false}
+										/>
+									);
+								})()}
+							</>
 						)}
 
 					{/* Transformer for resizing and rotating - works for both entities and relationships */}

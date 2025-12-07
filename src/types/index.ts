@@ -54,11 +54,25 @@ export interface Relationship extends BaseElement {
   rotation?: number;
 }
 
-export interface Connection {
+// Connection point on an element (which edge/side)
+export type ConnectionPoint = 'top' | 'right' | 'bottom' | 'left' | 'center';
+
+// Connection style
+export type ConnectionStyle = 'straight' | 'curved' | 'orthogonal';
+
+export interface Connection extends BaseElement {
   id: string;
+  type: 'connection';
   fromId: string;
   toId: string;
-  points: number[];
+  fromPoint: ConnectionPoint; // Which edge of the source element
+  toPoint: ConnectionPoint; // Which edge of the target element
+  points: number[]; // Main path points [x1, y1, x2, y2, ...]
+  waypoints: Position[]; // Optional intermediate points for custom routing
+  style: ConnectionStyle;
+  cardinality: Cardinality; // Cardinality at the 'to' end
+  participation: Participation; // Participation at the 'to' end
+  labelPosition?: Position; // Position of the cardinality/participation label
 }
 
 export interface LineShape extends BaseElement {
@@ -79,7 +93,7 @@ export type Cardinality = '1' | 'N' | 'M';
 export type Participation = 'total' | 'partial';
 
 export interface DiagramElement extends BaseElement {
-  type: 'entity' | 'relationship' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right';
+  type: 'entity' | 'relationship' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connection';
 }
 
 export interface Diagram {
@@ -102,11 +116,18 @@ export interface EditorState {
     scale: number;
     position: Position;
   };
-  mode: 'select' | 'pan' | 'entity' | 'relationship' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right';
+  mode: 'select' | 'pan' | 'entity' | 'relationship' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connect';
   drawingLine: {
     isDrawing: boolean;
     startPoint: Position | null;
     currentPoint: Position | null;
+  };
+  drawingConnection: {
+    isDrawing: boolean;
+    fromId: string | null;
+    fromPoint: ConnectionPoint | null;
+    currentPoint: Position | null;
+    waypoints: Position[];
   };
 }
 

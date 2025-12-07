@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
-import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute } from '../types';
+import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation } from '../types';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -31,9 +31,12 @@ interface EditorStore extends EditorState {
   deleteArrow: (id: string) => void;
 
   // Connection actions
-  addConnection: (fromId: string, toId: string) => void;
-  updateConnection: (id: string, points: number[]) => void;
+  addConnection: (fromId: string, toId: string, fromPoint?: ConnectionPoint, toPoint?: ConnectionPoint, waypoints?: Position[], style?: ConnectionStyle) => void;
+  updateConnection: (id: string, updates: Partial<Connection>) => void;
   deleteConnection: (id: string) => void;
+  addConnectionWaypoint: (connectionId: string, waypoint: Position, index?: number) => void;
+  removeConnectionWaypoint: (connectionId: string, waypointIndex: number) => void;
+  updateConnectionWaypoint: (connectionId: string, waypointIndex: number, position: Position) => void;
 
   // Selection actions
   selectElement: (id: string, multi?: boolean) => void;
@@ -49,13 +52,57 @@ interface EditorStore extends EditorState {
 
   // Drawing state actions
   setDrawingLine: (isDrawing: boolean, startPoint?: Position | null, currentPoint?: Position | null) => void;
+  setDrawingConnection: (isDrawing: boolean, fromId?: string | null, fromPoint?: ConnectionPoint | null, currentPoint?: Position | null, waypoints?: Position[]) => void;
 
   // Utility
-  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | undefined;
+  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | undefined;
+  getConnectionPoints: (elementId: string) => Position[]; // Get connection points for an element
 }
 
 // Helper function to generate IDs
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// Helper function to get connection point position on an element
+const getConnectionPointPosition = (element: Entity | Relationship, point: ConnectionPoint): Position => {
+  const centerX = element.position.x + element.size.width / 2;
+  const centerY = element.position.y + element.size.height / 2;
+
+  // For relationships (diamonds), use diamond vertices
+  if (element.type === 'relationship') {
+    switch (point) {
+      case 'top':
+        // Top vertex of diamond
+        return { x: centerX, y: element.position.y };
+      case 'right':
+        // Right vertex of diamond
+        return { x: element.position.x + element.size.width, y: centerY };
+      case 'bottom':
+        // Bottom vertex of diamond
+        return { x: centerX, y: element.position.y + element.size.height };
+      case 'left':
+        // Left vertex of diamond
+        return { x: element.position.x, y: centerY };
+      case 'center':
+      default:
+        return { x: centerX, y: centerY };
+    }
+  }
+
+  // For entities (rectangles), use rectangle edges
+  switch (point) {
+    case 'top':
+      return { x: centerX, y: element.position.y };
+    case 'right':
+      return { x: element.position.x + element.size.width, y: centerY };
+    case 'bottom':
+      return { x: centerX, y: element.position.y + element.size.height };
+    case 'left':
+      return { x: element.position.x, y: centerY };
+    case 'center':
+    default:
+      return { x: centerX, y: centerY };
+  }
+};
 
 export const useEditorStore = create<EditorStore>()(
   temporal(
@@ -83,6 +130,13 @@ export const useEditorStore = create<EditorStore>()(
         isDrawing: false,
         startPoint: null,
         currentPoint: null,
+      },
+      drawingConnection: {
+        isDrawing: false,
+        fromId: null,
+        fromPoint: null,
+        currentPoint: null,
+        waypoints: [],
       },
 
       // Entity actions
@@ -248,32 +302,187 @@ export const useEditorStore = create<EditorStore>()(
       },
 
       // Connection actions
-      addConnection: (fromId, toId) => {
+      addConnection: (fromId, toId, fromPoint = 'right' as ConnectionPoint, toPoint = 'left' as ConnectionPoint, waypoints = [] as Position[], style = 'straight' as ConnectionStyle) => {
         set((state) => {
+          const fromElement = state.diagram.entities.find(e => e.id === fromId) ||
+            state.diagram.relationships.find(r => r.id === fromId);
+          const toElement = state.diagram.entities.find(e => e.id === toId) ||
+            state.diagram.relationships.find(r => r.id === toId);
+
+          if (!fromElement || !toElement) return;
+
+          // Calculate initial connection points
+          const fromPos = getConnectionPointPosition(fromElement, fromPoint);
+          const toPos = getConnectionPointPosition(toElement, toPoint);
+
+          // Build points array: from -> waypoints -> to
+          const points: number[] = [fromPos.x, fromPos.y];
+          waypoints.forEach(wp => {
+            points.push(wp.x, wp.y);
+          });
+          points.push(toPos.x, toPos.y);
+
           const newConnection: Connection = {
             id: generateId(),
+            type: 'connection',
             fromId,
             toId,
-            points: [], // Will be calculated based on element positions
+            fromPoint,
+            toPoint,
+            points,
+            waypoints,
+            style,
+            cardinality: '1' as Cardinality,
+            participation: 'partial' as Participation,
+            position: { x: Math.min(fromPos.x, toPos.x), y: Math.min(fromPos.y, toPos.y) },
+            selected: false,
           };
           state.diagram.connections.push(newConnection);
+
+          // Update relationship entityIds if connecting entity to relationship
+          if (fromElement.type === 'entity' && toElement.type === 'relationship') {
+            if (!toElement.entityIds.includes(fromId)) {
+              toElement.entityIds.push(fromId);
+            }
+          } else if (fromElement.type === 'relationship' && toElement.type === 'entity') {
+            if (!fromElement.entityIds.includes(toId)) {
+              fromElement.entityIds.push(toId);
+            }
+          }
         });
       },
 
-      updateConnection: (id, points) => {
+      updateConnection: (id, updates) => {
         set((state) => {
           const connection = state.diagram.connections.find((c) => c.id === id);
           if (connection) {
-            connection.points = points;
+            Object.assign(connection, updates);
+            // Recalculate points if from/to elements or waypoints changed
+            if (updates.fromPoint || updates.toPoint || updates.waypoints) {
+              const fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
+                state.diagram.relationships.find(r => r.id === connection.fromId);
+              const toElement = state.diagram.entities.find(e => e.id === connection.toId) ||
+                state.diagram.relationships.find(r => r.id === connection.toId);
+
+              if (fromElement && toElement) {
+                const fromPos = getConnectionPointPosition(fromElement, connection.fromPoint);
+                const toPos = getConnectionPointPosition(toElement, connection.toPoint);
+
+                const points: number[] = [fromPos.x, fromPos.y];
+                connection.waypoints.forEach(wp => {
+                  points.push(wp.x, wp.y);
+                });
+                points.push(toPos.x, toPos.y);
+                connection.points = points;
+              }
+            }
           }
         });
       },
 
       deleteConnection: (id) => {
         set((state) => {
+          const connection = state.diagram.connections.find(c => c.id === id);
+          if (connection) {
+            // Remove from relationship entityIds
+            const fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
+              state.diagram.relationships.find(r => r.id === connection.fromId);
+            const toElement = state.diagram.entities.find(e => e.id === connection.toId) ||
+              state.diagram.relationships.find(r => r.id === connection.toId);
+
+            if (fromElement?.type === 'relationship' && toElement?.type === 'entity') {
+              fromElement.entityIds = fromElement.entityIds.filter(eid => eid !== connection.toId);
+            } else if (fromElement?.type === 'entity' && toElement?.type === 'relationship') {
+              toElement.entityIds = toElement.entityIds.filter(eid => eid !== connection.fromId);
+            }
+          }
+
           state.diagram.connections = state.diagram.connections.filter(
             (c) => c.id !== id
           );
+          state.selectedIds = state.selectedIds.filter(sid => sid !== id);
+        });
+      },
+
+      addConnectionWaypoint: (connectionId, waypoint, index) => {
+        set((state) => {
+          const connection = state.diagram.connections.find((c) => c.id === connectionId);
+          if (connection) {
+            if (index !== undefined) {
+              connection.waypoints.splice(index, 0, waypoint);
+            } else {
+              connection.waypoints.push(waypoint);
+            }
+            // Recalculate points
+            const fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
+              state.diagram.relationships.find(r => r.id === connection.fromId);
+            const toElement = state.diagram.entities.find(e => e.id === connection.toId) ||
+              state.diagram.relationships.find(r => r.id === connection.toId);
+
+            if (fromElement && toElement) {
+              const fromPos = getConnectionPointPosition(fromElement, connection.fromPoint);
+              const toPos = getConnectionPointPosition(toElement, connection.toPoint);
+
+              const points: number[] = [fromPos.x, fromPos.y];
+              connection.waypoints.forEach(wp => {
+                points.push(wp.x, wp.y);
+              });
+              points.push(toPos.x, toPos.y);
+              connection.points = points;
+            }
+          }
+        });
+      },
+
+      removeConnectionWaypoint: (connectionId, waypointIndex) => {
+        set((state) => {
+          const connection = state.diagram.connections.find((c) => c.id === connectionId);
+          if (connection && waypointIndex >= 0 && waypointIndex < connection.waypoints.length) {
+            connection.waypoints.splice(waypointIndex, 1);
+            // Recalculate points
+            const fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
+              state.diagram.relationships.find(r => r.id === connection.fromId);
+            const toElement = state.diagram.entities.find(e => e.id === connection.toId) ||
+              state.diagram.relationships.find(r => r.id === connection.toId);
+
+            if (fromElement && toElement) {
+              const fromPos = getConnectionPointPosition(fromElement, connection.fromPoint);
+              const toPos = getConnectionPointPosition(toElement, connection.toPoint);
+
+              const points: number[] = [fromPos.x, fromPos.y];
+              connection.waypoints.forEach(wp => {
+                points.push(wp.x, wp.y);
+              });
+              points.push(toPos.x, toPos.y);
+              connection.points = points;
+            }
+          }
+        });
+      },
+
+      updateConnectionWaypoint: (connectionId, waypointIndex, position) => {
+        set((state) => {
+          const connection = state.diagram.connections.find((c) => c.id === connectionId);
+          if (connection && waypointIndex >= 0 && waypointIndex < connection.waypoints.length) {
+            connection.waypoints[waypointIndex] = position;
+            // Recalculate points
+            const fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
+              state.diagram.relationships.find(r => r.id === connection.fromId);
+            const toElement = state.diagram.entities.find(e => e.id === connection.toId) ||
+              state.diagram.relationships.find(r => r.id === connection.toId);
+
+            if (fromElement && toElement) {
+              const fromPos = getConnectionPointPosition(fromElement, connection.fromPoint);
+              const toPos = getConnectionPointPosition(toElement, connection.toPoint);
+
+              const points: number[] = [fromPos.x, fromPos.y];
+              connection.waypoints.forEach(wp => {
+                points.push(wp.x, wp.y);
+              });
+              points.push(toPos.x, toPos.y);
+              connection.points = points;
+            }
+          }
         });
       },
 
@@ -416,6 +625,9 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.attributes.forEach((a) => {
             a.selected = state.selectedIds.includes(a.id);
           });
+          state.diagram.connections.forEach((c) => {
+            c.selected = state.selectedIds.includes(c.id);
+          });
         });
       },
 
@@ -427,6 +639,7 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.lines.forEach((l) => (l.selected = false));
           state.diagram.arrows.forEach((a) => (a.selected = false));
           state.diagram.attributes.forEach((a) => (a.selected = false));
+          state.diagram.connections.forEach((c) => (c.selected = false));
         });
       },
 
@@ -447,6 +660,9 @@ export const useEditorStore = create<EditorStore>()(
           });
           state.diagram.attributes.forEach((a) => {
             a.selected = ids.includes(a.id);
+          });
+          state.diagram.connections.forEach((c) => {
+            c.selected = ids.includes(c.id);
           });
         });
       },
@@ -486,8 +702,18 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      setDrawingConnection: (isDrawing: boolean, fromId: string | null = null, fromPoint: ConnectionPoint | null = null, currentPoint: Position | null = null, waypoints: Position[] = []) => {
+        set((state) => {
+          state.drawingConnection.isDrawing = isDrawing;
+          if (fromId !== undefined) state.drawingConnection.fromId = fromId;
+          if (fromPoint !== undefined) state.drawingConnection.fromPoint = fromPoint;
+          if (currentPoint !== undefined) state.drawingConnection.currentPoint = currentPoint;
+          if (waypoints !== undefined) state.drawingConnection.waypoints = waypoints;
+        });
+      },
+
       // Utility
-      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | Attribute | undefined => {
+      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | undefined => {
         const state = get();
         return (
           state.diagram.entities.find((e) => e.id === id) ||
@@ -495,8 +721,24 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.lines.find((l) => l.id === id) ||
           state.diagram.arrows.find((a) => a.id === id) ||
           state.diagram.attributes.find((a) => a.id === id) ||
+          state.diagram.connections.find((c) => c.id === id) ||
           undefined
         );
+      },
+
+      getConnectionPoints: (elementId: string): Position[] => {
+        const state = get();
+        const element = state.diagram.entities.find((e) => e.id === elementId) ||
+          state.diagram.relationships.find((r) => r.id === elementId);
+
+        if (!element) return [];
+
+        return [
+          getConnectionPointPosition(element, 'top'),
+          getConnectionPointPosition(element, 'right'),
+          getConnectionPointPosition(element, 'bottom'),
+          getConnectionPointPosition(element, 'left'),
+        ];
       },
     })),
     {

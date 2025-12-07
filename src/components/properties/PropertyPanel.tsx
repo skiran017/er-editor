@@ -1,17 +1,20 @@
 import React, { useState } from "react";
-import { X, Plus, Trash2, Key, Database } from "lucide-react";
+import { X, Plus, Trash2, Key, Database, Link } from "lucide-react";
 import { useEditorStore } from "../../store/editorStore";
 import type {
 	Entity,
 	EntityAttribute,
 	Cardinality,
 	Participation,
+	ConnectionPoint,
+	ConnectionStyle,
 } from "../../types";
 
 export const PropertyPanel: React.FC = () => {
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
+	const connections = useEditorStore((state) => state.diagram.connections);
 
 	// Get the first selected element (for now, we only support single selection in property panel)
 	const selectedId = selectedIds[0];
@@ -21,9 +24,10 @@ export const PropertyPanel: React.FC = () => {
 		return null;
 	}
 
-	// Find entity or relationship directly from store (reactive)
+	// Find entity, relationship, or connection directly from store (reactive)
 	const entity = entities.find((e) => e.id === selectedId);
 	const relationship = relationships.find((r) => r.id === selectedId);
+	const connection = connections.find((c) => c.id === selectedId);
 
 	// Handle entity properties
 	if (entity) {
@@ -33,6 +37,11 @@ export const PropertyPanel: React.FC = () => {
 	// Handle relationship properties
 	if (relationship) {
 		return <RelationshipPropertyPanel relationshipId={relationship.id} />;
+	}
+
+	// Handle connection properties
+	if (connection) {
+		return <ConnectionPropertyPanel connectionId={connection.id} />;
 	}
 
 	return null;
@@ -416,6 +425,236 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 									</div>
 								);
 							})}
+						</div>
+					</div>
+				)}
+			</div>
+		</div>
+	);
+};
+
+interface ConnectionPropertyPanelProps {
+	connectionId: string;
+}
+
+const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
+	connectionId,
+}) => {
+	// Get connection reactively from store
+	const connection = useEditorStore((state) =>
+		state.diagram.connections.find((c) => c.id === connectionId)
+	);
+	const entities = useEditorStore((state) => state.diagram.entities);
+	const relationships = useEditorStore((state) => state.diagram.relationships);
+
+	const updateConnection = useEditorStore((state) => state.updateConnection);
+	const removeConnectionWaypoint = useEditorStore(
+		(state) => state.removeConnectionWaypoint
+	);
+	const clearSelection = useEditorStore((state) => state.clearSelection);
+
+	// Don't render if connection not found
+	if (!connection) {
+		return null;
+	}
+
+	// Find from and to elements
+	const fromElement =
+		entities.find((e) => e.id === connection.fromId) ||
+		relationships.find((r) => r.id === connection.fromId);
+	const toElement =
+		entities.find((e) => e.id === connection.toId) ||
+		relationships.find((r) => r.id === connection.toId);
+
+	const handleCardinalityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+		updateConnection(connection.id, {
+			cardinality: e.target.value as Cardinality,
+		});
+	};
+
+	const handleParticipationChange = (
+		e: React.ChangeEvent<HTMLSelectElement>
+	) => {
+		updateConnection(connection.id, {
+			participation: e.target.value as Participation,
+		});
+	};
+
+	const handleFromPointChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+		updateConnection(connection.id, {
+			fromPoint: e.target.value as ConnectionPoint,
+		});
+	};
+
+	const handleToPointChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+		updateConnection(connection.id, {
+			toPoint: e.target.value as ConnectionPoint,
+		});
+	};
+
+	const handleStyleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+		updateConnection(connection.id, {
+			style: e.target.value as ConnectionStyle,
+		});
+	};
+
+	const handleRemoveWaypoint = (index: number) => {
+		removeConnectionWaypoint(connection.id, index);
+	};
+
+	return (
+		<div className="absolute right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-40 flex flex-col">
+			{/* Header */}
+			<div className="flex items-center justify-between p-4 border-b border-gray-200">
+				<div className="flex items-center gap-2">
+					<Link className="w-5 h-5 text-blue-600" />
+					<h2 className="text-lg font-semibold">Connection Properties</h2>
+				</div>
+				<button
+					onClick={clearSelection}
+					className="p-1 rounded hover:bg-gray-100 transition-colors"
+					title="Close"
+				>
+					<X className="w-5 h-5" />
+				</button>
+			</div>
+
+			{/* Content */}
+			<div className="flex-1 overflow-y-auto p-4 space-y-6">
+				{/* Connection Info */}
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						From
+					</label>
+					<div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm">
+						{fromElement
+							? `${
+									fromElement.type === "entity" ? "Entity" : "Relationship"
+							  }: ${fromElement.name || "Unnamed"}`
+							: "Unknown"}
+					</div>
+				</div>
+
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						To
+					</label>
+					<div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm">
+						{toElement
+							? `${toElement.type === "entity" ? "Entity" : "Relationship"}: ${
+									toElement.name || "Unnamed"
+							  }`
+							: "Unknown"}
+					</div>
+				</div>
+
+				{/* Cardinality */}
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Cardinality
+					</label>
+					<select
+						value={connection.cardinality}
+						onChange={handleCardinalityChange}
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					>
+						<option value="1">1</option>
+						<option value="N">N</option>
+						<option value="M">M</option>
+					</select>
+				</div>
+
+				{/* Participation */}
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Participation
+					</label>
+					<select
+						value={connection.participation}
+						onChange={handleParticipationChange}
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					>
+						<option value="partial">Partial</option>
+						<option value="total">Total</option>
+					</select>
+				</div>
+
+				{/* Connection Points */}
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						From Point
+					</label>
+					<select
+						value={connection.fromPoint}
+						onChange={handleFromPointChange}
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					>
+						<option value="top">Top</option>
+						<option value="right">Right</option>
+						<option value="bottom">Bottom</option>
+						<option value="left">Left</option>
+						<option value="center">Center</option>
+					</select>
+				</div>
+
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						To Point
+					</label>
+					<select
+						value={connection.toPoint}
+						onChange={handleToPointChange}
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					>
+						<option value="top">Top</option>
+						<option value="right">Right</option>
+						<option value="bottom">Bottom</option>
+						<option value="left">Left</option>
+						<option value="center">Center</option>
+					</select>
+				</div>
+
+				{/* Connection Style */}
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Style
+					</label>
+					<select
+						value={connection.style}
+						onChange={handleStyleChange}
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+					>
+						<option value="straight">Straight</option>
+						<option value="curved">Curved</option>
+						<option value="orthogonal">Orthogonal</option>
+					</select>
+				</div>
+
+				{/* Waypoints */}
+				{connection.waypoints.length > 0 && (
+					<div>
+						<label className="block text-sm font-medium text-gray-700 mb-2">
+							Waypoints ({connection.waypoints.length})
+						</label>
+						<div className="space-y-2">
+							{connection.waypoints.map((waypoint, index) => (
+								<div
+									key={index}
+									className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded"
+								>
+									<span className="text-sm text-gray-600">
+										Point {index + 1}: ({Math.round(waypoint.x)},{" "}
+										{Math.round(waypoint.y)})
+									</span>
+									<button
+										onClick={() => handleRemoveWaypoint(index)}
+										className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+										title="Remove waypoint"
+									>
+										<Trash2 className="w-4 h-4" />
+									</button>
+								</div>
+							))}
 						</div>
 					</div>
 				)}
