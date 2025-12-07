@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Toolbar } from "./components/toolbar/Toolbar";
 import { ERCanvas } from "./components/canvas/ERCanvas";
+import { PropertyPanel } from "./components/properties/PropertyPanel";
 import { useEditorStore } from "./store/editorStore";
 
 function App() {
@@ -9,6 +10,16 @@ function App() {
 	// Keyboard shortcuts
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
+			// Don't interfere with input fields, textareas, or contenteditable elements
+			const target = e.target as HTMLElement;
+			if (
+				target.tagName === "INPUT" ||
+				target.tagName === "TEXTAREA" ||
+				target.isContentEditable
+			) {
+				return;
+			}
+
 			// Prevent default browser shortcuts
 			if (e.ctrlKey || e.metaKey) {
 				switch (e.key) {
@@ -38,6 +49,9 @@ function App() {
 					break;
 				case "r":
 					setMode("relationship");
+					break;
+				case "a":
+					setMode("attribute");
 					break;
 				case "l":
 					setMode("line");
@@ -99,6 +113,7 @@ function App() {
 			<Toolbar />
 			<div className="flex-1 relative overflow-hidden mt-14">
 				<ERCanvas />
+				<PropertyPanel />
 			</div>
 		</div>
 	);

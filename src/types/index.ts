@@ -15,7 +15,8 @@ export interface BaseElement {
   selected: boolean;
 }
 
-export interface Attribute {
+// Simplified attribute stored in entity (for reference)
+export interface EntityAttribute {
   id: string;
   name: string;
   isKey: boolean;
@@ -23,10 +24,21 @@ export interface Attribute {
   isDerived: boolean;
 }
 
+// Full attribute with position for canvas rendering
+export interface Attribute extends BaseElement {
+  id: string;
+  name: string;
+  isKey: boolean;
+  isMultivalued: boolean;
+  isDerived: boolean;
+  entityId: string; // Parent entity ID
+  type: 'attribute';
+}
+
 export interface Entity extends BaseElement {
   type: 'entity';
   name: string;
-  attributes: Attribute[];
+  attributes: EntityAttribute[]; // Simplified attributes for reference
   isWeak: boolean;
   size: Size;
   rotation?: number;
@@ -76,6 +88,7 @@ export interface Diagram {
   connections: Connection[];
   lines: LineShape[];
   arrows: ArrowShape[];
+  attributes: Attribute[]; // Attributes as separate canvas elements
 }
 
 export interface EditorState {

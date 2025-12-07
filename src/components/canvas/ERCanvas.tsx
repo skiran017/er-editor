@@ -6,6 +6,7 @@ import { EntityShape } from "./EntityShape";
 import { RelationshipShape } from "./RelationshipShape";
 import { LineShapeComponent } from "./LineShape";
 import { ArrowShapeComponent } from "./ArrowShape";
+import { AttributeShape } from "./AttributeShape";
 
 export const ERCanvas: React.FC = () => {
 	const stageRef = useRef<Konva.Stage>(null);
@@ -22,6 +23,7 @@ export const ERCanvas: React.FC = () => {
 	const relationships = useEditorStore((state) => state.diagram.relationships);
 	const lines = useEditorStore((state) => state.diagram.lines);
 	const arrows = useEditorStore((state) => state.diagram.arrows);
+	const attributes = useEditorStore((state) => state.diagram.attributes);
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const viewport = useEditorStore((state) => state.viewport);
 	const mode = useEditorStore((state) => state.mode);
@@ -34,6 +36,7 @@ export const ERCanvas: React.FC = () => {
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 	const addLine = useEditorStore((state) => state.addLine);
 	const addArrow = useEditorStore((state) => state.addArrow);
+	const addAttribute = useEditorStore((state) => state.addAttribute);
 
 	const drawingLine = useEditorStore((state) => state.drawingLine);
 	const setDrawingLine = useEditorStore((state) => state.setDrawingLine);
@@ -138,17 +141,77 @@ export const ERCanvas: React.FC = () => {
 
 	// Handle canvas click
 	const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		const stage = stageRef.current;
+		if (!stage) return;
+
+		const pointer = stage.getPointerPosition();
+		if (!pointer) return;
+
+		const transform = stage.getAbsoluteTransform().copy();
+		transform.invert();
+		const pos = transform.point(pointer);
+
+		// Check if clicking on an entity (for attribute mode)
+		if (mode === "attribute") {
+			// Find the entity that was clicked on or nearest entity
+			let targetEntity = null;
+			const clickedNode = e.target;
+			
+			// Check if clicking directly on an entity
+			if (clickedNode && clickedNode.getType() === "Group") {
+				const groupId = clickedNode.id();
+				targetEntity = entities.find((e) => e.id === groupId);
+			}
+
+			// If not clicking on entity, find nearest entity within reasonable distance
+			if (!targetEntity) {
+				let minDistance = Infinity;
+				const maxDistance = 200; // Maximum distance to consider
+
+				for (const entity of entities) {
+					const entityCenterX = entity.position.x + entity.size.width / 2;
+					const entityCenterY = entity.position.y + entity.size.height / 2;
+					const distance = Math.sqrt(
+						Math.pow(pos.x - entityCenterX, 2) +
+							Math.pow(pos.y - entityCenterY, 2)
+					);
+
+					if (distance < minDistance && distance < maxDistance) {
+						minDistance = distance;
+						targetEntity = entity;
+					}
+				}
+			}
+
+			if (targetEntity) {
+				// Add attribute to the entity
+				addAttribute(targetEntity.id, {
+					name: "New Attribute",
+					isKey: false,
+					isMultivalued: false,
+					isDerived: false,
+				});
+				// Update position to clicked position after creation
+				// Use a small delay to ensure attribute is created first
+				requestAnimationFrame(() => {
+					const state = useEditorStore.getState();
+					// Find the most recently created attribute for this entity
+					const entityAttributes = state.diagram.attributes.filter(
+						(a) => a.entityId === targetEntity.id
+					);
+					if (entityAttributes.length > 0) {
+						// Get the last one (most recently added)
+						const newAttribute = entityAttributes[entityAttributes.length - 1];
+						if (newAttribute && newAttribute.name === "New Attribute") {
+							updateAttributePosition(newAttribute.id, pos);
+						}
+					}
+				});
+			}
+			return;
+		}
+
 		if (e.target === e.target.getStage()) {
-			const stage = stageRef.current;
-			if (!stage) return;
-
-			const pointer = stage.getPointerPosition();
-			if (!pointer) return;
-
-			const transform = stage.getAbsoluteTransform().copy();
-			transform.invert();
-			const pos = transform.point(pointer);
-
 			if (mode === "entity") {
 				addEntity(pos);
 			} else if (mode === "relationship") {
@@ -259,6 +322,12 @@ export const ERCanvas: React.FC = () => {
 							relationship={relationship}
 						/>
 					))}
+
+					{/* Render attributes with connection lines */}
+					{attributes.map((attribute) => (
+						<AttributeShape key={attribute.id} attribute={attribute} />
+					))}
+
 					{/* Render lines */}
 					{lines.map((line) => (
 						<LineShapeComponent key={line.id} line={line} />

@@ -1,13 +1,19 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
-import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape } from '../types';
+import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute } from '../types';
 
 interface EditorStore extends EditorState {
   // Entity actions
   addEntity: (position: Position) => void;
   updateEntity: (id: string, updates: Partial<Entity>) => void;
   deleteEntity: (id: string) => void;
+
+  // Attribute actions
+  addAttribute: (entityId: string, attribute: Omit<EntityAttribute, 'id'>) => void;
+  updateAttribute: (entityId: string, attributeId: string, updates: Partial<Attribute>) => void;
+  deleteAttribute: (entityId: string, attributeId: string) => void;
+  updateAttributePosition: (attributeId: string, position: Position) => void;
 
   // Relationship actions
   addRelationship: (position: Position) => void;
@@ -45,7 +51,7 @@ interface EditorStore extends EditorState {
   setDrawingLine: (isDrawing: boolean, startPoint?: Position | null, currentPoint?: Position | null) => void;
 
   // Utility
-  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | undefined;
+  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | undefined;
 }
 
 // Helper function to generate IDs
@@ -61,6 +67,7 @@ export const useEditorStore = create<EditorStore>()(
         connections: [],
         lines: [],
         arrows: [],
+        attributes: [],
       },
       selectedIds: [],
       history: {
@@ -110,6 +117,11 @@ export const useEditorStore = create<EditorStore>()(
           // Remove entity
           state.diagram.entities = state.diagram.entities.filter((e) => e.id !== id);
 
+          // Remove associated attributes
+          state.diagram.attributes = state.diagram.attributes.filter(
+            (a) => a.entityId !== id
+          );
+
           // Remove associated connections
           state.diagram.connections = state.diagram.connections.filter(
             (c) => c.fromId !== id && c.toId !== id
@@ -117,6 +129,81 @@ export const useEditorStore = create<EditorStore>()(
 
           // Remove from selection
           state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
+        });
+      },
+
+      // Attribute actions
+      addAttribute: (entityId, attribute) => {
+        set((state) => {
+          const entity = state.diagram.entities.find((e) => e.id === entityId);
+          if (entity) {
+            const attributeId = generateId();
+            // Calculate position relative to entity (to the right side)
+            const attributeCount = state.diagram.attributes.filter(a => a.entityId === entityId).length;
+            const newAttribute: Attribute = {
+              id: attributeId,
+              type: 'attribute',
+              ...attribute,
+              entityId,
+              position: {
+                x: entity.position.x + entity.size.width + 40,
+                y: entity.position.y + 20 + attributeCount * 30,
+              },
+              selected: false,
+            };
+            // Add to both entity's attributes array and diagram's attributes array
+            entity.attributes.push({
+              id: attributeId,
+              name: attribute.name,
+              isKey: attribute.isKey,
+              isMultivalued: attribute.isMultivalued,
+              isDerived: attribute.isDerived,
+            });
+            state.diagram.attributes.push(newAttribute);
+          }
+        });
+      },
+
+      updateAttribute: (entityId: string, attributeId: string, updates: Partial<EntityAttribute>) => {
+        set((state) => {
+          const entity = state.diagram.entities.find((e) => e.id === entityId);
+          const canvasAttribute = state.diagram.attributes.find((a) => a.id === attributeId);
+
+          if (entity) {
+            const attribute = entity.attributes.find((a) => a.id === attributeId);
+            if (attribute) {
+              Object.assign(attribute, updates);
+            }
+          }
+
+          // Also update canvas attribute
+          if (canvasAttribute) {
+            if (updates.name !== undefined) canvasAttribute.name = updates.name;
+            if (updates.isKey !== undefined) canvasAttribute.isKey = updates.isKey;
+            if (updates.isMultivalued !== undefined) canvasAttribute.isMultivalued = updates.isMultivalued;
+            if (updates.isDerived !== undefined) canvasAttribute.isDerived = updates.isDerived;
+          }
+        });
+      },
+
+      deleteAttribute: (entityId, attributeId) => {
+        set((state) => {
+          const entity = state.diagram.entities.find((e) => e.id === entityId);
+          if (entity) {
+            entity.attributes = entity.attributes.filter((a) => a.id !== attributeId);
+          }
+          // Also remove from canvas attributes
+          state.diagram.attributes = state.diagram.attributes.filter((a) => a.id !== attributeId);
+        });
+      },
+
+      // Attribute position actions
+      updateAttributePosition: (attributeId: string, position: Position) => {
+        set((state) => {
+          const attribute = state.diagram.attributes.find((a) => a.id === attributeId);
+          if (attribute) {
+            attribute.position = position;
+          }
         });
       },
 
@@ -326,6 +413,9 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.arrows.forEach((a) => {
             a.selected = state.selectedIds.includes(a.id);
           });
+          state.diagram.attributes.forEach((a) => {
+            a.selected = state.selectedIds.includes(a.id);
+          });
         });
       },
 
@@ -336,6 +426,7 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.relationships.forEach((r) => (r.selected = false));
           state.diagram.lines.forEach((l) => (l.selected = false));
           state.diagram.arrows.forEach((a) => (a.selected = false));
+          state.diagram.attributes.forEach((a) => (a.selected = false));
         });
       },
 
@@ -352,6 +443,9 @@ export const useEditorStore = create<EditorStore>()(
             l.selected = ids.includes(l.id);
           });
           state.diagram.arrows.forEach((a) => {
+            a.selected = ids.includes(a.id);
+          });
+          state.diagram.attributes.forEach((a) => {
             a.selected = ids.includes(a.id);
           });
         });
@@ -393,14 +487,15 @@ export const useEditorStore = create<EditorStore>()(
       },
 
       // Utility
-      // Utility
-      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | undefined => {
+      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | Attribute | undefined => {
         const state = get();
         return (
           state.diagram.entities.find((e) => e.id === id) ||
           state.diagram.relationships.find((r) => r.id === id) ||
           state.diagram.lines.find((l) => l.id === id) ||
-          state.diagram.arrows.find((a) => a.id === id)
+          state.diagram.arrows.find((a) => a.id === id) ||
+          state.diagram.attributes.find((a) => a.id === id) ||
+          undefined
         );
       },
     })),

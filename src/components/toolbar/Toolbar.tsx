@@ -13,6 +13,8 @@ import {
 	Minus,
 	ArrowLeft,
 	ArrowRight,
+	Trash2,
+	Circle,
 } from "lucide-react";
 import {
 	useEditorStore,
@@ -28,6 +30,13 @@ export const Toolbar: React.FC = () => {
 	const setMode = useEditorStore((state) => state.setMode);
 	const setZoom = useEditorStore((state) => state.setZoom);
 	const viewport = useEditorStore((state) => state.viewport);
+	const selectedIds = useEditorStore((state) => state.selectedIds);
+	const getElementById = useEditorStore((state) => state.getElementById);
+	const deleteEntity = useEditorStore((state) => state.deleteEntity);
+	const deleteRelationship = useEditorStore((state) => state.deleteRelationship);
+	const deleteLine = useEditorStore((state) => state.deleteLine);
+	const deleteArrow = useEditorStore((state) => state.deleteArrow);
+	const deleteAttribute = useEditorStore((state) => state.deleteAttribute);
 
 	const undo = useUndo();
 	const redo = useRedo();
@@ -38,6 +47,7 @@ export const Toolbar: React.FC = () => {
 		{ id: "select", icon: MousePointer2, label: "Select (V)" },
 		{ id: "entity", icon: Square, label: "Entity (E)" },
 		{ id: "relationship", icon: Diamond, label: "Relationship (R)" },
+		{ id: "attribute", icon: Circle, label: "Attribute (A)" },
 		{ id: "line", icon: Minus, label: "Line (L)" },
 		{ id: "arrow-left", icon: ArrowLeft, label: "Arrow Left" },
 		{ id: "arrow-right", icon: ArrowRight, label: "Arrow Right" },
@@ -60,6 +70,31 @@ export const Toolbar: React.FC = () => {
 	const handleImport = () => {
 		// TODO: Implement XML import
 		console.log("Import clicked");
+	};
+
+	const handleDelete = () => {
+		if (selectedIds.length === 0) return;
+
+		selectedIds.forEach((id) => {
+			const element = getElementById(id);
+			if (element) {
+				if (element.type === "entity") {
+					deleteEntity(id);
+				} else if (element.type === "relationship") {
+					deleteRelationship(id);
+				} else if (element.type === "line") {
+					deleteLine(id);
+				} else if (
+					element.type === "arrow-left" ||
+					element.type === "arrow-right"
+				) {
+					deleteArrow(id);
+				} else if (element.type === "attribute") {
+					// Attributes need entityId to delete
+					deleteAttribute(element.entityId, id);
+				}
+			}
+		});
 	};
 
 	return (
@@ -111,6 +146,19 @@ export const Toolbar: React.FC = () => {
 					<Redo2 size={20} />
 				</button>
 			</div>
+
+			{/* Delete button - only show when something is selected */}
+			{selectedIds.length > 0 && (
+				<div className="flex items-center gap-1 mr-4 border-r pr-4">
+					<button
+						onClick={handleDelete}
+						className="p-2 rounded hover:bg-red-100 text-red-600 transition-colors"
+						title={`Delete selected (${selectedIds.length})`}
+					>
+						<Trash2 size={20} />
+					</button>
+				</div>
+			)}
 
 			{/* Zoom tools */}
 			<div className="flex items-center gap-1 mr-4 border-r pr-4">

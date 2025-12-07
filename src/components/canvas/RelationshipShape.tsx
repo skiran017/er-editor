@@ -73,10 +73,8 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	};
 
 	const handleDblClick = () => {
-		const newName = prompt("Enter relationship name:", name);
-		if (newName) {
-			updateRelationship(id, { name: newName });
-		}
+		// Double-click now just ensures selection (property panel will show)
+		selectElement(id, false);
 	};
 
 	// Diamond points: top, right, bottom, left

@@ -74,10 +74,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	};
 
 	const handleDblClick = () => {
-		const newName = prompt("Enter entity name:", name);
-		if (newName) {
-			updateEntity(id, { name: newName });
-		}
+		// Double-click now just ensures selection (property panel will show)
+		selectElement(id, false);
 	};
 
 	return (
@@ -129,30 +127,6 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 				fontStyle="bold"
 				fill="black"
 			/>
-
-			{/* Attribute circles preview */}
-			{attributes.slice(0, 3).map((attr, index) => (
-				<Circle
-					key={attr.id}
-					x={size.width + 20}
-					y={20 + index * 15}
-					radius={5}
-					fill={attr.isKey ? "#fbbf24" : "white"}
-					stroke="black"
-					strokeWidth={1}
-				/>
-			))}
-
-			{/* Attribute count indicator */}
-			{attributes.length > 3 && (
-				<Text
-					text={`+${attributes.length - 3}`}
-					x={size.width + 35}
-					y={65}
-					fontSize={10}
-					fill="#6b7280"
-				/>
-			)}
 		</Group>
 	);
 };
