@@ -128,6 +128,53 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	// Determine stroke style
 	const strokeColor = selected ? "#3b82f6" : "#6b7280";
 	const strokeWidth = selected ? 2.5 : 2;
+	const isTotalParticipation = participation === "total";
+
+	// Calculate offset points for double line (perpendicular to each segment)
+	const getOffsetPoints = (
+		originalPoints: number[],
+		offset: number
+	): number[] => {
+		if (originalPoints.length < 4) return originalPoints;
+
+		const offsetPoints: number[] = [];
+
+		// Process each segment
+		for (let i = 0; i < originalPoints.length - 2; i += 2) {
+			const x1 = originalPoints[i];
+			const y1 = originalPoints[i + 1];
+			const x2 = originalPoints[i + 2];
+			const y2 = originalPoints[i + 3];
+
+			// Calculate direction vector
+			const dx = x2 - x1;
+			const dy = y2 - y1;
+			const length = Math.sqrt(dx * dx + dy * dy);
+
+			if (length > 0.1) {
+				// Perpendicular vector (normalized, pointing to the right side)
+				const perpX = -dy / length;
+				const perpY = dx / length;
+
+				// Apply offset to start point (only for first segment)
+				if (i === 0) {
+					offsetPoints.push(x1 + perpX * offset, y1 + perpY * offset);
+				}
+				// Apply offset to end point
+				offsetPoints.push(x2 + perpX * offset, y2 + perpY * offset);
+			} else {
+				// Degenerate segment, just copy points
+				if (i === 0) {
+					offsetPoints.push(x1, y1);
+				}
+				offsetPoints.push(x2, y2);
+			}
+		}
+
+		return offsetPoints;
+	};
+
+	const offsetDistance = 3; // Distance between double lines in pixels
 
 	return (
 		<Group ref={groupRef} listening={true}>
@@ -143,6 +190,21 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 				shadowBlur={5}
 				shadowOpacity={0.3}
 			/>
+
+			{/* Second line for total participation (double line) */}
+			{isTotalParticipation && (
+				<Line
+					points={getOffsetPoints(points, offsetDistance)}
+					stroke={strokeColor}
+					strokeWidth={strokeWidth}
+					lineCap="round"
+					lineJoin="round"
+					onClick={handleClick}
+					shadowEnabled={selected}
+					shadowBlur={5}
+					shadowOpacity={0.3}
+				/>
+			)}
 
 			{/* Waypoints (draggable intermediate points) */}
 			{selected && waypoints.length > 0 && mode === "select" && (

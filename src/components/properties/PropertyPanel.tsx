@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Plus, Trash2, Key, Database, Link } from "lucide-react";
+import { X, Plus, Trash2, Key, Database, Link, Circle } from "lucide-react";
 import { useEditorStore } from "../../store/editorStore";
 import type {
 	Entity,
@@ -15,6 +15,7 @@ export const PropertyPanel: React.FC = () => {
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
 	const connections = useEditorStore((state) => state.diagram.connections);
+	const attributes = useEditorStore((state) => state.diagram.attributes);
 
 	// Get the first selected element (for now, we only support single selection in property panel)
 	const selectedId = selectedIds[0];
@@ -24,10 +25,11 @@ export const PropertyPanel: React.FC = () => {
 		return null;
 	}
 
-	// Find entity, relationship, or connection directly from store (reactive)
+	// Find entity, relationship, connection, or attribute directly from store (reactive)
 	const entity = entities.find((e) => e.id === selectedId);
 	const relationship = relationships.find((r) => r.id === selectedId);
 	const connection = connections.find((c) => c.id === selectedId);
+	const attribute = attributes.find((a) => a.id === selectedId);
 
 	// Handle entity properties
 	if (entity) {
@@ -42,6 +44,11 @@ export const PropertyPanel: React.FC = () => {
 	// Handle connection properties
 	if (connection) {
 		return <ConnectionPropertyPanel connectionId={connection.id} />;
+	}
+
+	// Handle attribute properties
+	if (attribute) {
+		return <AttributePropertyPanel attributeId={attribute.id} />;
 	}
 
 	return null;
@@ -85,6 +92,7 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 			addAttribute(entity.id, {
 				name: newAttributeName.trim(),
 				isKey: false,
+				isPartialKey: false,
 				isMultivalued: false,
 				isDerived: false,
 			});
@@ -202,12 +210,32 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 											onChange={(e) =>
 												handleAttributeUpdate(attr.id, {
 													isKey: e.target.checked,
+													// If setting key, unset partial key
+													isPartialKey: e.target.checked
+														? false
+														: attr.isPartialKey || false,
 												})
 											}
 											className="w-3.5 h-3.5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
 										/>
 										<Key className="w-3.5 h-3.5 text-yellow-600" />
 										<span className="text-gray-700">Key</span>
+									</label>
+
+									<label className="flex items-center gap-1.5 text-xs cursor-pointer">
+										<input
+											type="checkbox"
+											checked={attr.isPartialKey || false}
+											onChange={(e) =>
+												handleAttributeUpdate(attr.id, {
+													isPartialKey: e.target.checked,
+													// If setting partial key, unset key
+													isKey: e.target.checked ? false : attr.isKey,
+												})
+											}
+											className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+										/>
+										<span className="text-gray-700">Partial Key</span>
 									</label>
 
 									<label className="flex items-center gap-1.5 text-xs cursor-pointer">
@@ -287,6 +315,7 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 		(state) => state.updateRelationship
 	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
+	const [newAttributeName, setNewAttributeName] = useState("");
 
 	// Don't render if relationship not found
 	if (!relationship) {
@@ -335,6 +364,252 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 					/>
 				</div>
 
+				{/* Weak Relationship */}
+				<div className="flex items-center gap-2">
+					<input
+						type="checkbox"
+						id="weak-relationship"
+						checked={relationship.isWeak || false}
+						onChange={(e) => {
+							updateRelationship(relationship.id, {
+								isWeak: e.target.checked,
+							});
+						}}
+						className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+					/>
+					<label
+						htmlFor="weak-relationship"
+						className="text-sm font-medium text-gray-700 cursor-pointer"
+					>
+						Weak Relationship (Identifying)
+					</label>
+				</div>
+
+				{/* Attributes Section */}
+				<div>
+					<div className="flex items-center justify-between mb-3">
+						<label className="block text-sm font-medium text-gray-700">
+							Attributes
+						</label>
+						<span className="text-xs text-gray-500">
+							{relationship.attributes?.length || 0} attribute
+							{(relationship.attributes?.length || 0) !== 1 ? "s" : ""}
+						</span>
+					</div>
+
+					{/* Attributes List */}
+					<div className="space-y-2 mb-3">
+						{(relationship.attributes || []).map((attr) => (
+							<div
+								key={attr.id}
+								className="p-3 border border-gray-200 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
+							>
+								<div className="flex items-start justify-between gap-2 mb-2">
+									<input
+										type="text"
+										value={attr.name}
+										onChange={(e) => {
+											const updateRelationship =
+												useEditorStore.getState().updateRelationship;
+											updateRelationship(relationship.id, {
+												attributes: relationship.attributes.map((a) =>
+													a.id === attr.id ? { ...a, name: e.target.value } : a
+												),
+											});
+											// Also update canvas attribute
+											const updateAttributeById =
+												useEditorStore.getState().updateAttributeById;
+											updateAttributeById(attr.id, { name: e.target.value });
+										}}
+										className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+										placeholder="Attribute name"
+									/>
+									<button
+										onClick={() => {
+											const updateRelationship =
+												useEditorStore.getState().updateRelationship;
+											updateRelationship(relationship.id, {
+												attributes: relationship.attributes.filter(
+													(a) => a.id !== attr.id
+												),
+											});
+											const deleteAttributeById =
+												useEditorStore.getState().deleteAttributeById;
+											deleteAttributeById(attr.id);
+										}}
+										className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+										title="Delete attribute"
+									>
+										<Trash2 className="w-4 h-4" />
+									</button>
+								</div>
+
+								{/* Attribute Properties */}
+								<div className="flex flex-wrap gap-3 mt-2">
+									<label className="flex items-center gap-1.5 text-xs cursor-pointer">
+										<input
+											type="checkbox"
+											checked={attr.isKey}
+											onChange={(e) => {
+												const updateRelationship =
+													useEditorStore.getState().updateRelationship;
+												updateRelationship(relationship.id, {
+													attributes: relationship.attributes.map((a) =>
+														a.id === attr.id
+															? {
+																	...a,
+																	isKey: e.target.checked,
+																	isPartialKey: e.target.checked
+																		? false
+																		: a.isPartialKey,
+															  }
+															: a
+													),
+												});
+												const updateAttributeById =
+													useEditorStore.getState().updateAttributeById;
+												updateAttributeById(attr.id, {
+													isKey: e.target.checked,
+													isPartialKey: e.target.checked
+														? false
+														: attr.isPartialKey,
+												});
+											}}
+											className="w-3.5 h-3.5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+										/>
+										<Key className="w-3.5 h-3.5 text-yellow-600" />
+										<span className="text-gray-700">Key</span>
+									</label>
+									<label className="flex items-center gap-1.5 text-xs cursor-pointer">
+										<input
+											type="checkbox"
+											checked={attr.isPartialKey || false}
+											onChange={(e) => {
+												const updateRelationship =
+													useEditorStore.getState().updateRelationship;
+												updateRelationship(relationship.id, {
+													attributes: relationship.attributes.map((a) =>
+														a.id === attr.id
+															? {
+																	...a,
+																	isPartialKey: e.target.checked,
+																	isKey: e.target.checked ? false : a.isKey,
+															  }
+															: a
+													),
+												});
+												const updateAttributeById =
+													useEditorStore.getState().updateAttributeById;
+												updateAttributeById(attr.id, {
+													isPartialKey: e.target.checked,
+													isKey: e.target.checked ? false : attr.isKey,
+												});
+											}}
+											className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+										/>
+										<span className="text-gray-700">Partial Key</span>
+									</label>
+									<label className="flex items-center gap-1.5 text-xs cursor-pointer">
+										<input
+											type="checkbox"
+											checked={attr.isMultivalued}
+											onChange={(e) => {
+												const updateRelationship =
+													useEditorStore.getState().updateRelationship;
+												updateRelationship(relationship.id, {
+													attributes: relationship.attributes.map((a) =>
+														a.id === attr.id
+															? { ...a, isMultivalued: e.target.checked }
+															: a
+													),
+												});
+												const updateAttributeById =
+													useEditorStore.getState().updateAttributeById;
+												updateAttributeById(attr.id, {
+													isMultivalued: e.target.checked,
+												});
+											}}
+											className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+										/>
+										<span className="text-gray-700">Multivalued</span>
+									</label>
+									<label className="flex items-center gap-1.5 text-xs cursor-pointer">
+										<input
+											type="checkbox"
+											checked={attr.isDerived}
+											onChange={(e) => {
+												const updateRelationship =
+													useEditorStore.getState().updateRelationship;
+												updateRelationship(relationship.id, {
+													attributes: relationship.attributes.map((a) =>
+														a.id === attr.id
+															? { ...a, isDerived: e.target.checked }
+															: a
+													),
+												});
+												const updateAttributeById =
+													useEditorStore.getState().updateAttributeById;
+												updateAttributeById(attr.id, {
+													isDerived: e.target.checked,
+												});
+											}}
+											className="w-3.5 h-3.5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+										/>
+										<span className="text-gray-700">Derived</span>
+									</label>
+								</div>
+							</div>
+						))}
+					</div>
+
+					{/* Add Attribute */}
+					<div className="flex gap-2">
+						<input
+							type="text"
+							value={newAttributeName}
+							onChange={(e) => setNewAttributeName(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") {
+									const addRelationshipAttribute =
+										useEditorStore.getState().addRelationshipAttribute;
+									if (newAttributeName.trim()) {
+										addRelationshipAttribute(relationship.id, {
+											name: newAttributeName.trim(),
+											isKey: false,
+											isPartialKey: false,
+											isMultivalued: false,
+											isDerived: false,
+										});
+										setNewAttributeName("");
+									}
+								}
+							}}
+							className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+							placeholder="New attribute name"
+						/>
+						<button
+							onClick={() => {
+								const addRelationshipAttribute =
+									useEditorStore.getState().addRelationshipAttribute;
+								if (newAttributeName.trim()) {
+									addRelationshipAttribute(relationship.id, {
+										name: newAttributeName.trim(),
+										isKey: false,
+										isPartialKey: false,
+										isMultivalued: false,
+										isDerived: false,
+									});
+									setNewAttributeName("");
+								}
+							}}
+							className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center gap-1"
+							title="Add attribute"
+						>
+							<Plus className="w-4 h-4" />
+						</button>
+					</div>
+				</div>
+
 				{/* Connected Entities */}
 				<div>
 					<label className="block text-sm font-medium text-gray-700 mb-2">
@@ -353,16 +628,16 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 						</div>
 					) : (
 						<p className="text-sm text-gray-500 italic">
-							No entities connected yet. (Connection system coming in step 2)
+							No entities connected yet.
 						</p>
 					)}
 				</div>
 
-				{/* Cardinalities and Participations */}
+				{/* Connection Details */}
 				{connectedEntities.length > 0 && (
 					<div>
 						<label className="block text-sm font-medium text-gray-700 mb-2">
-							Cardinalities & Participations
+							Connection Details
 						</label>
 						<div className="space-y-3">
 							{connectedEntities.map((entity) => {
@@ -376,10 +651,10 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 										key={entity.id}
 										className="p-3 border border-gray-200 rounded-md bg-gray-50"
 									>
-										<div className="text-sm font-medium mb-2">
+										<div className="font-medium text-sm mb-2">
 											{entity.name}
 										</div>
-										<div className="space-y-2">
+										<div className="grid grid-cols-2 gap-2">
 											<div>
 												<label className="block text-xs text-gray-600 mb-1">
 													Cardinality
@@ -498,16 +773,12 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 		});
 	};
 
-	const handleRemoveWaypoint = (index: number) => {
-		removeConnectionWaypoint(connection.id, index);
-	};
-
 	return (
 		<div className="absolute right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-40 flex flex-col">
 			{/* Header */}
 			<div className="flex items-center justify-between p-4 border-b border-gray-200">
 				<div className="flex items-center gap-2">
-					<Link className="w-5 h-5 text-blue-600" />
+					<Link className="w-5 h-5 text-green-600" />
 					<h2 className="text-lg font-semibold">Connection Properties</h2>
 				</div>
 				<button
@@ -524,27 +795,10 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 				{/* Connection Info */}
 				<div>
 					<label className="block text-sm font-medium text-gray-700 mb-2">
-						From
+						Connection
 					</label>
-					<div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm">
-						{fromElement
-							? `${
-									fromElement.type === "entity" ? "Entity" : "Relationship"
-							  }: ${fromElement.name || "Unnamed"}`
-							: "Unknown"}
-					</div>
-				</div>
-
-				<div>
-					<label className="block text-sm font-medium text-gray-700 mb-2">
-						To
-					</label>
-					<div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm">
-						{toElement
-							? `${toElement.type === "entity" ? "Entity" : "Relationship"}: ${
-									toElement.name || "Unnamed"
-							  }`
-							: "Unknown"}
+					<div className="p-2 border border-gray-200 rounded-md bg-gray-50 text-sm">
+						{fromElement?.name || "Unknown"} → {toElement?.name || "Unknown"}
 					</div>
 				</div>
 
@@ -556,7 +810,7 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 					<select
 						value={connection.cardinality}
 						onChange={handleCardinalityChange}
-						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
 					>
 						<option value="1">1</option>
 						<option value="N">N</option>
@@ -572,7 +826,7 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 					<select
 						value={connection.participation}
 						onChange={handleParticipationChange}
-						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
 					>
 						<option value="partial">Partial</option>
 						<option value="total">Total</option>
@@ -582,47 +836,53 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 				{/* Connection Points */}
 				<div>
 					<label className="block text-sm font-medium text-gray-700 mb-2">
-						From Point
+						Connection Points
 					</label>
-					<select
-						value={connection.fromPoint}
-						onChange={handleFromPointChange}
-						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-					>
-						<option value="top">Top</option>
-						<option value="right">Right</option>
-						<option value="bottom">Bottom</option>
-						<option value="left">Left</option>
-						<option value="center">Center</option>
-					</select>
-				</div>
-
-				<div>
-					<label className="block text-sm font-medium text-gray-700 mb-2">
-						To Point
-					</label>
-					<select
-						value={connection.toPoint}
-						onChange={handleToPointChange}
-						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-					>
-						<option value="top">Top</option>
-						<option value="right">Right</option>
-						<option value="bottom">Bottom</option>
-						<option value="left">Left</option>
-						<option value="center">Center</option>
-					</select>
+					<div className="space-y-2">
+						<div>
+							<label className="block text-xs text-gray-600 mb-1">
+								From Point
+							</label>
+							<select
+								value={connection.fromPoint}
+								onChange={handleFromPointChange}
+								className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+							>
+								<option value="top">Top</option>
+								<option value="right">Right</option>
+								<option value="bottom">Bottom</option>
+								<option value="left">Left</option>
+								<option value="center">Center</option>
+							</select>
+						</div>
+						<div>
+							<label className="block text-xs text-gray-600 mb-1">
+								To Point
+							</label>
+							<select
+								value={connection.toPoint}
+								onChange={handleToPointChange}
+								className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+							>
+								<option value="top">Top</option>
+								<option value="right">Right</option>
+								<option value="bottom">Bottom</option>
+								<option value="left">Left</option>
+								<option value="center">Center</option>
+							</select>
+						</div>
+					</div>
 				</div>
 
 				{/* Connection Style */}
 				<div>
 					<label className="block text-sm font-medium text-gray-700 mb-2">
-						Style
+						Connection Style
 					</label>
 					<select
 						value={connection.style}
 						onChange={handleStyleChange}
-						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
 					>
 						<option value="straight">Straight</option>
 						<option value="curved">Curved</option>
@@ -631,7 +891,7 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 				</div>
 
 				{/* Waypoints */}
-				{connection.waypoints.length > 0 && (
+				{connection.waypoints && connection.waypoints.length > 0 && (
 					<div>
 						<label className="block text-sm font-medium text-gray-700 mb-2">
 							Waypoints ({connection.waypoints.length})
@@ -640,24 +900,180 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 							{connection.waypoints.map((waypoint, index) => (
 								<div
 									key={index}
-									className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded"
+									className="flex items-center justify-between p-2 border border-gray-200 rounded-md bg-gray-50 text-xs"
 								>
-									<span className="text-sm text-gray-600">
-										Point {index + 1}: ({Math.round(waypoint.x)},{" "}
-										{Math.round(waypoint.y)})
+									<span>
+										({Math.round(waypoint.x)}, {Math.round(waypoint.y)})
 									</span>
 									<button
-										onClick={() => handleRemoveWaypoint(index)}
+										onClick={() => {
+											removeConnectionWaypoint(connection.id, index);
+										}}
 										className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
 										title="Remove waypoint"
 									>
-										<Trash2 className="w-4 h-4" />
+										<Trash2 className="w-3 h-3" />
 									</button>
 								</div>
 							))}
 						</div>
 					</div>
 				)}
+			</div>
+		</div>
+	);
+};
+
+interface AttributePropertyPanelProps {
+	attributeId: string;
+}
+
+const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
+	attributeId,
+}) => {
+	// Get attribute reactively from store
+	const attribute = useEditorStore((state) =>
+		state.diagram.attributes.find((a) => a.id === attributeId)
+	);
+	const entities = useEditorStore((state) => state.diagram.entities);
+	const relationships = useEditorStore((state) => state.diagram.relationships);
+
+	const updateAttributeById = useEditorStore(
+		(state) => state.updateAttributeById
+	);
+	const clearSelection = useEditorStore((state) => state.clearSelection);
+
+	// Don't render if attribute not found
+	if (!attribute) {
+		return null;
+	}
+
+	// Find parent element
+	const parentEntity = attribute.entityId
+		? entities.find((e) => e.id === attribute.entityId)
+		: null;
+	const parentRelationship = attribute.relationshipId
+		? relationships.find((r) => r.id === attribute.relationshipId)
+		: null;
+
+	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		updateAttributeById(attribute.id, { name: e.target.value });
+	};
+
+	return (
+		<div className="absolute right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-40 flex flex-col">
+			{/* Header */}
+			<div className="flex items-center justify-between p-4 border-b border-gray-200">
+				<div className="flex items-center gap-2">
+					<Circle className="w-5 h-5 text-green-600" />
+					<h2 className="text-lg font-semibold">Attribute Properties</h2>
+				</div>
+				<button
+					onClick={clearSelection}
+					className="p-1 rounded hover:bg-gray-100 transition-colors"
+					title="Close"
+				>
+					<X className="w-5 h-5" />
+				</button>
+			</div>
+
+			{/* Content */}
+			<div className="flex-1 overflow-y-auto p-4 space-y-6">
+				{/* Attribute Name */}
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Attribute Name
+					</label>
+					<input
+						type="text"
+						value={attribute.name}
+						onChange={handleNameChange}
+						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+						placeholder="Enter attribute name"
+					/>
+				</div>
+
+				{/* Parent Element */}
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Parent Element
+					</label>
+					<div className="p-2 border border-gray-200 rounded-md bg-gray-50 text-sm">
+						{parentEntity
+							? `Entity: ${parentEntity.name}`
+							: parentRelationship
+							? `Relationship: ${parentRelationship.name}`
+							: "Unknown"}
+					</div>
+				</div>
+
+				{/* Attribute Properties */}
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Properties
+					</label>
+					<div className="space-y-3">
+						<label className="flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={attribute.isKey}
+								onChange={(e) => {
+									updateAttributeById(attribute.id, {
+										isKey: e.target.checked,
+										isPartialKey: e.target.checked
+											? false
+											: attribute.isPartialKey,
+									});
+								}}
+								className="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+							/>
+							<span className="text-sm text-gray-700">Key</span>
+						</label>
+
+						<label className="flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={attribute.isPartialKey || false}
+								onChange={(e) => {
+									updateAttributeById(attribute.id, {
+										isPartialKey: e.target.checked,
+										isKey: e.target.checked ? false : attribute.isKey,
+									});
+								}}
+								className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+							/>
+							<span className="text-sm text-gray-700">Partial Key</span>
+						</label>
+
+						<label className="flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={attribute.isMultivalued}
+								onChange={(e) => {
+									updateAttributeById(attribute.id, {
+										isMultivalued: e.target.checked,
+									});
+								}}
+								className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+							/>
+							<span className="text-sm text-gray-700">Multivalued</span>
+						</label>
+
+						<label className="flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={attribute.isDerived}
+								onChange={(e) => {
+									updateAttributeById(attribute.id, {
+										isDerived: e.target.checked,
+									});
+								}}
+								className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+							/>
+							<span className="text-sm text-gray-700">Derived</span>
+						</label>
+					</div>
+				</div>
 			</div>
 		</div>
 	);

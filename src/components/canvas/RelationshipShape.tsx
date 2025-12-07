@@ -19,7 +19,18 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 
-	const { id, name, position, selected, size, rotation = 0 } = relationship;
+	const {
+		id,
+		name,
+		position,
+		selected,
+		size,
+		isWeak,
+		rotation = 0,
+	} = relationship;
+
+	const selectedIds = useEditorStore((state) => state.selectedIds);
+	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
 
 	// Diamond dimensions
 	const width = size.width;
@@ -27,6 +38,10 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 
 	// Handle drag move (update position in real-time for smooth dragging)
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+		// If multiple items are selected, let ERCanvas handle it
+		if (isMultiSelect) {
+			return;
+		}
 		updateRelationship(id, {
 			position: {
 				x: e.target.x(),
@@ -37,6 +52,10 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 
 	// Handle drag end
 	const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+		// If multiple items are selected, let ERCanvas handle it
+		if (isMultiSelect) {
+			return;
+		}
 		updateRelationship(id, {
 			position: {
 				x: e.target.x(),
@@ -73,23 +92,58 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	);
 	const addConnection = useEditorStore((state) => state.addConnection);
 
+	// Handle touch tap events
+	const handleTap = (e: Konva.KonvaEventObject<PointerEvent | TouchEvent>) => {
+		const mouseEvent = {
+			...e,
+			evt: {
+				...e.evt,
+				shiftKey: false,
+			},
+		} as Konva.KonvaEventObject<MouseEvent>;
+		handleClick(mouseEvent);
+	};
+
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		if (mode === "connect") {
 			e.cancelBubble = true;
 			const stage = e.target.getStage();
 			if (!stage) return;
 
+			// Get the click position relative to the relationship's group (accounts for rotation)
+			const group = groupRef.current;
+			if (!group) return;
+
+			// Get pointer position in stage coordinates
 			const pointer = stage.getPointerPosition();
 			if (!pointer) return;
 
-			const transform = stage.getAbsoluteTransform().copy();
-			transform.invert();
-			const pos = transform.point(pointer);
+			// Get group's transform and invert it to get position relative to group
+			// This accounts for rotation, scale, and position
+			const groupTransform = group.getAbsoluteTransform().copy();
+			groupTransform.invert();
+			const groupRelativePos = groupTransform.point(pointer);
+
+			// For edge detection, use position relative to the relationship's unrotated bounding box
+			// Since the relationship is at (0, 0) relative to the group, we can use groupRelativePos directly
+			const relationshipRelativePos = {
+				x: groupRelativePos.x,
+				y: groupRelativePos.y,
+			};
+
+			// Create a temporary element object for getClosestEdge (relative to relationship origin)
+			const tempElement = {
+				position: { x: 0, y: 0 },
+				size: relationship.size,
+			};
 
 			if (!drawingConnection.isDrawing) {
-				// Start connection
-				const edge = getClosestEdge(pos, relationship) as ConnectionPoint;
-				// Calculate the actual connection point position
+				// Start connection - use relationship-relative position to determine edge
+				const edge = getClosestEdge(
+					relationshipRelativePos,
+					tempElement
+				) as ConnectionPoint;
+				// Calculate the actual connection point position in stage coordinates
 				const centerX = relationship.position.x + relationship.size.width / 2;
 				const centerY = relationship.position.y + relationship.size.height / 2;
 				let connectionPoint: { x: number; y: number };
@@ -119,7 +173,10 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			} else {
 				// Complete connection
 				if (drawingConnection.fromId && drawingConnection.fromId !== id) {
-					const toEdge = getClosestEdge(pos, relationship) as ConnectionPoint;
+					const toEdge = getClosestEdge(
+						relationshipRelativePos,
+						tempElement
+					) as ConnectionPoint;
 					addConnection(
 						drawingConnection.fromId,
 						id,
@@ -171,8 +228,29 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			onDragEnd={handleDragEnd}
 			onTransformEnd={handleTransformEnd}
 			onClick={handleClick}
+			onTap={handleTap}
 			onDblClick={handleDblClick}
 		>
+			{/* Outer diamond for weak relationships (double border) */}
+			{isWeak && (
+				<Line
+					points={[
+						width / 2,
+						-5, // Top (offset outward)
+						width + 5,
+						height / 2, // Right (offset outward)
+						width / 2,
+						height + 5, // Bottom (offset outward)
+						-5,
+						height / 2, // Left (offset outward)
+					]}
+					closed
+					fill="transparent"
+					stroke={selected ? "#3b82f6" : "black"}
+					strokeWidth={selected ? 3 : 2}
+				/>
+			)}
+
 			{/* Diamond shape */}
 			<Line
 				points={points}
@@ -184,6 +262,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				shadowBlur={10}
 				shadowOpacity={0.3}
 				onClick={handleClick}
+				onTap={handleTap}
 				onDblClick={handleDblClick}
 			/>
 
@@ -198,6 +277,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				fontStyle="bold"
 				fill="black"
 				onClick={handleClick}
+				onTap={handleTap}
 				onDblClick={handleDblClick}
 			/>
 

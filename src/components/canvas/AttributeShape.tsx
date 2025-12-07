@@ -25,14 +25,27 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		position,
 		selected,
 		isKey,
+		isPartialKey,
 		isMultivalued,
 		isDerived,
 		entityId,
 	} = attribute;
 
-	// Find parent entity
-	const parentEntity = entities.find((e) => e.id === entityId);
-	if (!parentEntity) {
+	// Find parent entity or relationship
+	const parentEntity = entityId
+		? entities.find((e) => e.id === entityId)
+		: null;
+	const relationships = useEditorStore((state) => state.diagram.relationships);
+	const parentRelationship = attribute.relationshipId
+		? relationships.find((r) => r.id === attribute.relationshipId)
+		: null;
+
+	if (!parentEntity && !parentRelationship) {
+		return null;
+	}
+
+	const parentElement = parentEntity || parentRelationship;
+	if (!parentElement) {
 		return null;
 	}
 
@@ -45,9 +58,9 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	const actualTextWidth = name.length * 7; // Approximate character width
 
 	// Calculate connection points
-	// Entity right edge to attribute left edge
-	const entityRightX = parentEntity.position.x + parentEntity.size.width;
-	const entityRightY = parentEntity.position.y + parentEntity.size.height / 2;
+	// Parent element right edge to attribute left edge
+	const parentRightX = parentElement.position.x + parentElement.size.width;
+	const parentRightY = parentElement.position.y + parentElement.size.height / 2;
 	const attributeLeftX = position.x;
 	const attributeLeftY = position.y + ellipseHeight / 2;
 
@@ -89,9 +102,9 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 	return (
 		<>
-			{/* Connection line from entity to attribute - SOLID line */}
+			{/* Connection line from parent element to attribute - SOLID line */}
 			<Line
-				points={[entityRightX, entityRightY, attributeLeftX, attributeLeftY]}
+				points={[parentRightX, parentRightY, attributeLeftX, attributeLeftY]}
 				stroke={selected ? "#3b82f6" : "#6b7280"}
 				strokeWidth={selected ? 2 : 1.5}
 				lineCap="round"
@@ -148,8 +161,8 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 					fontStyle={isKey ? "bold" : "normal"}
 				/>
 
-				{/* Key indicator - underline for key attributes (matches text width) */}
-				{isKey && (
+				{/* Key indicator - solid underline for key attributes */}
+				{isKey && !isPartialKey && (
 					<Line
 						points={[
 							-actualTextWidth / 2,
@@ -159,6 +172,21 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 						]}
 						stroke="#f59e0b"
 						strokeWidth={2}
+					/>
+				)}
+
+				{/* Partial key indicator - dashed underline for weak/partial keys */}
+				{isPartialKey && (
+					<Line
+						points={[
+							-actualTextWidth / 2,
+							ellipseHeight / 2 - 5,
+							actualTextWidth / 2,
+							ellipseHeight / 2 - 5,
+						]}
+						stroke="#f59e0b"
+						strokeWidth={2}
+						dash={[5, 5]}
 					/>
 				)}
 			</Group>

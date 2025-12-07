@@ -40,6 +40,9 @@ export const Toolbar: React.FC = () => {
 	const deleteLine = useEditorStore((state) => state.deleteLine);
 	const deleteArrow = useEditorStore((state) => state.deleteArrow);
 	const deleteAttribute = useEditorStore((state) => state.deleteAttribute);
+	const deleteAttributeById = useEditorStore(
+		(state) => state.deleteAttributeById
+	);
 	const deleteConnection = useEditorStore((state) => state.deleteConnection);
 
 	const undo = useUndo();
@@ -95,8 +98,13 @@ export const Toolbar: React.FC = () => {
 				) {
 					deleteArrow(id);
 				} else if (element.type === "attribute") {
-					// Attributes need entityId to delete
-					deleteAttribute(element.entityId, id);
+					// Attributes can be attached to either entity or relationship
+					if (element.entityId) {
+						deleteAttribute(element.entityId, id);
+					} else if (element.relationshipId) {
+						// Use deleteAttributeById for relationship attributes
+						deleteAttributeById(id);
+					}
 				} else if (element.type === "connection") {
 					deleteConnection(id);
 				}

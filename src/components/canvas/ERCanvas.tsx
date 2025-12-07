@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Stage, Layer, Transformer, Line } from "react-konva";
+import { Stage, Layer, Transformer, Line, Rect } from "react-konva";
 import Konva from "konva";
 import { useEditorStore } from "../../store/editorStore";
 import { EntityShape } from "./EntityShape";
@@ -14,6 +14,15 @@ export const ERCanvas: React.FC = () => {
 	const layerRef = useRef<Konva.Layer>(null);
 	const transformerRef = useRef<Konva.Transformer>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const lastPinchDistanceRef = useRef<number | null>(null);
+	const lastPinchCenterRef = useRef<{ x: number; y: number } | null>(null);
+	const [selectionBox, setSelectionBox] = useState<{
+		startX: number;
+		startY: number;
+		endX: number;
+		endY: number;
+	} | null>(null);
+	const [isSelecting, setIsSelecting] = useState<boolean>(false);
 
 	const [stageSize, setStageSize] = useState({
 		width: window.innerWidth,
@@ -30,15 +39,23 @@ export const ERCanvas: React.FC = () => {
 	const viewport = useEditorStore((state) => state.viewport);
 	const mode = useEditorStore((state) => state.mode);
 	const addEntity = useEditorStore((state) => state.addEntity);
+	const updateEntity = useEditorStore((state) => state.updateEntity);
 	const addRelationship = useEditorStore((state) => state.addRelationship);
+	const updateRelationship = useEditorStore(
+		(state) => state.updateRelationship
+	);
 	const setZoom = useEditorStore((state) => state.setZoom);
 	const setViewportPosition = useEditorStore(
 		(state) => state.setViewportPosition
 	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
+	const selectMultiple = useEditorStore((state) => state.selectMultiple);
 	const addLine = useEditorStore((state) => state.addLine);
 	const addArrow = useEditorStore((state) => state.addArrow);
 	const addAttribute = useEditorStore((state) => state.addAttribute);
+	const addRelationshipAttribute = useEditorStore(
+		(state) => state.addRelationshipAttribute
+	);
 	const updateAttributePosition = useEditorStore(
 		(state) => state.updateAttributePosition
 	);
@@ -50,6 +67,11 @@ export const ERCanvas: React.FC = () => {
 		(state) => state.setDrawingConnection
 	);
 	// const setMode = useEditorStore((state) => state.setMode);
+
+	// Track previous positions for multi-select dragging
+	const prevNodePositionsRef = useRef<Map<string, { x: number; y: number }>>(
+		new Map()
+	);
 
 	// Update transformer when selection changes
 	useEffect(() => {
@@ -77,14 +99,474 @@ export const ERCanvas: React.FC = () => {
 		if (selectedNodes.length > 0) {
 			try {
 				transformer.nodes(selectedNodes);
+
+				// Handle multi-select dragging and resizing
+				if (selectedNodes.length > 1) {
+					// Store initial positions for all selected nodes
+					const initialPositions = new Map<string, { x: number; y: number }>();
+					const initialSizes = new Map<
+						string,
+						{ width: number; height: number }
+					>();
+					const initialCenter = { x: 0, y: 0 };
+					let draggedNode: Konva.Node | null = null;
+					let initialDragNodePos: { x: number; y: number } | null = null;
+					let initialTransformerBox: {
+						x: number;
+						y: number;
+						width: number;
+						height: number;
+					} | null = null;
+
+					// Store initial state for transform
+					const storeInitialState = () => {
+						initialPositions.clear();
+						initialSizes.clear();
+
+						// Calculate bounding box of all selected nodes in stage coordinates
+						let minX = Infinity;
+						let minY = Infinity;
+						let maxX = -Infinity;
+						let maxY = -Infinity;
+
+						selectedNodes.forEach((node: Konva.Node) => {
+							const nodeId = node.id();
+							const x = node.x();
+							const y = node.y();
+
+							// Get size from store
+							const entity = entities.find((e) => e.id === nodeId);
+							if (entity) {
+								const width = entity.size.width;
+								const height = entity.size.height;
+								minX = Math.min(minX, x);
+								minY = Math.min(minY, y);
+								maxX = Math.max(maxX, x + width);
+								maxY = Math.max(maxY, y + height);
+								initialSizes.set(nodeId, {
+									width: width,
+									height: height,
+								});
+								return;
+							}
+
+							const relationship = relationships.find((r) => r.id === nodeId);
+							if (relationship) {
+								const width = relationship.size.width;
+								const height = relationship.size.height;
+								minX = Math.min(minX, x);
+								minY = Math.min(minY, y);
+								maxX = Math.max(maxX, x + width);
+								maxY = Math.max(maxY, y + height);
+								initialSizes.set(nodeId, {
+									width: width,
+									height: height,
+								});
+								return;
+							}
+
+							const attribute = attributes.find((a) => a.id === nodeId);
+							if (attribute) {
+								// Attributes are points, use a small bounding box
+								minX = Math.min(minX, x);
+								minY = Math.min(minY, y);
+								maxX = Math.max(maxX, x);
+								maxY = Math.max(maxY, y);
+								return;
+							}
+						});
+
+						// Calculate center from bounding box
+						initialCenter.x = (minX + maxX) / 2;
+						initialCenter.y = (minY + maxY) / 2;
+
+						// Store initial positions relative to center
+						selectedNodes.forEach((node: Konva.Node) => {
+							const nodeId = node.id();
+							initialPositions.set(nodeId, {
+								x: node.x() - initialCenter.x,
+								y: node.y() - initialCenter.y,
+							});
+						});
+
+						// Store initial bounding box in stage coordinates
+						initialTransformerBox = {
+							x: minX,
+							y: minY,
+							width: maxX - minX,
+							height: maxY - minY,
+						};
+					};
+
+					const handleNodeDragStart = (
+						e: Konva.KonvaEventObject<DragEvent>
+					) => {
+						draggedNode = e.target as Konva.Node;
+						initialDragNodePos = {
+							x: draggedNode.x(),
+							y: draggedNode.y(),
+						};
+
+						// Store initial positions of all selected nodes
+						initialPositions.clear();
+						selectedNodes.forEach((node: Konva.Node) => {
+							initialPositions.set(node.id(), {
+								x: node.x(),
+								y: node.y(),
+							});
+						});
+					};
+
+					const handleNodeDragMove = () => {
+						if (!draggedNode || !initialDragNodePos) return;
+
+						const currentX = draggedNode.x();
+						const currentY = draggedNode.y();
+						const dx = currentX - initialDragNodePos.x;
+						const dy = currentY - initialDragNodePos.y;
+
+						// Move all selected nodes by the same delta
+						selectedNodes.forEach((node: Konva.Node) => {
+							if (node === draggedNode) return; // Already moved
+
+							const initialPos = initialPositions.get(node.id());
+							if (initialPos) {
+								const newX = initialPos.x + dx;
+								const newY = initialPos.y + dy;
+								// Update Konva node position directly for smooth dragging
+								node.x(newX);
+								node.y(newY);
+							}
+						});
+					};
+
+					const handleNodeDragEnd = () => {
+						if (!draggedNode) return;
+
+						// Final update to store for all nodes
+						selectedNodes.forEach((node: Konva.Node) => {
+							const nodeId = node.id();
+							const finalX = node.x();
+							const finalY = node.y();
+
+							// Update entity
+							const entity = entities.find((e) => e.id === nodeId);
+							if (entity) {
+								updateEntity(nodeId, {
+									position: { x: finalX, y: finalY },
+								});
+								return;
+							}
+
+							// Update relationship
+							const relationship = relationships.find((r) => r.id === nodeId);
+							if (relationship) {
+								updateRelationship(nodeId, {
+									position: { x: finalX, y: finalY },
+								});
+								return;
+							}
+
+							// Update attribute
+							const attribute = attributes.find((a) => a.id === nodeId);
+							if (attribute) {
+								updateAttributePosition(nodeId, {
+									x: finalX,
+									y: finalY,
+								});
+								return;
+							}
+						});
+
+						initialPositions.clear();
+						draggedNode = null;
+						initialDragNodePos = null;
+					};
+
+					// Handle transformer transform (resize/rotate)
+					const handleTransformStart = () => {
+						storeInitialState();
+					};
+
+					const handleTransform = () => {
+						if (!initialTransformerBox) return;
+
+						// Check if this is primarily a rotation (scale hasn't changed much)
+						// Get scale from the first node to detect if we're resizing
+						const firstNode = selectedNodes[0];
+						if (!firstNode) return;
+
+						const currentScaleX = firstNode.scaleX();
+						const currentScaleY = firstNode.scaleY();
+
+						// If scale is still 1 (or very close), this is likely just rotation
+						// Let the transformer handle rotation naturally, only intervene for resize
+						const isResizing =
+							Math.abs(currentScaleX - 1) > 0.01 ||
+							Math.abs(currentScaleY - 1) > 0.01;
+
+						if (!isResizing) {
+							// This is rotation only, let transformer handle it naturally
+							return;
+						}
+
+						// This is a resize operation - apply our custom resize logic
+						// Calculate current bounding box from nodes in stage coordinates
+						let minX = Infinity;
+						let minY = Infinity;
+						let maxX = -Infinity;
+						let maxY = -Infinity;
+
+						selectedNodes.forEach((node: Konva.Node) => {
+							const nodeId = node.id();
+							const x = node.x();
+							const y = node.y();
+
+							const initialSize = initialSizes.get(nodeId);
+							if (initialSize) {
+								const currentWidth = initialSize.width * node.scaleX();
+								const currentHeight = initialSize.height * node.scaleY();
+								minX = Math.min(minX, x);
+								minY = Math.min(minY, y);
+								maxX = Math.max(maxX, x + currentWidth);
+								maxY = Math.max(maxY, y + currentHeight);
+							} else {
+								// Attribute or point
+								minX = Math.min(minX, x);
+								minY = Math.min(minY, y);
+								maxX = Math.max(maxX, x);
+								maxY = Math.max(maxY, y);
+							}
+						});
+
+						const currentBox = {
+							x: minX,
+							y: minY,
+							width: maxX - minX,
+							height: maxY - minY,
+						};
+
+						const scaleX = currentBox.width / initialTransformerBox.width;
+						const scaleY = currentBox.height / initialTransformerBox.height;
+
+						// Calculate new center
+						const newCenterX = currentBox.x + currentBox.width / 2;
+						const newCenterY = currentBox.y + currentBox.height / 2;
+
+						// Apply scale to all selected nodes
+						selectedNodes.forEach((node: Konva.Node) => {
+							const nodeId = node.id();
+							const relativePos = initialPositions.get(nodeId);
+							if (relativePos) {
+								// Calculate new position
+								const newX = newCenterX + relativePos.x * scaleX;
+								const newY = newCenterY + relativePos.y * scaleY;
+								node.x(newX);
+								node.y(newY);
+							}
+
+							// Scale size - apply scale to node (will be reset in transformEnd)
+							const initialSize = initialSizes.get(nodeId);
+							if (initialSize) {
+								// Update scale on node (will be reset in transformEnd)
+								node.scaleX(scaleX);
+								node.scaleY(scaleY);
+							}
+						});
+					};
+
+					const handleTransformEnd = () => {
+						if (!initialTransformerBox) return;
+
+						// Check if this was a resize or rotation
+						const firstNode = selectedNodes[0];
+						if (!firstNode) return;
+
+						const currentScaleX = firstNode.scaleX();
+						const currentScaleY = firstNode.scaleY();
+						const isResizing =
+							Math.abs(currentScaleX - 1) > 0.01 ||
+							Math.abs(currentScaleY - 1) > 0.01;
+
+						if (isResizing) {
+							// Handle resize - calculate new sizes and positions
+							// Calculate current bounding box from nodes in stage coordinates
+							let minX = Infinity;
+							let minY = Infinity;
+							let maxX = -Infinity;
+							let maxY = -Infinity;
+
+							selectedNodes.forEach((node: Konva.Node) => {
+								const nodeId = node.id();
+								const x = node.x();
+								const y = node.y();
+
+								const initialSize = initialSizes.get(nodeId);
+								if (initialSize) {
+									const currentWidth = initialSize.width * node.scaleX();
+									const currentHeight = initialSize.height * node.scaleY();
+									minX = Math.min(minX, x);
+									minY = Math.min(minY, y);
+									maxX = Math.max(maxX, x + currentWidth);
+									maxY = Math.max(maxY, y + currentHeight);
+								} else {
+									// Attribute or point
+									minX = Math.min(minX, x);
+									minY = Math.min(minY, y);
+									maxX = Math.max(maxX, x);
+									maxY = Math.max(maxY, y);
+								}
+							});
+
+							const currentBox = {
+								x: minX,
+								y: minY,
+								width: maxX - minX,
+								height: maxY - minY,
+							};
+
+							const scaleX = currentBox.width / initialTransformerBox.width;
+							const scaleY = currentBox.height / initialTransformerBox.height;
+
+							// Calculate new center
+							const newCenterX = currentBox.x + currentBox.width / 2;
+							const newCenterY = currentBox.y + currentBox.height / 2;
+
+							// Final update to store for all nodes
+							selectedNodes.forEach((node: Konva.Node) => {
+								const nodeId = node.id();
+								const relativePos = initialPositions.get(nodeId);
+
+								if (relativePos) {
+									const finalX = newCenterX + relativePos.x * scaleX;
+									const finalY = newCenterY + relativePos.y * scaleY;
+
+									// Update entity
+									const entity = entities.find((e) => e.id === nodeId);
+									if (entity) {
+										const initialSize = initialSizes.get(nodeId);
+										updateEntity(nodeId, {
+											position: { x: finalX, y: finalY },
+											size: initialSize
+												? {
+														width: Math.max(50, initialSize.width * scaleX),
+														height: Math.max(30, initialSize.height * scaleY),
+												  }
+												: entity.size,
+										});
+										// Reset scale
+										node.scaleX(1);
+										node.scaleY(1);
+										return;
+									}
+
+									// Update relationship
+									const relationship = relationships.find(
+										(r) => r.id === nodeId
+									);
+									if (relationship) {
+										const initialSize = initialSizes.get(nodeId);
+										updateRelationship(nodeId, {
+											position: { x: finalX, y: finalY },
+											size: initialSize
+												? {
+														width: Math.max(60, initialSize.width * scaleX),
+														height: Math.max(40, initialSize.height * scaleY),
+												  }
+												: relationship.size,
+										});
+										// Reset scale
+										node.scaleX(1);
+										node.scaleY(1);
+										return;
+									}
+
+									// Update attribute (only position, no size)
+									const attribute = attributes.find((a) => a.id === nodeId);
+									if (attribute) {
+										updateAttributePosition(nodeId, {
+											x: finalX,
+											y: finalY,
+										});
+										return;
+									}
+								}
+							});
+
+							// Reset scale on all nodes
+							selectedNodes.forEach((node: Konva.Node) => {
+								node.scaleX(1);
+								node.scaleY(1);
+							});
+						} else {
+							// This was rotation only - update rotation for all nodes
+							selectedNodes.forEach((node: Konva.Node) => {
+								const nodeId = node.id();
+								const newRotation = node.rotation();
+
+								// Update entity
+								const entity = entities.find((e) => e.id === nodeId);
+								if (entity) {
+									updateEntity(nodeId, {
+										rotation: newRotation,
+									});
+									return;
+								}
+
+								// Update relationship
+								const relationship = relationships.find((r) => r.id === nodeId);
+								if (relationship) {
+									updateRelationship(nodeId, {
+										rotation: newRotation,
+									});
+									return;
+								}
+							});
+						}
+
+						initialPositions.clear();
+						initialSizes.clear();
+						initialTransformerBox = null;
+					};
+
+					// Attach drag handlers to all selected nodes
+					selectedNodes.forEach((node: Konva.Node) => {
+						node.off("dragstart dragmove dragend");
+						node.on("dragstart", handleNodeDragStart);
+						node.on("dragmove", handleNodeDragMove);
+						node.on("dragend", handleNodeDragEnd);
+					});
+
+					// Attach transform handlers to transformer
+					transformer.off("transformstart transform transformend");
+					transformer.on("transformstart", handleTransformStart);
+					transformer.on("transform", handleTransform);
+					transformer.on("transformend", handleTransformEnd);
+				} else {
+					// Clean up drag handlers when not in multi-select
+					selectedNodes.forEach((node: Konva.Node) => {
+						node.off("dragstart dragmove dragend");
+					});
+					transformer.off("transformstart transform transformend");
+				}
+
 				transformer.getLayer()?.batchDraw();
 			} catch (e) {
 				console.error("Error setting transformer nodes:", e);
 			}
 		} else {
 			transformer.nodes([]);
+			prevNodePositionsRef.current.clear();
 		}
-	}, [selectedIds, entities, relationships]);
+	}, [
+		selectedIds,
+		entities,
+		relationships,
+		attributes,
+		updateEntity,
+		updateRelationship,
+		updateAttributePosition,
+	]);
 
 	// Handle window resize and update stage size based on container
 	useEffect(() => {
@@ -148,6 +630,166 @@ export const ERCanvas: React.FC = () => {
 		stage.batchDraw();
 	};
 
+	// Handle touch events (tap) - same logic as click
+	const handleStageTap = (
+		e: Konva.KonvaEventObject<PointerEvent | TouchEvent>
+	) => {
+		// Convert to mouse event format for compatibility
+		const mouseEvent = {
+			...e,
+			evt: {
+				...e.evt,
+				shiftKey: false, // Touch events don't have shift key
+			},
+		} as Konva.KonvaEventObject<MouseEvent>;
+		handleStageClick(mouseEvent);
+	};
+
+	// Handle canvas mouse down (for box selection)
+	const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		// Only start box selection in select mode and when clicking on empty space
+		if (mode === "select" && e.target === e.target.getStage()) {
+			// Don't start box selection if clicking on transformer or its handles
+			const targetType = e.target.getType();
+			if (
+				targetType === "Transformer" ||
+				targetType === "Circle" ||
+				targetType === "Rect"
+			) {
+				return;
+			}
+
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			const pointer = stage.getPointerPosition();
+			if (!pointer) return;
+
+			const transform = stage.getAbsoluteTransform().copy();
+			transform.invert();
+			const pos = transform.point(pointer);
+
+			// Start box selection
+			setIsSelecting(true);
+			setSelectionBox({
+				startX: pos.x,
+				startY: pos.y,
+				endX: pos.x,
+				endY: pos.y,
+			});
+		}
+	};
+
+	// Handle canvas mouse move (for box selection)
+	const handleStageMouseMove = () => {
+		if (isSelecting && selectionBox) {
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			const pointer = stage.getPointerPosition();
+			if (!pointer) return;
+
+			const transform = stage.getAbsoluteTransform().copy();
+			transform.invert();
+			const pos = transform.point(pointer);
+
+			setSelectionBox({
+				...selectionBox,
+				endX: pos.x,
+				endY: pos.y,
+			});
+		}
+	};
+
+	// Handle canvas mouse up (for box selection)
+	const handleStageMouseUp = () => {
+		if (isSelecting && selectionBox) {
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			const boxX = Math.min(selectionBox.startX, selectionBox.endX);
+			const boxY = Math.min(selectionBox.startY, selectionBox.endY);
+			const boxWidth = Math.abs(selectionBox.endX - selectionBox.startX);
+			const boxHeight = Math.abs(selectionBox.endY - selectionBox.startY);
+
+			// Only select if box is large enough (to avoid accidental selection on click)
+			if (boxWidth > 5 && boxHeight > 5) {
+				// Find all elements within the selection box
+				const selectedIds: string[] = [];
+
+				// Check entities
+				entities.forEach((entity) => {
+					const entityCenterX = entity.position.x + entity.size.width / 2;
+					const entityCenterY = entity.position.y + entity.size.height / 2;
+					if (
+						entityCenterX >= boxX &&
+						entityCenterX <= boxX + boxWidth &&
+						entityCenterY >= boxY &&
+						entityCenterY <= boxY + boxHeight
+					) {
+						selectedIds.push(entity.id);
+					}
+				});
+
+				// Check relationships
+				relationships.forEach((relationship) => {
+					const relCenterX =
+						relationship.position.x + relationship.size.width / 2;
+					const relCenterY =
+						relationship.position.y + relationship.size.height / 2;
+					if (
+						relCenterX >= boxX &&
+						relCenterX <= boxX + boxWidth &&
+						relCenterY >= boxY &&
+						relCenterY <= boxY + boxHeight
+					) {
+						selectedIds.push(relationship.id);
+					}
+				});
+
+				// Check attributes
+				attributes.forEach((attribute) => {
+					const attrCenterX = attribute.position.x;
+					const attrCenterY = attribute.position.y;
+					if (
+						attrCenterX >= boxX &&
+						attrCenterX <= boxX + boxWidth &&
+						attrCenterY >= boxY &&
+						attrCenterY <= boxY + boxHeight
+					) {
+						selectedIds.push(attribute.id);
+					}
+				});
+
+				// Check connections (check if any point is in the box)
+				connections.forEach((connection) => {
+					// Check if any point in the connection is within the box
+					for (let i = 0; i < connection.points.length; i += 2) {
+						const x = connection.points[i];
+						const y = connection.points[i + 1];
+						if (
+							x >= boxX &&
+							x <= boxX + boxWidth &&
+							y >= boxY &&
+							y <= boxY + boxHeight
+						) {
+							selectedIds.push(connection.id);
+							break;
+						}
+					}
+				});
+
+				if (selectedIds.length > 0) {
+					selectMultiple(selectedIds);
+				}
+			}
+
+			// Reset selection box
+			setIsSelecting(false);
+			setSelectionBox(null);
+		}
+	};
+
 	// Handle canvas click
 	const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		const stage = stageRef.current;
@@ -177,23 +819,28 @@ export const ERCanvas: React.FC = () => {
 			return;
 		}
 
-		// Check if clicking on an entity (for attribute mode)
+		// Check if clicking on an entity or relationship (for attribute mode)
 		if (mode === "attribute") {
-			// Find the entity that was clicked on or nearest entity
+			// Find the entity or relationship that was clicked on or nearest one
 			let targetEntity = null;
+			let targetRelationship = null;
 			const clickedNode = e.target;
 
-			// Check if clicking directly on an entity
+			// Check if clicking directly on an entity or relationship
 			if (clickedNode && clickedNode.getType() === "Group") {
 				const groupId = clickedNode.id();
 				targetEntity = entities.find((e) => e.id === groupId);
+				if (!targetEntity) {
+					targetRelationship = relationships.find((r) => r.id === groupId);
+				}
 			}
 
-			// If not clicking on entity, find nearest entity within reasonable distance
-			if (!targetEntity) {
+			// If not clicking directly, find nearest entity or relationship within reasonable distance
+			if (!targetEntity && !targetRelationship) {
 				let minDistance = Infinity;
 				const maxDistance = 200; // Maximum distance to consider
 
+				// Check entities first
 				for (const entity of entities) {
 					const entityCenterX = entity.position.x + entity.size.width / 2;
 					const entityCenterY = entity.position.y + entity.size.height / 2;
@@ -207,6 +854,24 @@ export const ERCanvas: React.FC = () => {
 						targetEntity = entity;
 					}
 				}
+
+				// Check relationships if no entity found
+				if (!targetEntity) {
+					for (const relationship of relationships) {
+						const relCenterX =
+							relationship.position.x + relationship.size.width / 2;
+						const relCenterY =
+							relationship.position.y + relationship.size.height / 2;
+						const distance = Math.sqrt(
+							Math.pow(pos.x - relCenterX, 2) + Math.pow(pos.y - relCenterY, 2)
+						);
+
+						if (distance < minDistance && distance < maxDistance) {
+							minDistance = distance;
+							targetRelationship = relationship;
+						}
+					}
+				}
 			}
 
 			if (targetEntity) {
@@ -214,6 +879,7 @@ export const ERCanvas: React.FC = () => {
 				addAttribute(targetEntity.id, {
 					name: "New Attribute",
 					isKey: false,
+					isPartialKey: false,
 					isMultivalued: false,
 					isDerived: false,
 				});
@@ -228,6 +894,32 @@ export const ERCanvas: React.FC = () => {
 					if (entityAttributes.length > 0) {
 						// Get the last one (most recently added)
 						const newAttribute = entityAttributes[entityAttributes.length - 1];
+						if (newAttribute && newAttribute.name === "New Attribute") {
+							updateAttributePosition(newAttribute.id, pos);
+						}
+					}
+				});
+			} else if (targetRelationship) {
+				// Add attribute to the relationship
+				addRelationshipAttribute(targetRelationship.id, {
+					name: "New Attribute",
+					isKey: false,
+					isPartialKey: false,
+					isMultivalued: false,
+					isDerived: false,
+				});
+				// Update position to clicked position after creation
+				// Use a small delay to ensure attribute is created first
+				requestAnimationFrame(() => {
+					const state = useEditorStore.getState();
+					// Find the most recently created attribute for this relationship
+					const relationshipAttributes = state.diagram.attributes.filter(
+						(a) => a.relationshipId === targetRelationship.id
+					);
+					if (relationshipAttributes.length > 0) {
+						// Get the last one (most recently added)
+						const newAttribute =
+							relationshipAttributes[relationshipAttributes.length - 1];
 						if (newAttribute && newAttribute.name === "New Attribute") {
 							updateAttributePosition(newAttribute.id, pos);
 						}
@@ -271,14 +963,17 @@ export const ERCanvas: React.FC = () => {
 					}
 					setDrawingLine(false, null, null);
 				}
-			} else {
-				clearSelection();
+			} else if (mode === "select") {
+				// Only clear selection if not in box selection mode
+				if (!isSelecting) {
+					clearSelection();
+				}
 			}
 		}
 	};
 
-	// Add mouse move handler for preview
-	const handleMouseMove = () => {
+	// Add mouse/touch move handler for preview
+	const handlePointerMove = () => {
 		const stage = stageRef.current;
 		if (!stage) return;
 
@@ -306,6 +1001,81 @@ export const ERCanvas: React.FC = () => {
 		}
 	};
 
+	// Handle pinch-to-zoom gesture
+	const handleTouchStart = (e: Konva.KonvaEventObject<TouchEvent>) => {
+		if (e.evt.touches.length === 2) {
+			const touch1 = e.evt.touches[0];
+			const touch2 = e.evt.touches[1];
+
+			const distance = Math.sqrt(
+				Math.pow(touch2.clientX - touch1.clientX, 2) +
+					Math.pow(touch2.clientY - touch1.clientY, 2)
+			);
+
+			const centerX = (touch1.clientX + touch2.clientX) / 2;
+			const centerY = (touch1.clientY + touch2.clientY) / 2;
+
+			lastPinchDistanceRef.current = distance;
+			lastPinchCenterRef.current = { x: centerX, y: centerY };
+		}
+	};
+
+	const handleTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
+		if (e.evt.touches.length === 2 && lastPinchDistanceRef.current !== null) {
+			e.evt.preventDefault(); // Prevent scrolling while pinching
+
+			const touch1 = e.evt.touches[0];
+			const touch2 = e.evt.touches[1];
+
+			const distance = Math.sqrt(
+				Math.pow(touch2.clientX - touch1.clientX, 2) +
+					Math.pow(touch2.clientY - touch1.clientY, 2)
+			);
+
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			const scaleChange = distance / lastPinchDistanceRef.current;
+			const oldScale = viewport.scale;
+			const newScale = Math.max(0.1, Math.min(5, oldScale * scaleChange));
+
+			// Get the center point in stage coordinates
+			const container = containerRef.current;
+			if (!container) return;
+
+			const rect = container.getBoundingClientRect();
+			const centerX = (touch1.clientX + touch2.clientX) / 2 - rect.left;
+			const centerY = (touch1.clientY + touch2.clientY) / 2 - rect.top;
+
+			const pointer = { x: centerX, y: centerY };
+			const mousePointTo = {
+				x: (pointer.x - stage.x()) / oldScale,
+				y: (pointer.y - stage.y()) / oldScale,
+			};
+
+			setZoom(newScale);
+
+			const newPos = {
+				x: pointer.x - mousePointTo.x * newScale,
+				y: pointer.y - mousePointTo.y * newScale,
+			};
+
+			stage.position(newPos);
+			setViewportPosition(newPos);
+			stage.batchDraw();
+
+			lastPinchDistanceRef.current = distance;
+		} else {
+			// Single touch - update preview
+			handlePointerMove();
+		}
+	};
+
+	const handleTouchEnd = () => {
+		lastPinchDistanceRef.current = null;
+		lastPinchCenterRef.current = null;
+	};
+
 	// Initialize stage position from store on mount
 	useEffect(() => {
 		if (stageRef.current) {
@@ -319,7 +1089,11 @@ export const ERCanvas: React.FC = () => {
 	}, []);
 
 	return (
-		<div ref={containerRef} className="relative w-full h-full bg-gray-50">
+		<div
+			ref={containerRef}
+			className="relative w-full h-full bg-gray-50"
+			style={{ touchAction: "none" }}
+		>
 			{/* Grid background */}
 			<div className="absolute inset-0 bg-grid-pattern opacity-20" />
 
@@ -334,7 +1108,16 @@ export const ERCanvas: React.FC = () => {
 				draggable={mode === "pan"}
 				onWheel={handleWheel}
 				onClick={handleStageClick}
-				onMouseMove={handleMouseMove}
+				onTap={handleStageTap}
+				onMouseDown={handleStageMouseDown}
+				onMouseMove={() => {
+					handlePointerMove();
+					handleStageMouseMove();
+				}}
+				onMouseUp={handleStageMouseUp}
+				onTouchStart={handleTouchStart}
+				onTouchMove={handleTouchMove}
+				onTouchEnd={handleTouchEnd}
 				onDragEnd={(e) => {
 					if (mode === "pan") {
 						const stage = e.target as Konva.Stage;
@@ -344,7 +1127,12 @@ export const ERCanvas: React.FC = () => {
 						});
 					}
 				}}
-				className="cursor-crosshair"
+				className={
+					selectedIds.length > 1 && mode === "select"
+						? "cursor-move"
+						: "cursor-crosshair"
+				}
+				style={{ touchAction: "none" }}
 			>
 				<Layer ref={layerRef}>
 					{/* Render entities */}
@@ -469,6 +1257,21 @@ export const ERCanvas: React.FC = () => {
 								})()}
 							</>
 						)}
+
+					{/* Selection box for multi-select */}
+					{isSelecting && selectionBox && (
+						<Rect
+							x={Math.min(selectionBox.startX, selectionBox.endX)}
+							y={Math.min(selectionBox.startY, selectionBox.endY)}
+							width={Math.abs(selectionBox.endX - selectionBox.startX)}
+							height={Math.abs(selectionBox.endY - selectionBox.startY)}
+							fill="rgba(59, 130, 246, 0.1)"
+							stroke="#3b82f6"
+							strokeWidth={2}
+							dash={[5, 5]}
+							listening={false}
+						/>
+					)}
 
 					{/* Transformer for resizing and rotating - works for both entities and relationships */}
 					<Transformer

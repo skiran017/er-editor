@@ -20,6 +20,7 @@ export interface EntityAttribute {
   id: string;
   name: string;
   isKey: boolean;
+  isPartialKey: boolean; // Weak key/partial key/discriminator
   isMultivalued: boolean;
   isDerived: boolean;
 }
@@ -29,9 +30,11 @@ export interface Attribute extends BaseElement {
   id: string;
   name: string;
   isKey: boolean;
+  isPartialKey: boolean; // Weak key/partial key/discriminator (dashed underline)
   isMultivalued: boolean;
   isDerived: boolean;
-  entityId: string; // Parent entity ID
+  entityId?: string; // Parent entity ID (optional - can be on relationship)
+  relationshipId?: string; // Parent relationship ID (optional - for relationship attributes)
   type: 'attribute';
 }
 
@@ -48,8 +51,10 @@ export interface Relationship extends BaseElement {
   type: 'relationship';
   name: string;
   entityIds: string[];
+  attributes: EntityAttribute[]; // Attributes for relationships
   cardinalities: Record<string, Cardinality>;
   participations: Record<string, Participation>;
+  isWeak: boolean; // Weak/identifying relationship (double border)
   size: Size;
   rotation?: number;
 }

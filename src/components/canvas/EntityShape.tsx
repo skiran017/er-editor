@@ -16,9 +16,15 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const mode = useEditorStore((state) => state.mode);
 
 	const { id, name, position, size, selected, isWeak, rotation = 0 } = entity;
+	const selectedIds = useEditorStore((state) => state.selectedIds);
+	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
 
 	// Handle drag move (update position in real-time for smooth dragging)
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+		// If multiple items are selected, let transformer handle it
+		if (isMultiSelect) {
+			return;
+		}
 		updateEntity(id, {
 			position: {
 				x: e.target.x(),
@@ -29,6 +35,10 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 
 	// Handle drag end
 	const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+		// If multiple items are selected, let transformer handle it
+		if (isMultiSelect) {
+			return;
+		}
 		updateEntity(id, {
 			position: {
 				x: e.target.x(),
@@ -65,23 +75,58 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	);
 	const addConnection = useEditorStore((state) => state.addConnection);
 
+	// Handle touch tap events
+	const handleTap = (e: Konva.KonvaEventObject<PointerEvent | TouchEvent>) => {
+		const mouseEvent = {
+			...e,
+			evt: {
+				...e.evt,
+				shiftKey: false,
+			},
+		} as Konva.KonvaEventObject<MouseEvent>;
+		handleClick(mouseEvent);
+	};
+
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		if (mode === "connect") {
 			e.cancelBubble = true;
 			const stage = e.target.getStage();
 			if (!stage) return;
 
+			// Get the click position relative to the entity's group (accounts for rotation)
+			const group = groupRef.current;
+			if (!group) return;
+
+			// Get pointer position in stage coordinates
 			const pointer = stage.getPointerPosition();
 			if (!pointer) return;
 
-			const transform = stage.getAbsoluteTransform().copy();
-			transform.invert();
-			const pos = transform.point(pointer);
+			// Get group's transform and invert it to get position relative to group
+			// This accounts for rotation, scale, and position
+			const groupTransform = group.getAbsoluteTransform().copy();
+			groupTransform.invert();
+			const groupRelativePos = groupTransform.point(pointer);
+
+			// For edge detection, use position relative to the entity's unrotated bounding box
+			// Since the entity is at (0, 0) relative to the group, we can use groupRelativePos directly
+			const entityRelativePos = {
+				x: groupRelativePos.x,
+				y: groupRelativePos.y,
+			};
+
+			// Create a temporary element object for getClosestEdge (relative to entity origin)
+			const tempElement = {
+				position: { x: 0, y: 0 },
+				size: entity.size,
+			};
 
 			if (!drawingConnection.isDrawing) {
-				// Start connection
-				const edge = getClosestEdge(pos, entity) as ConnectionPoint;
-				// Calculate the actual connection point position
+				// Start connection - use entity-relative position to determine edge
+				const edge = getClosestEdge(
+					entityRelativePos,
+					tempElement
+				) as ConnectionPoint;
+				// Calculate the actual connection point position in stage coordinates
 				const centerX = entity.position.x + entity.size.width / 2;
 				const centerY = entity.position.y + entity.size.height / 2;
 				let connectionPoint: { x: number; y: number };
@@ -111,7 +156,10 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 			} else {
 				// Complete connection
 				if (drawingConnection.fromId && drawingConnection.fromId !== id) {
-					const toEdge = getClosestEdge(pos, entity) as ConnectionPoint;
+					const toEdge = getClosestEdge(
+						entityRelativePos,
+						tempElement
+					) as ConnectionPoint;
 					addConnection(
 						drawingConnection.fromId,
 						id,
@@ -151,6 +199,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 			onDragEnd={handleDragEnd}
 			onTransformEnd={handleTransformEnd}
 			onClick={handleClick}
+			onTap={handleTap}
 			onDblClick={handleDblClick}
 		>
 			{/* Outer rectangle for weak entities (double border) */}

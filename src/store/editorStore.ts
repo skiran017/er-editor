@@ -11,8 +11,11 @@ interface EditorStore extends EditorState {
 
   // Attribute actions
   addAttribute: (entityId: string, attribute: Omit<EntityAttribute, 'id'>) => void;
-  updateAttribute: (entityId: string, attributeId: string, updates: Partial<Attribute>) => void;
+  addRelationshipAttribute: (relationshipId: string, attribute: Omit<EntityAttribute, 'id'>) => void;
+  updateAttribute: (entityId: string, attributeId: string, updates: Partial<EntityAttribute>) => void;
+  updateAttributeById: (attributeId: string, updates: Partial<Attribute>) => void;
   deleteAttribute: (entityId: string, attributeId: string) => void;
+  deleteAttributeById: (attributeId: string) => void;
   updateAttributePosition: (attributeId: string, position: Position) => void;
 
   // Relationship actions
@@ -210,6 +213,7 @@ export const useEditorStore = create<EditorStore>()(
               id: attributeId,
               name: attribute.name,
               isKey: attribute.isKey,
+              isPartialKey: attribute.isPartialKey || false,
               isMultivalued: attribute.isMultivalued,
               isDerived: attribute.isDerived,
             });
@@ -234,6 +238,7 @@ export const useEditorStore = create<EditorStore>()(
           if (canvasAttribute) {
             if (updates.name !== undefined) canvasAttribute.name = updates.name;
             if (updates.isKey !== undefined) canvasAttribute.isKey = updates.isKey;
+            if (updates.isPartialKey !== undefined) canvasAttribute.isPartialKey = updates.isPartialKey;
             if (updates.isMultivalued !== undefined) canvasAttribute.isMultivalued = updates.isMultivalued;
             if (updates.isDerived !== undefined) canvasAttribute.isDerived = updates.isDerived;
           }
@@ -261,6 +266,98 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      addRelationshipAttribute: (relationshipId, attribute) => {
+        set((state) => {
+          const relationship = state.diagram.relationships.find((r) => r.id === relationshipId);
+          if (relationship) {
+            const attributeId = generateId();
+            // Calculate position relative to relationship (to the right side)
+            const attributeCount = state.diagram.attributes.filter(a => a.relationshipId === relationshipId).length;
+            const newAttribute: Attribute = {
+              id: attributeId,
+              type: 'attribute',
+              ...attribute,
+              relationshipId,
+              position: {
+                x: relationship.position.x + relationship.size.width + 40,
+                y: relationship.position.y + 20 + attributeCount * 30,
+              },
+              selected: false,
+            };
+            // Add to both relationship's attributes array and diagram's attributes array
+            relationship.attributes.push({
+              id: attributeId,
+              name: attribute.name,
+              isKey: attribute.isKey,
+              isPartialKey: attribute.isPartialKey || false,
+              isMultivalued: attribute.isMultivalued,
+              isDerived: attribute.isDerived,
+            });
+            state.diagram.attributes.push(newAttribute);
+          }
+        });
+      },
+
+      updateAttributeById: (attributeId, updates) => {
+        set((state) => {
+          const canvasAttribute = state.diagram.attributes.find((a) => a.id === attributeId);
+          if (canvasAttribute) {
+            Object.assign(canvasAttribute, updates);
+            // Also update in parent entity or relationship
+            if (canvasAttribute.entityId) {
+              const entity = state.diagram.entities.find((e) => e.id === canvasAttribute.entityId);
+              if (entity) {
+                const attribute = entity.attributes.find((a) => a.id === attributeId);
+                if (attribute) {
+                  if (updates.name !== undefined) attribute.name = updates.name;
+                  if (updates.isKey !== undefined) attribute.isKey = updates.isKey;
+                  if (updates.isPartialKey !== undefined) attribute.isPartialKey = updates.isPartialKey;
+                  if (updates.isMultivalued !== undefined) attribute.isMultivalued = updates.isMultivalued;
+                  if (updates.isDerived !== undefined) attribute.isDerived = updates.isDerived;
+                }
+              }
+            }
+            if (canvasAttribute.relationshipId) {
+              const relationship = state.diagram.relationships.find((r) => r.id === canvasAttribute.relationshipId);
+              if (relationship) {
+                const attribute = relationship.attributes.find((a) => a.id === attributeId);
+                if (attribute) {
+                  if (updates.name !== undefined) attribute.name = updates.name;
+                  if (updates.isKey !== undefined) attribute.isKey = updates.isKey;
+                  if (updates.isPartialKey !== undefined) attribute.isPartialKey = updates.isPartialKey;
+                  if (updates.isMultivalued !== undefined) attribute.isMultivalued = updates.isMultivalued;
+                  if (updates.isDerived !== undefined) attribute.isDerived = updates.isDerived;
+                }
+              }
+            }
+          }
+        });
+      },
+
+      deleteAttributeById: (attributeId) => {
+        set((state) => {
+          const canvasAttribute = state.diagram.attributes.find((a) => a.id === attributeId);
+          if (canvasAttribute) {
+            // Remove from parent entity
+            if (canvasAttribute.entityId) {
+              const entity = state.diagram.entities.find((e) => e.id === canvasAttribute.entityId);
+              if (entity) {
+                entity.attributes = entity.attributes.filter((a) => a.id !== attributeId);
+              }
+            }
+            // Remove from parent relationship
+            if (canvasAttribute.relationshipId) {
+              const relationship = state.diagram.relationships.find((r) => r.id === canvasAttribute.relationshipId);
+              if (relationship) {
+                relationship.attributes = relationship.attributes.filter((a) => a.id !== attributeId);
+              }
+            }
+          }
+          // Remove from canvas attributes
+          state.diagram.attributes = state.diagram.attributes.filter((a) => a.id !== attributeId);
+        });
+      },
+
       // Relationship actions
       addRelationship: (position) => {
         set((state) => {
@@ -271,8 +368,10 @@ export const useEditorStore = create<EditorStore>()(
             position,
             selected: false,
             entityIds: [],
+            attributes: [],
             cardinalities: {},
             participations: {},
+            isWeak: false,
             size: { width: 120, height: 80 },
             rotation: 0,
           };
