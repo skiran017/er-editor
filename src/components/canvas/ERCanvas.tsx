@@ -1106,11 +1106,11 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	return (
 		<div
 			ref={containerRef}
-			className="relative w-full h-full bg-gray-50"
+			className="relative w-full h-full bg-gray-50 dark:bg-gray-900"
 			style={{ touchAction: "none" }}
 		>
 			{/* Grid background */}
-			<div className="absolute inset-0 bg-grid-pattern opacity-20" />
+			<div className="absolute inset-0 bg-grid-pattern opacity-20 dark:opacity-10" />
 
 			<Stage
 				ref={stageRef}

@@ -1,7 +1,8 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Group, Line, Text, Circle } from "react-konva";
 import type { Connection } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
+import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
 interface ConnectionShapeProps {
@@ -20,6 +21,19 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	const mode = useEditorStore((state) => state.mode);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
+
+	// Get theme-aware colors (must be before early returns)
+	const [colors, setColors] = useState(getThemeColorsSync());
+	useEffect(() => {
+		const updateColors = () => setColors(getThemeColorsSync());
+		updateColors();
+		const observer = new MutationObserver(updateColors);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+		return () => observer.disconnect();
+	}, []);
 
 	const {
 		id,
@@ -126,7 +140,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 		};
 
 	// Determine stroke style
-	const strokeColor = selected ? "#3b82f6" : "#6b7280";
+	const strokeColor = selected ? "#3b82f6" : colors.stroke;
 	const strokeWidth = selected ? 2.5 : 2;
 	const isTotalParticipation = participation === "total";
 
@@ -216,7 +230,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 							y={waypoint.y}
 							radius={6}
 							fill="#3b82f6"
-							stroke="white"
+							stroke={colors.fill}
 							strokeWidth={2}
 							draggable
 							onDragMove={handleWaypointDrag(index)}
@@ -245,12 +259,12 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 					e.cancelBubble = true;
 				}}
 			>
-				{/* Label background */}
+				{/* Label background - use fill color for background */}
 				<Text
 					text={labelText}
 					fontSize={12}
 					fontStyle="bold"
-					fill="white"
+					fill={colors.fill}
 					padding={4}
 					align="center"
 					offsetX={-20}
@@ -260,7 +274,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 					text={labelText}
 					fontSize={12}
 					fontStyle="bold"
-					fill={selected ? "#3b82f6" : "#374151"}
+					fill={selected ? "#3b82f6" : colors.text}
 					padding={4}
 					align="center"
 					offsetX={-20}

@@ -139,6 +139,20 @@
 			linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
 		background-size: 20px 20px;
 	}
+
+	.dark .bg-grid-pattern {
+		background-image: linear-gradient(to right, #374151 1px, transparent 1px),
+			linear-gradient(to bottom, #374151 1px, transparent 1px);
+	}
+
+	/* Hide scrollbar but keep functionality */
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
 }
 
 /* Konva cursor styles */

@@ -1,7 +1,8 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Circle, Line, Group } from "react-konva";
 import type { LineShape as LineShapeType } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
+import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
 interface LineShapeProps {
@@ -16,6 +17,19 @@ export const LineShapeComponent: React.FC<LineShapeProps> = ({ line }) => {
 	const mode = useEditorStore((state) => state.mode);
 
 	const { id, points, selected, strokeWidth, position } = line;
+
+	// Get theme-aware colors
+	const [colors, setColors] = useState(getThemeColorsSync());
+	useEffect(() => {
+		const updateColors = () => setColors(getThemeColorsSync());
+		updateColors();
+		const observer = new MutationObserver(updateColors);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+		return () => observer.disconnect();
+	}, []);
 
 	// Convert absolute points to relative points for the group
 	const relativePoints = points.map((point, index) => {
@@ -134,7 +148,7 @@ export const LineShapeComponent: React.FC<LineShapeProps> = ({ line }) => {
 			<Line
 				ref={lineRef}
 				points={relativePoints}
-				stroke={selected ? "#3b82f6" : "black"}
+				stroke={selected ? "#3b82f6" : colors.stroke}
 				strokeWidth={strokeWidth}
 				lineCap="round"
 				lineJoin="round"
@@ -152,7 +166,7 @@ export const LineShapeComponent: React.FC<LineShapeProps> = ({ line }) => {
 						x={relativePoints[0]}
 						y={relativePoints[1]}
 						radius={8}
-						fill="white"
+						fill={colors.fill}
 						stroke="#3b82f6"
 						strokeWidth={2}
 						draggable
@@ -179,7 +193,7 @@ export const LineShapeComponent: React.FC<LineShapeProps> = ({ line }) => {
 						x={relativePoints[2]}
 						y={relativePoints[3]}
 						radius={8}
-						fill="white"
+						fill={colors.fill}
 						stroke="#3b82f6"
 						strokeWidth={2}
 						draggable

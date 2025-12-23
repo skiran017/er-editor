@@ -4,11 +4,18 @@ import { ERCanvas, type ERCanvasRef } from "./components/canvas/ERCanvas";
 import { PropertyPanel } from "./components/properties/PropertyPanel";
 import { ToastContainer, useToast } from "./components/ui/toast";
 import { useEditorStore } from "./store/editorStore";
+import { useThemeStore } from "./store/themeStore";
 
 function App() {
 	const setMode = useEditorStore((state) => state.setMode);
 	const canvasRef = useRef<ERCanvasRef>(null);
 	const { toasts, removeToast } = useToast();
+
+	// Initialize theme
+	useEffect(() => {
+		const theme = useThemeStore.getState().theme;
+		useThemeStore.getState().setTheme(theme);
+	}, []);
 
 	// Keyboard shortcuts
 	useEffect(() => {
@@ -117,7 +124,7 @@ function App() {
 	return (
 		<div className="h-screen flex flex-col overflow-hidden">
 			<Toolbar stageRef={canvasRef.current?.stageRef} />
-			<div className="flex-1 relative overflow-hidden mt-14">
+			<div className="flex-1 relative overflow-hidden">
 				<ERCanvas ref={canvasRef} />
 				<PropertyPanel />
 			</div>

@@ -1,8 +1,9 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Group, Line, Text } from "react-konva";
 import type { Relationship, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getClosestEdge } from "../../lib/utils";
+import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
 interface RelationshipShapeProps {
@@ -31,6 +32,19 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
+
+	// Get theme-aware colors
+	const [colors, setColors] = useState(getThemeColorsSync());
+	useEffect(() => {
+		const updateColors = () => setColors(getThemeColorsSync());
+		updateColors();
+		const observer = new MutationObserver(updateColors);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+		return () => observer.disconnect();
+	}, []);
 
 	// Diamond dimensions
 	const width = size.width;
@@ -246,7 +260,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 					]}
 					closed
 					fill="transparent"
-					stroke={selected ? "#3b82f6" : "black"}
+					stroke={selected ? "#3b82f6" : colors.stroke}
 					strokeWidth={selected ? 3 : 2}
 				/>
 			)}
@@ -255,8 +269,8 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			<Line
 				points={points}
 				closed
-				fill="white"
-				stroke={selected ? "#3b82f6" : "black"}
+				fill={colors.fill}
+				stroke={selected ? "#3b82f6" : colors.stroke}
 				strokeWidth={selected ? 3 : 2}
 				shadowEnabled={selected}
 				shadowBlur={10}
@@ -275,7 +289,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				verticalAlign="middle"
 				fontSize={14}
 				fontStyle="bold"
-				fill="black"
+				fill={colors.text}
 				onClick={handleClick}
 				onTap={handleTap}
 				onDblClick={handleDblClick}

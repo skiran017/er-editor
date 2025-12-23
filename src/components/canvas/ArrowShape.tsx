@@ -1,7 +1,8 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Arrow, Group } from "react-konva";
 import type { ArrowShape as ArrowShapeType } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
+import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
 interface ArrowShapeProps {
@@ -24,6 +25,19 @@ export const ArrowShapeComponent: React.FC<ArrowShapeProps> = ({ arrow }) => {
 		pointerWidth,
 		position,
 	} = arrow;
+
+	// Get theme-aware colors
+	const [colors, setColors] = useState(getThemeColorsSync());
+	useEffect(() => {
+		const updateColors = () => setColors(getThemeColorsSync());
+		updateColors();
+		const observer = new MutationObserver(updateColors);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+		return () => observer.disconnect();
+	}, []);
 
 	// Convert absolute points to relative points for the group
 	// Note: Points are already stored in the correct order (reversed for left arrows in store)
@@ -145,8 +159,8 @@ export const ArrowShapeComponent: React.FC<ArrowShapeProps> = ({ arrow }) => {
 			<Arrow
 				ref={arrowRef}
 				points={relativePoints}
-				stroke={selected ? "#3b82f6" : "black"}
-				fill={selected ? "#3b82f6" : "black"}
+				stroke={selected ? "#3b82f6" : colors.stroke}
+				fill={selected ? "#3b82f6" : colors.stroke}
 				strokeWidth={strokeWidth}
 				pointerLength={pointerLength}
 				pointerWidth={pointerWidth}

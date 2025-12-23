@@ -1,8 +1,9 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Group, Rect, Text } from "react-konva";
 import type { Entity, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getClosestEdge } from "../../lib/utils";
+import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
 interface EntityShapeProps {
@@ -18,6 +19,20 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const { id, name, position, size, selected, isWeak, rotation = 0 } = entity;
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
+
+	// Get theme-aware colors
+	const [colors, setColors] = useState(getThemeColorsSync());
+	useEffect(() => {
+		const updateColors = () => setColors(getThemeColorsSync());
+		updateColors();
+		// Listen for theme changes
+		const observer = new MutationObserver(updateColors);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+		return () => observer.disconnect();
+	}, []);
 
 	// Handle drag move (update position in real-time for smooth dragging)
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -209,7 +224,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 					y={-5}
 					width={size.width + 10}
 					height={size.height + 10}
-					stroke="black"
+					stroke={colors.stroke}
 					strokeWidth={1}
 				/>
 			)}
@@ -218,8 +233,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 			<Rect
 				width={size.width}
 				height={size.height}
-				fill="white"
-				stroke={selected ? "#3b82f6" : "black"}
+				fill={colors.fill}
+				stroke={selected ? "#3b82f6" : colors.stroke}
 				strokeWidth={selected ? 3 : 2}
 				shadowEnabled={selected}
 				shadowBlur={10}
@@ -235,7 +250,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 				y={size.height / 2 - 10}
 				fontSize={16}
 				fontStyle="bold"
-				fill="black"
+				fill={colors.text}
 			/>
 		</Group>
 	);

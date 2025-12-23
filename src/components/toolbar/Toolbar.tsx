@@ -8,16 +8,14 @@ import {
 	Redo2,
 	ZoomIn,
 	ZoomOut,
-	Download,
-	Upload,
 	Minus,
 	ArrowLeft,
 	ArrowRight,
 	Trash2,
 	Circle,
 	Link,
-	Image,
 } from "lucide-react";
+import { Menu } from "../menu/Menu";
 import {
 	useEditorStore,
 	useUndo,
@@ -203,114 +201,135 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 		});
 	};
 
+	const handleResetCanvas = async () => {
+		const confirmed = await showConfirmDialog(
+			"Are you sure you want to reset the canvas? This will delete all elements."
+		);
+		if (confirmed) {
+			loadDiagram(
+				{
+					entities: [],
+					relationships: [],
+					connections: [],
+					lines: [],
+					arrows: [],
+					attributes: [],
+				},
+				true
+			);
+			showToast("Canvas reset", "success");
+		}
+	};
+
+	const handleShowShortcuts = () => {
+		// TODO: Implement shortcuts modal/dialog
+		showToast(
+			"Keyboard shortcuts: V=Select, E=Entity, R=Relationship, A=Attribute, C=Connect, L=Line, Space=Pan",
+			"info",
+			5000
+		);
+	};
+
 	return (
-		<div className="fixed top-0 left-0 right-0 z-50 h-14 bg-white border-b border-gray-200 flex items-center px-2 sm:px-4 gap-1 sm:gap-2 shadow-sm overflow-x-auto">
-			{/* Mode tools */}
-			<div className="flex items-center gap-1 mr-4 border-r pr-4">
-				{tools.map((tool) => {
-					const Icon = tool.icon;
-					const isActive = mode === tool.id;
+		<>
+			{/* Hamburger Menu - Separate, fixed at top-left */}
+			<div className="fixed top-4 left-4 z-50">
+				<Menu
+					onImport={handleImport}
+					onExportXML={handleExport}
+					onExportImage={handleExportImage}
+					onResetCanvas={handleResetCanvas}
+					onShowShortcuts={handleShowShortcuts}
+				/>
+			</div>
 
-					return (
+			{/* Toolbar - Scrollable on mobile, centered on desktop */}
+			<div className="fixed bottom-4 left-4 right-4 md:bottom-auto md:top-4 md:left-1/2 md:-translate-x-1/2 md:right-auto z-50 md:max-w-max">
+				<div className="h-12 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-lg flex items-center px-3 gap-1 overflow-x-auto scrollbar-hide">
+					{/* Mode tools */}
+					<div className="flex items-center gap-0.5 mr-2 border-r border-gray-200 dark:border-gray-700 pr-2 shrink-0">
+						{tools.map((tool) => {
+							const Icon = tool.icon;
+							const isActive = mode === tool.id;
+
+							return (
+								<button
+									key={tool.id}
+									onClick={() => setMode(tool.id as typeof mode)}
+									className={cn(
+										"p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors",
+										isActive &&
+											"bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+									)}
+									title={tool.label}
+								>
+									<Icon size={18} />
+								</button>
+							);
+						})}
+					</div>
+
+					{/* History tools */}
+					<div className="flex items-center gap-0.5 mr-2 border-r border-gray-200 dark:border-gray-700 pr-2 shrink-0">
 						<button
-							key={tool.id}
-							onClick={() => setMode(tool.id as typeof mode)}
+							onClick={() => undo()}
+							disabled={!canUndo}
 							className={cn(
-								"p-2 rounded hover:bg-gray-100 transition-colors",
-								isActive && "bg-blue-100 text-blue-600"
+								"p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors",
+								!canUndo && "opacity-50 cursor-not-allowed"
 							)}
-							title={tool.label}
+							title="Undo (Ctrl+Z)"
 						>
-							<Icon size={20} />
+							<Undo2 size={18} />
 						</button>
-					);
-				})}
-			</div>
+						<button
+							onClick={() => redo()}
+							disabled={!canRedo}
+							className={cn(
+								"p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors",
+								!canRedo && "opacity-50 cursor-not-allowed"
+							)}
+							title="Redo (Ctrl+Y)"
+						>
+							<Redo2 size={18} />
+						</button>
+					</div>
 
-			{/* History tools */}
-			<div className="flex items-center gap-1 mr-4 border-r pr-4">
-				<button
-					onClick={() => undo()}
-					disabled={!canUndo}
-					className={cn(
-						"p-2 rounded hover:bg-gray-100 transition-colors",
-						!canUndo && "opacity-50 cursor-not-allowed"
+					{/* Delete button - only show when something is selected */}
+					{selectedIds.length > 0 && (
+						<div className="flex items-center gap-0.5 mr-2 border-r border-gray-200 dark:border-gray-700 pr-2 shrink-0">
+							<button
+								onClick={handleDelete}
+								className="p-2 rounded-md hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
+								title={`Delete selected (${selectedIds.length})`}
+							>
+								<Trash2 size={18} />
+							</button>
+						</div>
 					)}
-					title="Undo (Ctrl+Z)"
-				>
-					<Undo2 size={20} />
-				</button>
-				<button
-					onClick={() => redo()}
-					disabled={!canRedo}
-					className={cn(
-						"p-2 rounded hover:bg-gray-100 transition-colors",
-						!canRedo && "opacity-50 cursor-not-allowed"
-					)}
-					title="Redo (Ctrl+Y)"
-				>
-					<Redo2 size={20} />
-				</button>
-			</div>
 
-			{/* Delete button - only show when something is selected */}
-			{selectedIds.length > 0 && (
-				<div className="flex items-center gap-1 mr-4 border-r pr-4">
-					<button
-						onClick={handleDelete}
-						className="p-2 rounded hover:bg-red-100 text-red-600 transition-colors"
-						title={`Delete selected (${selectedIds.length})`}
-					>
-						<Trash2 size={20} />
-					</button>
+					{/* Zoom tools */}
+					<div className="flex items-center gap-0.5 shrink-0">
+						<button
+							onClick={handleZoomOut}
+							className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							title="Zoom Out"
+						>
+							<ZoomOut size={18} />
+						</button>
+						<span className="text-xs text-gray-600 dark:text-gray-400 min-w-[45px] text-center font-medium">
+							{Math.round(viewport.scale * 100)}%
+						</span>
+						<button
+							onClick={handleZoomIn}
+							className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							title="Zoom In"
+						>
+							<ZoomIn size={18} />
+						</button>
+					</div>
 				</div>
-			)}
-
-			{/* Zoom tools */}
-			<div className="flex items-center gap-1 mr-4 border-r pr-4">
-				<button
-					onClick={handleZoomOut}
-					className="p-2 rounded hover:bg-gray-100 transition-colors"
-					title="Zoom Out"
-				>
-					<ZoomOut size={20} />
-				</button>
-				<span className="text-sm text-gray-600 min-w-[50px] text-center">
-					{Math.round(viewport.scale * 100)}%
-				</span>
-				<button
-					onClick={handleZoomIn}
-					className="p-2 rounded hover:bg-gray-100 transition-colors"
-					title="Zoom In"
-				>
-					<ZoomIn size={20} />
-				</button>
 			</div>
-
-			{/* File operations */}
-			<div className="flex items-center gap-1 ml-auto">
-				<button
-					onClick={handleImport}
-					className="p-2 rounded hover:bg-gray-100 transition-colors"
-					title="Import XML"
-				>
-					<Upload size={20} />
-				</button>
-				<button
-					onClick={handleExport}
-					className="p-2 rounded hover:bg-gray-100 transition-colors"
-					title="Export XML"
-				>
-					<Download size={20} />
-				</button>
-				<button
-					onClick={handleExportImage}
-					className="p-2 rounded hover:bg-gray-100 transition-colors"
-					title="Export as Image (PNG)"
-				>
-					<Image size={20} />
-				</button>
-			</div>
-		</div>
+		</>
 	);
 };

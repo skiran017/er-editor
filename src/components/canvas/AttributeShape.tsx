@@ -1,7 +1,8 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Group, Ellipse, Text, Line } from "react-konva";
 import type { Attribute } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
+import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
 interface AttributeShapeProps {
@@ -18,6 +19,19 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 	const entities = useEditorStore((state) => state.diagram.entities);
+
+	// Get theme-aware colors (must be before early returns)
+	const [colors, setColors] = useState(getThemeColorsSync());
+	useEffect(() => {
+		const updateColors = () => setColors(getThemeColorsSync());
+		updateColors();
+		const observer = new MutationObserver(updateColors);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+		return () => observer.disconnect();
+	}, []);
 
 	const {
 		id,
@@ -87,7 +101,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	};
 
 	// Determine stroke style based on attribute properties
-	let strokeColor = "black";
+	let strokeColor = colors.stroke;
 	let strokeWidth = 2;
 	let strokeDash: number[] | undefined = undefined;
 
@@ -138,7 +152,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 				<Ellipse
 					radiusX={ellipseWidth / 2}
 					radiusY={ellipseHeight / 2}
-					fill="white"
+					fill={colors.fill}
 					stroke={strokeColor}
 					strokeWidth={strokeWidth}
 					dash={strokeDash}
@@ -157,7 +171,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 					align="center"
 					verticalAlign="middle"
 					fontSize={14}
-					fill={isKey ? "#f59e0b" : "black"}
+					fill={isKey ? "#f59e0b" : colors.text}
 					fontStyle={isKey ? "bold" : "normal"}
 				/>
 
