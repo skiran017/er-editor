@@ -1,11 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Toolbar } from "./components/toolbar/Toolbar";
-import { ERCanvas } from "./components/canvas/ERCanvas";
+import { ERCanvas, type ERCanvasRef } from "./components/canvas/ERCanvas";
 import { PropertyPanel } from "./components/properties/PropertyPanel";
+import { ToastContainer, useToast } from "./components/ui/toast";
 import { useEditorStore } from "./store/editorStore";
 
 function App() {
 	const setMode = useEditorStore((state) => state.setMode);
+	const canvasRef = useRef<ERCanvasRef>(null);
+	const { toasts, removeToast } = useToast();
 
 	// Keyboard shortcuts
 	useEffect(() => {
@@ -113,11 +116,12 @@ function App() {
 
 	return (
 		<div className="h-screen flex flex-col overflow-hidden">
-			<Toolbar />
+			<Toolbar stageRef={canvasRef.current?.stageRef} />
 			<div className="flex-1 relative overflow-hidden mt-14">
-				<ERCanvas />
+				<ERCanvas ref={canvasRef} />
 				<PropertyPanel />
 			</div>
+			<ToastContainer toasts={toasts} onRemove={removeToast} />
 		</div>
 	);
 }

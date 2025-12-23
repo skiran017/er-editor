@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
-import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation } from '../types';
+import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram } from '../types';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -56,6 +56,9 @@ interface EditorStore extends EditorState {
   // Drawing state actions
   setDrawingLine: (isDrawing: boolean, startPoint?: Position | null, currentPoint?: Position | null) => void;
   setDrawingConnection: (isDrawing: boolean, fromId?: string | null, fromPoint?: ConnectionPoint | null, currentPoint?: Position | null, waypoints?: Position[]) => void;
+
+  // Import/Export actions
+  loadDiagram: (diagram: Diagram, replace: boolean) => void;
 
   // Utility
   getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | undefined;
@@ -808,6 +811,32 @@ export const useEditorStore = create<EditorStore>()(
           if (fromPoint !== undefined) state.drawingConnection.fromPoint = fromPoint;
           if (currentPoint !== undefined) state.drawingConnection.currentPoint = currentPoint;
           if (waypoints !== undefined) state.drawingConnection.waypoints = waypoints;
+        });
+      },
+
+      // Import/Export actions
+      loadDiagram: (diagram: Diagram, replace: boolean) => {
+        set((state) => {
+          if (replace) {
+            // Replace current diagram
+            state.diagram = {
+              entities: [...diagram.entities],
+              relationships: [...diagram.relationships],
+              connections: [...diagram.connections],
+              lines: [...diagram.lines],
+              arrows: [...diagram.arrows],
+              attributes: [...diagram.attributes],
+            };
+            state.selectedIds = [];
+          } else {
+            // Merge with existing diagram
+            state.diagram.entities.push(...diagram.entities);
+            state.diagram.relationships.push(...diagram.relationships);
+            state.diagram.connections.push(...diagram.connections);
+            state.diagram.lines.push(...diagram.lines);
+            state.diagram.arrows.push(...diagram.arrows);
+            state.diagram.attributes.push(...diagram.attributes);
+          }
         });
       },
 

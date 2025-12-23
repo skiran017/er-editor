@@ -16,6 +16,7 @@ import {
 	Trash2,
 	Circle,
 	Link,
+	Image,
 } from "lucide-react";
 import {
 	useEditorStore,
@@ -25,8 +26,23 @@ import {
 	useCanRedo,
 } from "../../store/editorStore";
 import { cn } from "../../lib/utils";
+import { serializeDiagramToXML } from "../../lib/xmlSerializer";
+import { parseXMLToDiagram } from "../../lib/xmlParser";
+import {
+	downloadFile,
+	pickFile,
+	readFileAsText,
+	showConfirmDialog,
+} from "../../lib/fileUtils";
+import { exportCanvasAsImage } from "../../lib/imageExport";
+import { showToast } from "../ui/toast";
+import Konva from "konva";
 
-export const Toolbar: React.FC = () => {
+interface ToolbarProps {
+	stageRef?: React.RefObject<Konva.Stage | null>;
+}
+
+export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 	const mode = useEditorStore((state) => state.mode);
 	const setMode = useEditorStore((state) => state.setMode);
 	const setZoom = useEditorStore((state) => state.setZoom);
@@ -44,6 +60,8 @@ export const Toolbar: React.FC = () => {
 		(state) => state.deleteAttributeById
 	);
 	const deleteConnection = useEditorStore((state) => state.deleteConnection);
+	const diagram = useEditorStore((state) => state.diagram);
+	const loadDiagram = useEditorStore((state) => state.loadDiagram);
 
 	const undo = useUndo();
 	const redo = useRedo();
@@ -70,14 +88,87 @@ export const Toolbar: React.FC = () => {
 		setZoom(viewport.scale / 1.2);
 	};
 
-	const handleExport = () => {
-		// TODO: Implement XML export
-		console.log("Export clicked");
+	const handleExport = async () => {
+		try {
+			const xml = serializeDiagramToXML(diagram);
+			const filename = `er-diagram-${Date.now()}.xml`;
+			downloadFile(xml, filename, "text/xml");
+			showToast("Diagram exported successfully", "success");
+		} catch (error) {
+			console.error("Export error:", error);
+			showToast(
+				"Failed to export diagram: " +
+					(error instanceof Error ? error.message : "Unknown error"),
+				"error"
+			);
+		}
 	};
 
-	const handleImport = () => {
-		// TODO: Implement XML import
-		console.log("Import clicked");
+	const handleImport = async () => {
+		try {
+			const file = await pickFile(".xml");
+			const xmlContent = await readFileAsText(file);
+
+			// Parse XML
+			const importedDiagram = parseXMLToDiagram(xmlContent);
+
+			// Check if current diagram has content
+			const hasContent =
+				diagram.entities.length > 0 ||
+				diagram.relationships.length > 0 ||
+				diagram.connections.length > 0 ||
+				diagram.attributes.length > 0 ||
+				diagram.lines.length > 0 ||
+				diagram.arrows.length > 0;
+
+			let replace = true;
+			if (hasContent) {
+				const shouldReplace = await showConfirmDialog(
+					"Current diagram has content. Do you want to replace it, or merge with existing?"
+				);
+				replace = shouldReplace;
+			}
+
+			// Load diagram
+			loadDiagram(importedDiagram, replace);
+			showToast(
+				`Diagram ${replace ? "replaced" : "merged"} successfully`,
+				"success"
+			);
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message === "File selection cancelled"
+			) {
+				// User cancelled, don't show error
+				return;
+			}
+			console.error("Import error:", error);
+			showToast(
+				"Failed to import diagram: " +
+					(error instanceof Error ? error.message : "Unknown error"),
+				"error"
+			);
+		}
+	};
+
+	const handleExportImage = async () => {
+		if (!stageRef?.current) {
+			showToast("Canvas not available for export", "error");
+			return;
+		}
+
+		try {
+			await exportCanvasAsImage(stageRef.current, "png", 0.92);
+			showToast("Image exported successfully", "success");
+		} catch (error) {
+			console.error("Image export error:", error);
+			showToast(
+				"Failed to export image: " +
+					(error instanceof Error ? error.message : "Unknown error"),
+				"error"
+			);
+		}
 	};
 
 	const handleDelete = () => {
@@ -211,6 +302,13 @@ export const Toolbar: React.FC = () => {
 					title="Export XML"
 				>
 					<Download size={20} />
+				</button>
+				<button
+					onClick={handleExportImage}
+					className="p-2 rounded hover:bg-gray-100 transition-colors"
+					title="Export as Image (PNG)"
+				>
+					<Image size={20} />
 				</button>
 			</div>
 		</div>

@@ -1,4 +1,10 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, {
+	useRef,
+	useState,
+	useEffect,
+	forwardRef,
+	useImperativeHandle,
+} from "react";
 import { Stage, Layer, Transformer, Line, Rect } from "react-konva";
 import Konva from "konva";
 import { useEditorStore } from "../../store/editorStore";
@@ -9,7 +15,11 @@ import { ArrowShapeComponent } from "./ArrowShape";
 import { AttributeShape } from "./AttributeShape";
 import { ConnectionShape } from "./ConnectionShape";
 
-export const ERCanvas: React.FC = () => {
+export interface ERCanvasRef {
+	stageRef: React.RefObject<Konva.Stage | null>;
+}
+
+export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const stageRef = useRef<Konva.Stage>(null);
 	const layerRef = useRef<Konva.Layer>(null);
 	const transformerRef = useRef<Konva.Transformer>(null);
@@ -1076,6 +1086,11 @@ export const ERCanvas: React.FC = () => {
 		lastPinchCenterRef.current = null;
 	};
 
+	// Expose stageRef via ref
+	useImperativeHandle(ref, () => ({
+		stageRef,
+	}));
+
 	// Initialize stage position from store on mount
 	useEffect(() => {
 		if (stageRef.current) {
@@ -1302,4 +1317,6 @@ export const ERCanvas: React.FC = () => {
 			</div>
 		</div>
 	);
-};
+});
+
+ERCanvas.displayName = "ERCanvas";
