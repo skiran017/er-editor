@@ -3,6 +3,7 @@ import { Group, Line, Text, Circle } from "react-konva";
 import type { Connection } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getThemeColorsSync } from "../../lib/themeColors";
+import { convertToOrthogonalPath } from "../../lib/utils";
 import Konva from "konva";
 
 interface ConnectionShapeProps {
@@ -107,16 +108,25 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	const toPos = getConnectionPointPosition(toElement, toPoint);
 
 	// Build points array: from -> waypoints -> to
-	const points: number[] = [fromPos.x, fromPos.y];
+	const straightPoints: number[] = [fromPos.x, fromPos.y];
 	waypoints.forEach((wp) => {
-		points.push(wp.x, wp.y);
+		straightPoints.push(wp.x, wp.y);
 	});
-	points.push(toPos.x, toPos.y);
+	straightPoints.push(toPos.x, toPos.y);
+
+	// Convert to orthogonal path (horizontal + vertical only) - matches Java app behavior
+	// Pass edge information for smart routing (filter out 'center' as it's not a valid edge)
+	const points = convertToOrthogonalPath(
+		straightPoints,
+		fromPoint !== "center" ? fromPoint : undefined,
+		toPoint !== "center" ? toPoint : undefined
+	);
 
 	// Calculate label position (default to midpoint if not set)
+	// Use original straight points for label positioning to keep it centered
 	const defaultLabelPos = {
-		x: (points[0] + points[points.length - 2]) / 2,
-		y: (points[1] + points[points.length - 1]) / 2,
+		x: (straightPoints[0] + straightPoints[straightPoints.length - 2]) / 2,
+		y: (straightPoints[1] + straightPoints[straightPoints.length - 1]) / 2,
 	};
 	const labelPos = labelPosition || defaultLabelPos;
 

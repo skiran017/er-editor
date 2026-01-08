@@ -74,9 +74,11 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 	// Calculate connection points dynamically based on closest edges
 	// This ensures the line adjusts when either the parent or attribute moves
+	// Note: In Konva, the Group is at (position.x, position.y) and Ellipse is centered at (0,0) within group
+	// So the actual ellipse center in absolute coordinates is (position.x, position.y)
 	const attributeCenter = {
-		x: position.x + ellipseWidth / 2,
-		y: position.y + ellipseHeight / 2,
+		x: position.x,
+		y: position.y,
 	};
 	const parentCenter = {
 		x: parentElement.position.x + parentElement.size.width / 2,
@@ -98,77 +100,93 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 	// Calculate actual connection point positions
 	const getConnectionPoint = (
-		elem: { position: { x: number; y: number }; size: { width: number; height: number } },
-		edge: 'top' | 'right' | 'bottom' | 'left',
+		elem: {
+			position: { x: number; y: number };
+			size: { width: number; height: number };
+		},
+		edge: "top" | "right" | "bottom" | "left",
 		isAttribute: boolean = false,
 		targetPoint?: { x: number; y: number } // For ellipse: point we're connecting to
 	) => {
-		const centerX = elem.position.x + elem.size.width / 2;
-		const centerY = elem.position.y + elem.size.height / 2;
-		
+		// For attributes (ellipses), the center is at (position.x, position.y) because
+		// the Group is at (position.x, position.y) and Ellipse is centered at (0,0) within the group
+		// For entities/relationships (rectangles), the center is at position + size/2
+		const centerX = isAttribute
+			? elem.position.x
+			: elem.position.x + elem.size.width / 2;
+		const centerY = isAttribute
+			? elem.position.y
+			: elem.position.y + elem.size.height / 2;
+
 		if (isAttribute && targetPoint) {
 			// For attributes (ovals), calculate intersection with ellipse edge
+			// In Konva, ellipse center is at (0,0) within the Group, so centerX/centerY = elem.position
 			const radiusX = elem.size.width / 2;
 			const radiusY = elem.size.height / 2;
-			
+
 			// Calculate direction vector from ellipse center to target point
 			const dx = targetPoint.x - centerX;
 			const dy = targetPoint.y - centerY;
-			
+
 			// Normalize direction
 			const length = Math.sqrt(dx * dx + dy * dy);
-			if (length === 0) {
-				// Fallback to edge-based calculation
+			if (length < 0.001) {
+				// Fallback to edge-based calculation if points are too close
 				switch (edge) {
-					case 'top':
-						return { x: centerX, y: elem.position.y };
-					case 'right':
-						return { x: elem.position.x + elem.size.width, y: centerY };
-					case 'bottom':
-						return { x: centerX, y: elem.position.y + elem.size.height };
-					case 'left':
-						return { x: elem.position.x, y: centerY };
+					case "top":
+						return { x: centerX, y: centerY - radiusY };
+					case "right":
+						return { x: centerX + radiusX, y: centerY };
+					case "bottom":
+						return { x: centerX, y: centerY + radiusY };
+					case "left":
+						return { x: centerX - radiusX, y: centerY };
 					default:
 						return { x: centerX, y: centerY };
 				}
 			}
-			
+
 			// Find intersection point on ellipse using parametric equation
-			// Ellipse: (x/a)^2 + (y/b)^2 = 1
-			// Line from center: x = centerX + t*dx, y = centerY + t*dy
-			// Solve for t where line intersects ellipse
-			const t = Math.sqrt(1 / ((dx / radiusX) ** 2 + (dy / radiusY) ** 2));
-			
+			// Ellipse centered at (centerX, centerY): ((x-centerX)/radiusX)^2 + ((y-centerY)/radiusY)^2 = 1
+			// Line from center to target: x = centerX + t*dx, y = centerY + t*dy
+			// Substituting: (t*dx/radiusX)^2 + (t*dy/radiusY)^2 = 1
+			// Solving: t^2 * (dx^2/radiusX^2 + dy^2/radiusY^2) = 1
+			// Therefore: t = sqrt(1 / (dx^2/radiusX^2 + dy^2/radiusY^2))
+			const dxNorm = dx / radiusX;
+			const dyNorm = dy / radiusY;
+			const t = Math.sqrt(1 / (dxNorm * dxNorm + dyNorm * dyNorm));
+
+			// Return intersection point on ellipse edge
 			return {
 				x: centerX + t * dx,
-				y: centerY + t * dy
+				y: centerY + t * dy,
 			};
 		} else if (isAttribute) {
-			// Fallback: use bounding box edge if no target point
+			// Fallback: use ellipse edge if no target point
 			const radiusX = elem.size.width / 2;
 			const radiusY = elem.size.height / 2;
 			switch (edge) {
-				case 'top':
-					return { x: centerX, y: elem.position.y };
-				case 'right':
-					return { x: elem.position.x + elem.size.width, y: centerY };
-				case 'bottom':
-					return { x: centerX, y: elem.position.y + elem.size.height };
-				case 'left':
-					return { x: elem.position.x, y: centerY };
+				case "top":
+					return { x: centerX, y: centerY - radiusY };
+				case "right":
+					return { x: centerX + radiusX, y: centerY };
+				case "bottom":
+					return { x: centerX, y: centerY + radiusY };
+				case "left":
+					return { x: centerX - radiusX, y: centerY };
 				default:
 					return { x: centerX, y: centerY };
 			}
 		} else {
 			// For entities/relationships (rectangles/diamonds)
 			switch (edge) {
-				case 'top':
+				case "top":
 					return { x: centerX, y: elem.position.y };
-				case 'right':
+				case "right":
 					return { x: elem.position.x + elem.size.width, y: centerY };
-				case 'bottom':
+				case "bottom":
 					return { x: centerX, y: elem.position.y + elem.size.height };
-				case 'left':
+				case "left":
 					return { x: elem.position.x, y: centerY };
 				default:
 					return { x: centerX, y: centerY };
@@ -225,7 +243,12 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		<>
 			{/* Connection line from parent element to attribute - dynamically calculated */}
 			<Line
-				points={[parentPoint.x, parentPoint.y, attributePoint.x, attributePoint.y]}
+				points={[
+					parentPoint.x,
+					parentPoint.y,
+					attributePoint.x,
+					attributePoint.y,
+				]}
 				stroke={selected ? "#3b82f6" : "#6b7280"}
 				strokeWidth={selected ? 2 : 1.5}
 				lineCap="round"

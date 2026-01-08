@@ -385,7 +385,7 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
           toPoint,
           points: [fromPos.x, fromPos.y, toPos.x, toPos.y],
           waypoints: [],
-          style: 'straight' as const,
+          style: 'orthogonal' as const, // Java app uses orthogonal routing (horizontal + vertical only)
           cardinality: cardinality as Cardinality,
           participation: participation as Participation,
           position: { x: Math.min(fromPos.x, toPos.x), y: Math.min(fromPos.y, toPos.y) },

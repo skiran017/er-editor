@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Group, Rect, Text } from "react-konva";
 import type { Entity, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
-import { getClosestEdge } from "../../lib/utils";
+import { getClosestEdge, getBestAvailableEdge } from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
@@ -15,6 +15,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const updateEntity = useEditorStore((state) => state.updateEntity);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
+	const diagram = useEditorStore((state) => state.diagram);
 
 	const { id, name, position, size, selected, isWeak, rotation = 0 } = entity;
 	const selectedIds = useEditorStore((state) => state.selectedIds);
@@ -171,18 +172,72 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 			} else {
 				// Complete connection
 				if (drawingConnection.fromId && drawingConnection.fromId !== id) {
-					const toEdge = getClosestEdge(
-						entityRelativePos,
-						tempElement
-					) as ConnectionPoint;
-					addConnection(
-						drawingConnection.fromId,
-						id,
-						drawingConnection.fromPoint || "right",
-						toEdge,
-						drawingConnection.waypoints,
-						"straight"
-					);
+					// Find the fromElement (entity or relationship we're connecting from)
+					const fromElement =
+						diagram.entities.find((e) => e.id === drawingConnection.fromId) ||
+						diagram.relationships.find(
+							(r) => r.id === drawingConnection.fromId
+						);
+
+					if (fromElement) {
+						// Calculate the center of the fromElement
+						const fromCenter = {
+							x: fromElement.position.x + fromElement.size.width / 2,
+							y: fromElement.position.y + fromElement.size.height / 2,
+						};
+
+						// Calculate the center of the current entity (toEntity)
+						const toCenter = {
+							x: entity.position.x + entity.size.width / 2,
+							y: entity.position.y + entity.size.height / 2,
+						};
+
+						// Determine which edge of the current entity (toEntity) is closest to fromElement's center
+						const toEdge = getClosestEdge(
+							fromCenter,
+							entity
+						) as ConnectionPoint;
+
+						// For relationships, use edge distribution to avoid overlapping connections
+						// For entities, just use closest edge
+						let fromEdge: ConnectionPoint;
+						if (fromElement.type === "relationship") {
+							fromEdge = getBestAvailableEdge(
+								drawingConnection.fromId!,
+								diagram.connections,
+								toCenter,
+								fromElement
+							) as ConnectionPoint;
+						} else {
+							fromEdge = getClosestEdge(
+								toCenter,
+								fromElement
+							) as ConnectionPoint;
+						}
+
+						addConnection(
+							drawingConnection.fromId,
+							id,
+							fromEdge,
+							toEdge,
+							drawingConnection.waypoints,
+							"orthogonal"
+						);
+					} else {
+						// Fallback to old behavior if fromElement not found
+						const toEdge = getClosestEdge(
+							entityRelativePos,
+							tempElement
+						) as ConnectionPoint;
+						addConnection(
+							drawingConnection.fromId,
+							id,
+							drawingConnection.fromPoint || "right",
+							toEdge,
+							drawingConnection.waypoints,
+							"orthogonal"
+						);
+					}
 					setDrawingConnection(false, null, null, null, []);
 				} else {
 					// Cancel

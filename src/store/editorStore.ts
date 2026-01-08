@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
 import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram } from '../types';
-import { getClosestEdge } from '../lib/utils';
+import { getClosestEdge, getBestAvailableEdge } from '../lib/utils';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -147,34 +147,77 @@ const updateConnectionPointsOnMove = (
     };
 
     // Determine new closest edges
-    // getClosestEdge(point, element) returns which edge of element is closest to point
+    // For relationships, use edge distribution to avoid overlapping connections
+    // For entities, use closest edge
     let newFromPoint: ConnectionPoint;
     let newToPoint: ConnectionPoint;
 
     if (connection.fromId === movedElementId) {
       // Moved element is the source (fromId)
       // Find which edge of movedElement is closest to otherElement's center
-      newFromPoint = getClosestEdge(otherCenter, {
-        position: movedElement.position,
-        size: movedElement.size,
-      }) as ConnectionPoint;
+      if (movedElement.type === 'relationship') {
+        // Use edge distribution for relationships
+        newFromPoint = getBestAvailableEdge(
+          movedElementId,
+          state.diagram.connections.filter(c => c.id !== connection.id), // Exclude current connection
+          otherCenter,
+          movedElement
+        ) as ConnectionPoint;
+      } else {
+        newFromPoint = getClosestEdge(otherCenter, {
+          position: movedElement.position,
+          size: movedElement.size,
+        }) as ConnectionPoint;
+      }
+
       // Find which edge of otherElement is closest to movedElement's center
-      newToPoint = getClosestEdge(movedCenter, {
-        position: otherElement.position,
-        size: otherElement.size,
-      }) as ConnectionPoint;
+      if (otherElement.type === 'relationship') {
+        // Use edge distribution for relationships
+        newToPoint = getBestAvailableEdge(
+          otherElementId,
+          state.diagram.connections.filter(c => c.id !== connection.id), // Exclude current connection
+          movedCenter,
+          otherElement
+        ) as ConnectionPoint;
+      } else {
+        newToPoint = getClosestEdge(movedCenter, {
+          position: otherElement.position,
+          size: otherElement.size,
+        }) as ConnectionPoint;
+      }
     } else {
       // Moved element is the target (toId)
       // Find which edge of otherElement is closest to movedElement's center
-      newFromPoint = getClosestEdge(movedCenter, {
-        position: otherElement.position,
-        size: otherElement.size,
-      }) as ConnectionPoint;
+      if (otherElement.type === 'relationship') {
+        // Use edge distribution for relationships
+        newFromPoint = getBestAvailableEdge(
+          otherElementId,
+          state.diagram.connections.filter(c => c.id !== connection.id), // Exclude current connection
+          movedCenter,
+          otherElement
+        ) as ConnectionPoint;
+      } else {
+        newFromPoint = getClosestEdge(movedCenter, {
+          position: otherElement.position,
+          size: otherElement.size,
+        }) as ConnectionPoint;
+      }
+
       // Find which edge of movedElement is closest to otherElement's center
-      newToPoint = getClosestEdge(otherCenter, {
-        position: movedElement.position,
-        size: movedElement.size,
-      }) as ConnectionPoint;
+      if (movedElement.type === 'relationship') {
+        // Use edge distribution for relationships
+        newToPoint = getBestAvailableEdge(
+          movedElementId,
+          state.diagram.connections.filter(c => c.id !== connection.id), // Exclude current connection
+          otherCenter,
+          movedElement
+        ) as ConnectionPoint;
+      } else {
+        newToPoint = getClosestEdge(otherCenter, {
+          position: movedElement.position,
+          size: movedElement.size,
+        }) as ConnectionPoint;
+      }
     }
 
     // Update connection points
@@ -372,11 +415,6 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const attribute = state.diagram.attributes.find((a) => a.id === attributeId);
           if (attribute) {
-            const positionChanged = (
-              position.x !== attribute.position.x ||
-              position.y !== attribute.position.y
-            );
-
             attribute.position = position;
 
             // Note: Attributes use lines (not connections) that are calculated dynamically in AttributeShape
@@ -531,7 +569,7 @@ export const useEditorStore = create<EditorStore>()(
       },
 
       // Connection actions
-      addConnection: (fromId, toId, fromPoint = 'right' as ConnectionPoint, toPoint = 'left' as ConnectionPoint, waypoints = [] as Position[], style = 'straight' as ConnectionStyle) => {
+      addConnection: (fromId, toId, fromPoint = 'right' as ConnectionPoint, toPoint = 'left' as ConnectionPoint, waypoints = [] as Position[], style = 'orthogonal' as ConnectionStyle) => {
         set((state) => {
           const fromElement = state.diagram.entities.find(e => e.id === fromId) ||
             state.diagram.relationships.find(r => r.id === fromId);

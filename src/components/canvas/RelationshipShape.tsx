@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Group, Line, Text } from "react-konva";
 import type { Relationship, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
-import { getClosestEdge } from "../../lib/utils";
+import { getClosestEdge, getBestAvailableEdge } from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
@@ -19,6 +19,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
+	const diagram = useEditorStore((state) => state.diagram);
 
 	const {
 		id,
@@ -187,18 +188,65 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			} else {
 				// Complete connection
 				if (drawingConnection.fromId && drawingConnection.fromId !== id) {
-					const toEdge = getClosestEdge(
-						relationshipRelativePos,
-						tempElement
-					) as ConnectionPoint;
-					addConnection(
-						drawingConnection.fromId,
-						id,
-						drawingConnection.fromPoint || "right",
-						toEdge,
-						drawingConnection.waypoints,
-						"straight"
-					);
+					// Find the fromElement (entity or relationship we're connecting from)
+					const fromElement =
+						diagram.entities.find((e) => e.id === drawingConnection.fromId) ||
+						diagram.relationships.find(
+							(r) => r.id === drawingConnection.fromId
+						);
+
+					if (fromElement) {
+						// Calculate the center of the fromElement
+						const fromCenter = {
+							x: fromElement.position.x + fromElement.size.width / 2,
+							y: fromElement.position.y + fromElement.size.height / 2,
+						};
+
+						// Calculate the center of the current relationship (toRelationship)
+						const toCenter = {
+							x: relationship.position.x + relationship.size.width / 2,
+							y: relationship.position.y + relationship.size.height / 2,
+						};
+
+						// For relationships, use edge distribution to avoid overlapping connections
+						// Determine which edge of the current relationship (toRelationship) is best available
+						const toEdge = getBestAvailableEdge(
+							id,
+							diagram.connections,
+							fromCenter,
+							relationship
+						) as ConnectionPoint;
+
+						// For entities connecting to relationship, use closest edge
+						// For relationships connecting to entities, use closest edge
+						const fromEdge = getClosestEdge(
+							toCenter,
+							fromElement
+						) as ConnectionPoint;
+
+						addConnection(
+							drawingConnection.fromId,
+							id,
+							fromEdge,
+							toEdge,
+							drawingConnection.waypoints,
+							"orthogonal"
+						);
+					} else {
+						// Fallback to old behavior if fromElement not found
+						const toEdge = getClosestEdge(
+							relationshipRelativePos,
+							tempElement
+						) as ConnectionPoint;
+						addConnection(
+							drawingConnection.fromId,
+							id,
+							drawingConnection.fromPoint || "right",
+							toEdge,
+							drawingConnection.waypoints,
+							"orthogonal"
+						);
+					}
 					setDrawingConnection(false, null, null, null, []);
 				} else {
 					// Cancel
