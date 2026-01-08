@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
 import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram } from '../types';
+import { getClosestEdge } from '../lib/utils';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -110,6 +111,103 @@ const getConnectionPointPosition = (element: Entity | Relationship, point: Conne
   }
 };
 
+/**
+ * Auto-adjust connection points when an element moves
+ * Finds all connections involving the moved element and recalculates the closest edges
+ */
+const updateConnectionPointsOnMove = (
+  state: EditorState,
+  movedElementId: string,
+  movedElement: Entity | Relationship
+): void => {
+  // Find all connections involving this element
+  const connections = state.diagram.connections.filter(
+    (conn) => conn.fromId === movedElementId || conn.toId === movedElementId
+  );
+
+  connections.forEach((connection) => {
+    // Find the other element in the connection
+    const otherElementId = connection.fromId === movedElementId
+      ? connection.toId
+      : connection.fromId;
+
+    const otherElement = state.diagram.entities.find(e => e.id === otherElementId) ||
+      state.diagram.relationships.find(r => r.id === otherElementId);
+
+    if (!otherElement) return;
+
+    // Calculate centers for both elements
+    const movedCenter = {
+      x: movedElement.position.x + movedElement.size.width / 2,
+      y: movedElement.position.y + movedElement.size.height / 2,
+    };
+    const otherCenter = {
+      x: otherElement.position.x + otherElement.size.width / 2,
+      y: otherElement.position.y + otherElement.size.height / 2,
+    };
+
+    // Determine new closest edges
+    // getClosestEdge(point, element) returns which edge of element is closest to point
+    let newFromPoint: ConnectionPoint;
+    let newToPoint: ConnectionPoint;
+
+    if (connection.fromId === movedElementId) {
+      // Moved element is the source (fromId)
+      // Find which edge of movedElement is closest to otherElement's center
+      newFromPoint = getClosestEdge(otherCenter, {
+        position: movedElement.position,
+        size: movedElement.size,
+      }) as ConnectionPoint;
+      // Find which edge of otherElement is closest to movedElement's center
+      newToPoint = getClosestEdge(movedCenter, {
+        position: otherElement.position,
+        size: otherElement.size,
+      }) as ConnectionPoint;
+    } else {
+      // Moved element is the target (toId)
+      // Find which edge of otherElement is closest to movedElement's center
+      newFromPoint = getClosestEdge(movedCenter, {
+        position: otherElement.position,
+        size: otherElement.size,
+      }) as ConnectionPoint;
+      // Find which edge of movedElement is closest to otherElement's center
+      newToPoint = getClosestEdge(otherCenter, {
+        position: movedElement.position,
+        size: movedElement.size,
+      }) as ConnectionPoint;
+    }
+
+    // Update connection points
+    connection.fromPoint = newFromPoint;
+    connection.toPoint = newToPoint;
+
+    // Recalculate connection path
+    const fromElement = connection.fromId === movedElementId
+      ? movedElement
+      : otherElement;
+    const toElement = connection.toId === movedElementId
+      ? movedElement
+      : otherElement;
+
+    const fromPos = getConnectionPointPosition(fromElement, connection.fromPoint);
+    const toPos = getConnectionPointPosition(toElement, connection.toPoint);
+
+    // Rebuild points array: from -> waypoints -> to
+    const points: number[] = [fromPos.x, fromPos.y];
+    connection.waypoints.forEach((wp) => {
+      points.push(wp.x, wp.y);
+    });
+    points.push(toPos.x, toPos.y);
+    connection.points = points;
+
+    // Update position (bounding box)
+    connection.position = {
+      x: Math.min(fromPos.x, toPos.x),
+      y: Math.min(fromPos.y, toPos.y),
+    };
+  });
+};
+
 export const useEditorStore = create<EditorStore>()(
   temporal(
     immer((set, get) => ({
@@ -167,7 +265,17 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const entity = state.diagram.entities.find((e) => e.id === id);
           if (entity) {
+            const positionChanged = updates.position && (
+              updates.position.x !== entity.position.x ||
+              updates.position.y !== entity.position.y
+            );
+
             Object.assign(entity, updates);
+
+            // Auto-adjust connection points if position changed
+            if (positionChanged) {
+              updateConnectionPointsOnMove(state, id, entity);
+            }
           }
         });
       },
@@ -264,7 +372,16 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const attribute = state.diagram.attributes.find((a) => a.id === attributeId);
           if (attribute) {
+            const positionChanged = (
+              position.x !== attribute.position.x ||
+              position.y !== attribute.position.y
+            );
+
             attribute.position = position;
+
+            // Note: Attributes use lines (not connections) that are calculated dynamically in AttributeShape
+            // The line automatically updates when attribute or parent position changes
+            // No explicit connection point adjustment needed for attributes
           }
         });
       },
@@ -386,7 +503,17 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const relationship = state.diagram.relationships.find((r) => r.id === id);
           if (relationship) {
+            const positionChanged = updates.position && (
+              updates.position.x !== relationship.position.x ||
+              updates.position.y !== relationship.position.y
+            );
+
             Object.assign(relationship, updates);
+
+            // Auto-adjust connection points if position changed
+            if (positionChanged) {
+              updateConnectionPointsOnMove(state, id, relationship);
+            }
           }
         });
       },

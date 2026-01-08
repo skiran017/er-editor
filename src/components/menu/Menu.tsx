@@ -29,6 +29,7 @@ interface MenuItem {
 interface MenuProps {
 	onImport: () => void;
 	onExportXML: () => void;
+	onExportJavaXML?: () => void;
 	onExportImage: () => void;
 	onResetCanvas?: () => void;
 	onShowShortcuts?: () => void;
@@ -37,6 +38,7 @@ interface MenuProps {
 export const Menu: React.FC<MenuProps> = ({
 	onImport,
 	onExportXML,
+	onExportJavaXML,
 	onExportImage,
 	onResetCanvas,
 	onShowShortcuts,
@@ -58,7 +60,7 @@ export const Menu: React.FC<MenuProps> = ({
 		},
 		{
 			id: "export-xml",
-			label: "Save to...",
+			label: "Save as Standard XML...",
 			icon: Download,
 			shortcut: "Cmd+S",
 			onClick: () => {
@@ -66,6 +68,20 @@ export const Menu: React.FC<MenuProps> = ({
 				setIsOpen(false);
 			},
 		},
+		...(onExportJavaXML
+			? [
+					{
+						id: "export-java-xml",
+						label: "Save as Java XML...",
+						icon: Download,
+						shortcut: "Cmd+Shift+S",
+						onClick: () => {
+							onExportJavaXML();
+							setIsOpen(false);
+						},
+					} as MenuItem,
+			  ]
+			: []),
 		{
 			id: "export-image",
 			label: "Export image...",
@@ -233,3 +249,4 @@ export const Menu: React.FC<MenuProps> = ({
 		</div>
 	);
 };
+

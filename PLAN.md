@@ -172,6 +172,136 @@ This document tracks planned features and improvements for the ER diagram editor
 
 ---
 
+## 🔧 Professor Feedback - Bug Fixes & Improvements
+
+### High Priority (Critical UX Issues)
+
+#### 1. Auto-Adjust Connection Points on Shape Move
+**Priority:** High | **Impact:** High | **Status:** ✅ Completed
+- [x] When entity/relationship is moved, automatically recalculate connection points
+- [x] Find closest edge/point for each connection endpoint
+- [x] Update `fromPoint` and `toPoint` automatically on position change
+- [x] Trigger in `updateEntity` and `updateRelationship` actions
+- [x] Maintain waypoints while adjusting endpoints
+
+**Why:** Improves diagram layout workflow - connections stay properly attached when repositioning elements
+
+**Technical Notes:**
+- Add `updateConnectionPointsOnMove()` function in editorStore
+- Use `getClosestEdge()` helper to determine best connection point
+- Update connections reactively when element positions change
+
+---
+
+#### 2. Fix Line/Connection Selection
+**Priority:** High | **Impact:** High | **Status:** Not Started
+- [ ] Increase hit area for connections (thicker invisible stroke for hit detection)
+- [ ] Add visual feedback on hover (highlight connection)
+- [ ] Implement click tolerance (10px radius around line)
+- [ ] Make waypoints more easily selectable/draggable
+- [ ] Improve selection for thin lines
+
+**Why:** Currently very difficult to select connections - major UX pain point
+
+**Technical Notes:**
+- Modify `ConnectionShape.tsx` to add larger hit area
+- Modify `LineShape.tsx` for better selection
+- Consider using Konva's `hitStrokeWidth` property
+
+---
+
+#### 3. Direct Text Editing on Canvas
+**Priority:** High | **Impact:** Medium | **Status:** Not Started
+- [ ] Double-click entity/relationship name to enter edit mode
+- [ ] Show inline text input (Konva Text with editing capability)
+- [ ] Save on Enter, cancel on Escape
+- [ ] Works without property panel open
+- [ ] Visual feedback during editing (cursor, selection)
+
+**Why:** Users shouldn't need to open property panel just to rename elements
+
+**Technical Notes:**
+- Add text editing to `EntityShape.tsx` and `RelationshipShape.tsx`
+- Consider creating reusable `EditableText` component
+- Use Konva's text editing capabilities or overlay HTML input
+
+---
+
+#### 4. Position Consistency in Edit Mode
+**Priority:** High | **Impact:** Medium | **Status:** Not Started
+- [ ] Ensure property panel position fields update in real-time when dragging
+- [ ] Sync bidirectional: dragging updates panel, panel input updates position
+- [ ] Prevent position desync during drag operations
+- [ ] Add position X/Y fields to property panel for entities and relationships
+- [ ] Ensure consistent positioning when property panel is open
+
+**Why:** Prevents confusion when editing properties while moving elements
+
+**Technical Notes:**
+- Add position input fields to `PropertyPanel.tsx`
+- Ensure `ERCanvas.tsx` updates store during drag operations
+- Sync position values between canvas and panel
+
+---
+
+### Critical Priority (Integration Requirement)
+
+#### 5. Java App XML Format Compatibility
+**Priority:** Critical | **Impact:** High | **Status:** Not Started
+- [ ] Parse Java app XML format (`ERDatabaseModel` structure)
+- [ ] Convert Java XML → Our Diagram format
+- [ ] Convert Our Diagram → Java XML format
+- [ ] Auto-detect XML format on import
+- [ ] Support both formats (current + Java app format)
+- [ ] Handle ID mapping (numeric IDs ↔ string IDs)
+- [ ] Map relationship types: `OneToOne`, `OneToN`, `NToN` → our format
+- [ ] Handle separate logical model (`ERDatabaseSchema`) and visual diagram (`ERDatabaseDiagram`)
+- [ ] Map `PrimaryKey` → `isKey: true`, `Discriminant` → `isPartialKey: true`
+- [ ] Map `totalParticipation` → `participation: "total" | "partial"`
+
+**Why:** Required for compatibility with existing university Java application
+
+**Technical Notes:**
+- Create `src/lib/javaXmlParser.ts` - Parse Java XML → Our Diagram
+- Create `src/lib/javaXmlSerializer.ts` - Serialize Our Diagram → Java XML
+- Modify `xmlParser.ts` to detect format and route to appropriate parser
+- Modify `Toolbar.tsx` to add export format option
+- Handle ID conversion: numeric (Java) ↔ string (ours)
+
+**Java XML Structure:**
+```xml
+<ERDatabaseModel>
+  <ERDatabaseSchema>
+    <EntitySets>
+      <StrongEntitySet id="1" name="...">
+        <Attributes><SimpleAttribute id="2" .../></Attributes>
+        <PrimaryKey><SimpleAttribute refid="2"/></PrimaryKey>
+      </StrongEntitySet>
+      <WeakEntitySet id="4" name="...">
+        <Discriminant><SimpleAttribute refid="5"/></Discriminant>
+      </WeakEntitySet>
+    </EntitySets>
+    <RelationshipSets>
+      <RelationshipSetOneToOne id="14" name="...">
+        <Branches>
+          <RelationshipSetBranch cardinality="1" totalParticipation="false">
+            <StrongEntitySet refid="1"/>
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToOne>
+      <RelationshipSetOneToN id="17" name="..."/>
+      <RelationshipSetNToN id="20" name="..."/>
+    </RelationshipSets>
+  </ERDatabaseSchema>
+  <ERDatabaseDiagram>
+    <StrongEntitySet refid="1"><Position x="219" y="178"/></StrongEntitySet>
+    <SimpleAttribute refid="2"><Position x="269" y="63"/></SimpleAttribute>
+  </ERDatabaseDiagram>
+</ERDatabaseModel>
+```
+
+---
+
 ## 💡 Ideas for Future Consideration
 
 - Mobile app version
@@ -194,4 +324,25 @@ This document tracks planned features and improvements for the ER diagram editor
 
 ---
 
-**Last Updated:** 2024
+---
+
+## 📋 Implementation Priority (Based on Professor Feedback)
+
+### Immediate (This Week)
+1. Auto-adjust connection points (#1)
+2. Fix line/connection selection (#2)
+3. Direct text editing on canvas (#3)
+
+### High Priority (Next Week)
+4. Position consistency in property panel (#4)
+5. Java XML compatibility - Parser (#5a)
+6. Java XML compatibility - Serializer (#5b)
+
+### Testing & Refinement
+- Test both XML formats thoroughly
+- Handle edge cases and malformed XML
+- Error handling and user feedback
+
+---
+
+**Last Updated:** January 2025

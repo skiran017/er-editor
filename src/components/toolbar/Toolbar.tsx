@@ -25,6 +25,7 @@ import {
 } from "../../store/editorStore";
 import { cn } from "../../lib/utils";
 import { serializeDiagramToXML } from "../../lib/xmlSerializer";
+import { serializeDiagramToJavaXML } from "../../lib/javaXmlSerializer";
 import { parseXMLToDiagram } from "../../lib/xmlParser";
 import {
 	downloadFile,
@@ -86,12 +87,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 		setZoom(viewport.scale / 1.2);
 	};
 
-	const handleExport = async () => {
+	const handleExport = async (format: 'standard' | 'java' = 'standard') => {
 		try {
-			const xml = serializeDiagramToXML(diagram);
-			const filename = `er-diagram-${Date.now()}.xml`;
+			const xml = format === 'java' 
+				? serializeDiagramToJavaXML(diagram)
+				: serializeDiagramToXML(diagram);
+			const formatSuffix = format === 'java' ? '-java' : '';
+			const filename = `er-diagram${formatSuffix}-${Date.now()}.xml`;
 			downloadFile(xml, filename, "text/xml");
-			showToast("Diagram exported successfully", "success");
+			showToast(`Diagram exported successfully (${format === 'java' ? 'Java' : 'Standard'} format)`, "success");
 		} catch (error) {
 			console.error("Export error:", error);
 			showToast(
@@ -236,7 +240,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			<div className="fixed top-4 left-4 z-50">
 				<Menu
 					onImport={handleImport}
-					onExportXML={handleExport}
+					onExportXML={() => handleExport('standard')}
+					onExportJavaXML={() => handleExport('java')}
 					onExportImage={handleExportImage}
 					onResetCanvas={handleResetCanvas}
 					onShowShortcuts={handleShowShortcuts}

@@ -3,6 +3,7 @@ import { Group, Ellipse, Text, Line } from "react-konva";
 import type { Attribute } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getThemeColorsSync } from "../../lib/themeColors";
+import { getClosestEdge } from "../../lib/utils";
 import Konva from "konva";
 
 interface AttributeShapeProps {
@@ -71,12 +72,118 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	// Calculate actual text width for underline (more accurate)
 	const actualTextWidth = name.length * 7; // Approximate character width
 
-	// Calculate connection points
-	// Parent element right edge to attribute left edge
-	const parentRightX = parentElement.position.x + parentElement.size.width;
-	const parentRightY = parentElement.position.y + parentElement.size.height / 2;
-	const attributeLeftX = position.x;
-	const attributeLeftY = position.y + ellipseHeight / 2;
+	// Calculate connection points dynamically based on closest edges
+	// This ensures the line adjusts when either the parent or attribute moves
+	const attributeCenter = {
+		x: position.x + ellipseWidth / 2,
+		y: position.y + ellipseHeight / 2,
+	};
+	const parentCenter = {
+		x: parentElement.position.x + parentElement.size.width / 2,
+		y: parentElement.position.y + parentElement.size.height / 2,
+	};
+
+	// Find closest edge on parent element
+	const parentEdge = getClosestEdge(attributeCenter, {
+		position: parentElement.position,
+		size: parentElement.size,
+	});
+
+	// Find closest edge on attribute (simplified - attributes are ovals, so we use center-relative calculation)
+	// For attributes, we'll connect from the side closest to the parent
+	const attributeEdge = getClosestEdge(parentCenter, {
+		position: { x: position.x, y: position.y },
+		size: { width: ellipseWidth, height: ellipseHeight },
+	});
+
+	// Calculate actual connection point positions
+	const getConnectionPoint = (
+		elem: { position: { x: number; y: number }; size: { width: number; height: number } },
+		edge: 'top' | 'right' | 'bottom' | 'left',
+		isAttribute: boolean = false,
+		targetPoint?: { x: number; y: number } // For ellipse: point we're connecting to
+	) => {
+		const centerX = elem.position.x + elem.size.width / 2;
+		const centerY = elem.position.y + elem.size.height / 2;
+		
+		if (isAttribute && targetPoint) {
+			// For attributes (ovals), calculate intersection with ellipse edge
+			const radiusX = elem.size.width / 2;
+			const radiusY = elem.size.height / 2;
+			
+			// Calculate direction vector from ellipse center to target point
+			const dx = targetPoint.x - centerX;
+			const dy = targetPoint.y - centerY;
+			
+			// Normalize direction
+			const length = Math.sqrt(dx * dx + dy * dy);
+			if (length === 0) {
+				// Fallback to edge-based calculation
+				switch (edge) {
+					case 'top':
+						return { x: centerX, y: elem.position.y };
+					case 'right':
+						return { x: elem.position.x + elem.size.width, y: centerY };
+					case 'bottom':
+						return { x: centerX, y: elem.position.y + elem.size.height };
+					case 'left':
+						return { x: elem.position.x, y: centerY };
+					default:
+						return { x: centerX, y: centerY };
+				}
+			}
+			
+			// Find intersection point on ellipse using parametric equation
+			// Ellipse: (x/a)^2 + (y/b)^2 = 1
+			// Line from center: x = centerX + t*dx, y = centerY + t*dy
+			// Solve for t where line intersects ellipse
+			const t = Math.sqrt(1 / ((dx / radiusX) ** 2 + (dy / radiusY) ** 2));
+			
+			return {
+				x: centerX + t * dx,
+				y: centerY + t * dy
+			};
+		} else if (isAttribute) {
+			// Fallback: use bounding box edge if no target point
+			const radiusX = elem.size.width / 2;
+			const radiusY = elem.size.height / 2;
+			switch (edge) {
+				case 'top':
+					return { x: centerX, y: elem.position.y };
+				case 'right':
+					return { x: elem.position.x + elem.size.width, y: centerY };
+				case 'bottom':
+					return { x: centerX, y: elem.position.y + elem.size.height };
+				case 'left':
+					return { x: elem.position.x, y: centerY };
+				default:
+					return { x: centerX, y: centerY };
+			}
+		} else {
+			// For entities/relationships (rectangles/diamonds)
+			switch (edge) {
+				case 'top':
+					return { x: centerX, y: elem.position.y };
+				case 'right':
+					return { x: elem.position.x + elem.size.width, y: centerY };
+				case 'bottom':
+					return { x: centerX, y: elem.position.y + elem.size.height };
+				case 'left':
+					return { x: elem.position.x, y: centerY };
+				default:
+					return { x: centerX, y: centerY };
+			}
+		}
+	};
+
+	const parentPoint = getConnectionPoint(parentElement, parentEdge);
+	// For ellipse, calculate intersection point on the actual ellipse edge
+	const attributePoint = getConnectionPoint(
+		{ position, size: { width: ellipseWidth, height: ellipseHeight } },
+		attributeEdge,
+		true,
+		parentPoint // Pass parent point to calculate proper ellipse intersection
+	);
 
 	// Handle drag move
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -116,9 +223,9 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 	return (
 		<>
-			{/* Connection line from parent element to attribute - SOLID line */}
+			{/* Connection line from parent element to attribute - dynamically calculated */}
 			<Line
-				points={[parentRightX, parentRightY, attributeLeftX, attributeLeftY]}
+				points={[parentPoint.x, parentPoint.y, attributePoint.x, attributePoint.y]}
 				stroke={selected ? "#3b82f6" : "#6b7280"}
 				strokeWidth={selected ? 2 : 1.5}
 				lineCap="round"
