@@ -14,8 +14,13 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	attribute,
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
+	const textRef = useRef<Konva.Text>(null);
+	const [isEditing, setIsEditing] = useState(false);
 	const updateAttributePosition = useEditorStore(
 		(state) => state.updateAttributePosition
+	);
+	const updateAttributeById = useEditorStore(
+		(state) => state.updateAttributeById
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
@@ -225,6 +230,65 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		}
 	};
 
+	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		// Double-click triggers text editing
+		e.cancelBubble = true;
+		handleTextDblClick(e);
+	};
+
+	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		e.cancelBubble = true;
+		setIsEditing(true);
+		
+		// Create HTML input for editing
+		const textNode = textRef.current;
+		const stage = textNode?.getStage();
+		if (!textNode || !stage) return;
+
+		// Get absolute position of text
+		const textPosition = textNode.getAbsolutePosition();
+		const stageBox = stage.container().getBoundingClientRect();
+		
+		// Create input element
+		const input = document.createElement('input');
+		input.value = name;
+		input.style.position = 'absolute';
+		input.style.top = `${stageBox.top + textPosition.y}px`;
+		input.style.left = `${stageBox.left + textPosition.x}px`;
+		input.style.width = `${100}px`;
+		input.style.height = '24px';
+		input.style.fontSize = '12px';
+		input.style.textAlign = 'center';
+		input.style.border = '2px solid #3b82f6';
+		input.style.borderRadius = '4px';
+		input.style.padding = '2px';
+		input.style.zIndex = '1000';
+		input.style.backgroundColor = 'white';
+		
+		document.body.appendChild(input);
+		input.focus();
+		input.select();
+
+		const removeInput = () => {
+			document.body.removeChild(input);
+			setIsEditing(false);
+		};
+
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				updateAttributeById(id, { name: input.value });
+				removeInput();
+			} else if (e.key === 'Escape') {
+				removeInput();
+			}
+		});
+
+		input.addEventListener('blur', () => {
+			updateAttributeById(id, { name: input.value });
+			removeInput();
+		});
+	};
+
 	// Determine stroke style based on attribute properties
 	let strokeColor = colors.stroke;
 	let strokeWidth = 2;
@@ -265,6 +329,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 				onDragMove={handleDragMove}
 				onDragEnd={handleDragEnd}
 				onClick={handleClick}
+				onDblClick={handleDblClick}
 			>
 				{/* Outer ellipse for multivalued attributes */}
 				{isMultivalued && (
@@ -293,6 +358,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 				{/* Attribute name - centered inside ellipse */}
 				<Text
+					ref={textRef}
 					text={name}
 					x={-ellipseWidth / 2}
 					y={-ellipseHeight / 2}
@@ -303,6 +369,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 					fontSize={14}
 					fill={isKey ? "#f59e0b" : colors.text}
 					fontStyle={isKey ? "bold" : "normal"}
+					listening={!isEditing}
 				/>
 
 				{/* Key indicator - solid underline for key attributes */}

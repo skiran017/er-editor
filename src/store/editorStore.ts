@@ -11,8 +11,8 @@ interface EditorStore extends EditorState {
   deleteEntity: (id: string) => void;
 
   // Attribute actions
-  addAttribute: (entityId: string, attribute: Omit<EntityAttribute, 'id'>) => void;
-  addRelationshipAttribute: (relationshipId: string, attribute: Omit<EntityAttribute, 'id'>) => void;
+  addAttribute: (entityId: string, attribute: Omit<EntityAttribute, 'id'>, customPosition?: Position) => void;
+  addRelationshipAttribute: (relationshipId: string, attribute: Omit<EntityAttribute, 'id'>, customPosition?: Position) => void;
   updateAttribute: (entityId: string, attributeId: string, updates: Partial<EntityAttribute>) => void;
   updateAttributeById: (attributeId: string, updates: Partial<Attribute>) => void;
   deleteAttribute: (entityId: string, attributeId: string) => void;
@@ -285,6 +285,8 @@ export const useEditorStore = create<EditorStore>()(
         currentPoint: null,
         waypoints: [],
       },
+      nextEntityNumber: 1,
+      nextRelationshipNumber: 1,
 
       // Entity actions
       addEntity: (position) => {
@@ -292,7 +294,7 @@ export const useEditorStore = create<EditorStore>()(
           const newEntity: Entity = {
             id: generateId(),
             type: 'entity',
-            name: 'New Entity',
+            name: `Entity ${state.nextEntityNumber}`,
             position,
             selected: false,
             attributes: [],
@@ -301,6 +303,7 @@ export const useEditorStore = create<EditorStore>()(
             rotation: 0,
           };
           state.diagram.entities.push(newEntity);
+          state.nextEntityNumber += 1;
         });
       },
 
@@ -344,22 +347,23 @@ export const useEditorStore = create<EditorStore>()(
       },
 
       // Attribute actions
-      addAttribute: (entityId, attribute) => {
+      addAttribute: (entityId, attribute, customPosition) => {
         set((state) => {
           const entity = state.diagram.entities.find((e) => e.id === entityId);
           if (entity) {
             const attributeId = generateId();
-            // Calculate position relative to entity (to the right side)
+            // Calculate position relative to entity (to the right side by default)
             const attributeCount = state.diagram.attributes.filter(a => a.entityId === entityId).length;
+            const defaultPosition = {
+              x: entity.position.x + entity.size.width + 40,
+              y: entity.position.y + 20 + attributeCount * 30,
+            };
             const newAttribute: Attribute = {
               id: attributeId,
               type: 'attribute',
               ...attribute,
               entityId,
-              position: {
-                x: entity.position.x + entity.size.width + 40,
-                y: entity.position.y + 20 + attributeCount * 30,
-              },
+              position: customPosition || defaultPosition,
               selected: false,
             };
             // Add to both entity's attributes array and diagram's attributes array
@@ -424,22 +428,23 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
-      addRelationshipAttribute: (relationshipId, attribute) => {
+      addRelationshipAttribute: (relationshipId, attribute, customPosition) => {
         set((state) => {
           const relationship = state.diagram.relationships.find((r) => r.id === relationshipId);
           if (relationship) {
             const attributeId = generateId();
-            // Calculate position relative to relationship (to the right side)
+            // Calculate position relative to relationship (to the right side by default)
             const attributeCount = state.diagram.attributes.filter(a => a.relationshipId === relationshipId).length;
+            const defaultPosition = {
+              x: relationship.position.x + relationship.size.width + 40,
+              y: relationship.position.y + 20 + attributeCount * 30,
+            };
             const newAttribute: Attribute = {
               id: attributeId,
               type: 'attribute',
               ...attribute,
               relationshipId,
-              position: {
-                x: relationship.position.x + relationship.size.width + 40,
-                y: relationship.position.y + 20 + attributeCount * 30,
-              },
+              position: customPosition || defaultPosition,
               selected: false,
             };
             // Add to both relationship's attributes array and diagram's attributes array
@@ -522,7 +527,7 @@ export const useEditorStore = create<EditorStore>()(
           const newRelationship: Relationship = {
             id: generateId(),
             type: 'relationship',
-            name: 'New Relationship',
+            name: `Relationship ${state.nextRelationshipNumber}`,
             position,
             selected: false,
             entityIds: [],
@@ -534,6 +539,7 @@ export const useEditorStore = create<EditorStore>()(
             rotation: 0,
           };
           state.diagram.relationships.push(newRelationship);
+          state.nextRelationshipNumber += 1;
         });
       },
 
@@ -993,6 +999,25 @@ export const useEditorStore = create<EditorStore>()(
               attributes: [...diagram.attributes],
             };
             state.selectedIds = [];
+            
+            // Update counters based on loaded entities/relationships
+            // Find the highest number in entity names
+            const entityNumbers = diagram.entities
+              .map(e => {
+                const match = e.name.match(/Entity (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(n => n > 0);
+            state.nextEntityNumber = entityNumbers.length > 0 ? Math.max(...entityNumbers) + 1 : 1;
+            
+            // Find the highest number in relationship names
+            const relationshipNumbers = diagram.relationships
+              .map(r => {
+                const match = r.name.match(/Relationship (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(n => n > 0);
+            state.nextRelationshipNumber = relationshipNumbers.length > 0 ? Math.max(...relationshipNumbers) + 1 : 1;
           } else {
             // Merge with existing diagram
             state.diagram.entities.push(...diagram.entities);
@@ -1001,6 +1026,23 @@ export const useEditorStore = create<EditorStore>()(
             state.diagram.lines.push(...diagram.lines);
             state.diagram.arrows.push(...diagram.arrows);
             state.diagram.attributes.push(...diagram.attributes);
+            
+            // Update counters for merged content too
+            const allEntityNumbers = state.diagram.entities
+              .map(e => {
+                const match = e.name.match(/Entity (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(n => n > 0);
+            state.nextEntityNumber = allEntityNumbers.length > 0 ? Math.max(...allEntityNumbers) + 1 : state.nextEntityNumber;
+            
+            const allRelationshipNumbers = state.diagram.relationships
+              .map(r => {
+                const match = r.name.match(/Relationship (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(n => n > 0);
+            state.nextRelationshipNumber = allRelationshipNumbers.length > 0 ? Math.max(...allRelationshipNumbers) + 1 : state.nextRelationshipNumber;
           }
         });
       },

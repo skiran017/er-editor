@@ -121,7 +121,7 @@ export interface EditorState {
     scale: number;
     position: Position;
   };
-  mode: 'select' | 'pan' | 'entity' | 'relationship' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connect';
+  mode: 'select' | 'pan' | 'entity' | 'relationship' | 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connect';
   drawingLine: {
     isDrawing: boolean;
     startPoint: Position | null;
@@ -134,6 +134,8 @@ export interface EditorState {
     currentPoint: Position | null;
     waypoints: Position[];
   };
+  nextEntityNumber: number;
+  nextRelationshipNumber: number;
 }
 
 export interface ValidationError {

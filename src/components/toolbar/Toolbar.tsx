@@ -1,8 +1,6 @@
 import React from "react";
 import {
 	MousePointer2,
-	Square,
-	Diamond,
 	Hand,
 	Undo2,
 	Redo2,
@@ -12,10 +10,24 @@ import {
 	ArrowLeft,
 	ArrowRight,
 	Trash2,
-	Circle,
 	Link,
+	MoreVertical,
+	Square,
+	Diamond,
 } from "lucide-react";
+import {
+	TbRelationOneToOne,
+	TbRelationOneToMany,
+	TbRelationManyToMany,
+	TbOvalVertical,
+} from "react-icons/tb";
 import { Menu } from "../menu/Menu";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import {
 	useEditorStore,
 	useUndo,
@@ -67,35 +79,121 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 	const canUndo = useCanUndo();
 	const canRedo = useCanRedo();
 
-	const tools = [
-		{ id: "select", icon: MousePointer2, label: "Select (V)" },
-		{ id: "entity", icon: Square, label: "Entity (E)" },
-		{ id: "relationship", icon: Diamond, label: "Relationship (R)" },
-		{ id: "attribute", icon: Circle, label: "Attribute (A)" },
-		{ id: "connect", icon: Link, label: "Connect (C)" },
-		{ id: "line", icon: Minus, label: "Line (L)" },
-		{ id: "arrow-left", icon: ArrowLeft, label: "Arrow Left" },
-		{ id: "arrow-right", icon: ArrowRight, label: "Arrow Right" },
-		{ id: "pan", icon: Hand, label: "Pan (Space)" },
+	// Main toolbar tools (visible by default)
+	const mainTools = [
+		{
+			id: "select",
+			icon: MousePointer2,
+			label: "Select (V)",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
+			id: "pan",
+			icon: Hand,
+			label: "Pan (Space)",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
+			id: "entity",
+			icon: Square,
+			label: "Entity (E)",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
+			id: "attribute",
+			icon: TbOvalVertical,
+			label: "Attribute (A)",
+			size: 20,
+			type: "react-icon" as const,
+		},
+		{
+			id: "relationship",
+			icon: Diamond,
+			label: "Relationship (R)",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
+			id: "connect",
+			icon: Link,
+			label: "Connect (C)",
+			size: 18,
+			type: "lucide" as const,
+		},
+	] as const;
+
+	// Overflow tools (shown in dropdown)
+	const moreTools = [
+		{
+			id: "relationship-1-1",
+			icon: TbRelationOneToOne,
+			label: "Relationship 1:1",
+			size: 20,
+			type: "react-icon" as const,
+		},
+		{
+			id: "relationship-1-n",
+			icon: TbRelationOneToMany,
+			label: "Relationship 1:N",
+			size: 20,
+			type: "react-icon" as const,
+		},
+		{
+			id: "relationship-n-n",
+			icon: TbRelationManyToMany,
+			label: "Relationship N:N",
+			size: 20,
+			type: "react-icon" as const,
+		},
+		{
+			id: "line",
+			icon: Minus,
+			label: "Line (L)",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
+			id: "arrow-left",
+			icon: ArrowLeft,
+			label: "Arrow Left",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
+			id: "arrow-right",
+			icon: ArrowRight,
+			label: "Arrow Right",
+			size: 18,
+			type: "lucide" as const,
+		},
 	] as const;
 
 	const handleZoomIn = () => {
-		setZoom(viewport.scale * 1.2);
+		setZoom(Math.min(viewport.scale * 1.2, 3));
 	};
 
 	const handleZoomOut = () => {
-		setZoom(viewport.scale / 1.2);
+		setZoom(Math.max(viewport.scale / 1.2, 0.1));
 	};
 
-	const handleExport = async (format: 'standard' | 'java' = 'standard') => {
+	const handleExport = async (format: "standard" | "java" = "standard") => {
 		try {
-			const xml = format === 'java' 
-				? serializeDiagramToJavaXML(diagram)
-				: serializeDiagramToXML(diagram);
-			const formatSuffix = format === 'java' ? '-java' : '';
+			const xml =
+				format === "java"
+					? serializeDiagramToJavaXML(diagram)
+					: serializeDiagramToXML(diagram);
+			const formatSuffix = format === "java" ? "-java" : "";
 			const filename = `er-diagram${formatSuffix}-${Date.now()}.xml`;
 			downloadFile(xml, filename, "text/xml");
-			showToast(`Diagram exported successfully (${format === 'java' ? 'Java' : 'Standard'} format)`, "success");
+			showToast(
+				`Diagram exported successfully (${
+					format === "java" ? "Java" : "Standard"
+				} format)`,
+				"success"
+			);
 		} catch (error) {
 			console.error("Export error:", error);
 			showToast(
@@ -240,8 +338,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			<div className="fixed top-4 left-4 z-50">
 				<Menu
 					onImport={handleImport}
-					onExportXML={() => handleExport('standard')}
-					onExportJavaXML={() => handleExport('java')}
+					onExportXML={() => handleExport("standard")}
+					onExportJavaXML={() => handleExport("java")}
 					onExportImage={handleExportImage}
 					onResetCanvas={handleResetCanvas}
 					onShowShortcuts={handleShowShortcuts}
@@ -251,9 +349,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			{/* Toolbar - Scrollable on mobile, centered on desktop */}
 			<div className="fixed bottom-4 left-4 right-4 md:bottom-auto md:top-4 md:left-1/2 md:-translate-x-1/2 md:right-auto z-50 md:max-w-max">
 				<div className="h-12 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-lg flex items-center px-3 gap-1 overflow-x-auto scrollbar-hide">
-					{/* Mode tools */}
+					{/* Main Mode tools */}
 					<div className="flex items-center gap-0.5 mr-2 border-r border-gray-200 dark:border-gray-700 pr-2 shrink-0">
-						{tools.map((tool) => {
+						{mainTools.map((tool) => {
 							const Icon = tool.icon;
 							const isActive = mode === tool.id;
 
@@ -268,10 +366,49 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 									)}
 									title={tool.label}
 								>
-									<Icon size={18} />
+									<Icon size={tool.size} />
 								</button>
 							);
 						})}
+					</div>
+
+					{/* More tools dropdown */}
+					<div className="flex items-center gap-0.5 mr-2 border-r border-gray-200 dark:border-gray-700 pr-2 shrink-0">
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<button
+									className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+									title="More tools"
+								>
+									<MoreVertical size={18} />
+								</button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent
+								side="bottom"
+								align="start"
+								className="min-w-[160px]"
+							>
+								{moreTools.map((tool) => {
+									const Icon = tool.icon;
+									const isActive = mode === tool.id;
+
+									return (
+										<DropdownMenuItem
+											key={tool.id}
+											onClick={() => setMode(tool.id as typeof mode)}
+											className={cn(
+												"flex items-center gap-2 cursor-pointer",
+												isActive &&
+													"bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+											)}
+										>
+											<Icon size={tool.size} />
+											<span className="text-sm">{tool.label}</span>
+										</DropdownMenuItem>
+									);
+								})}
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 
 					{/* History tools */}

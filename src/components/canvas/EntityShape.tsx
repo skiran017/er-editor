@@ -12,6 +12,8 @@ interface EntityShapeProps {
 
 export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const groupRef = useRef<Konva.Group>(null);
+	const textRef = useRef<Konva.Text>(null);
+	const [isEditing, setIsEditing] = useState(false);
 	const updateEntity = useEditorStore((state) => state.updateEntity);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
@@ -257,6 +259,60 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		selectElement(id, false);
 	};
 
+	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		e.cancelBubble = true;
+		setIsEditing(true);
+		
+		// Create HTML input for editing
+		const textNode = textRef.current;
+		const stage = textNode?.getStage();
+		if (!textNode || !stage) return;
+
+		// Get absolute position of text
+		const textPosition = textNode.getAbsolutePosition();
+		const stageBox = stage.container().getBoundingClientRect();
+		
+		// Create input element
+		const input = document.createElement('input');
+		input.value = name;
+		input.style.position = 'absolute';
+		input.style.top = `${stageBox.top + textPosition.y}px`;
+		input.style.left = `${stageBox.left + textPosition.x}px`;
+		input.style.width = `${size.width}px`;
+		input.style.height = '30px';
+		input.style.fontSize = '16px';
+		input.style.fontWeight = 'bold';
+		input.style.textAlign = 'center';
+		input.style.border = '2px solid #3b82f6';
+		input.style.borderRadius = '4px';
+		input.style.padding = '4px';
+		input.style.zIndex = '1000';
+		input.style.backgroundColor = 'white';
+		
+		document.body.appendChild(input);
+		input.focus();
+		input.select();
+
+		const removeInput = () => {
+			document.body.removeChild(input);
+			setIsEditing(false);
+		};
+
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				updateEntity(id, { name: input.value });
+				removeInput();
+			} else if (e.key === 'Escape') {
+				removeInput();
+			}
+		});
+
+		input.addEventListener('blur', () => {
+			updateEntity(id, { name: input.value });
+			removeInput();
+		});
+	};
+
 	return (
 		<Group
 			ref={groupRef}
@@ -298,6 +354,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 
 			{/* Entity name */}
 			<Text
+				ref={textRef}
 				text={name}
 				width={size.width}
 				align="center"
@@ -306,6 +363,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 				fontSize={16}
 				fontStyle="bold"
 				fill={colors.text}
+				onDblClick={handleTextDblClick}
+				listening={!isEditing}
 			/>
 		</Group>
 	);

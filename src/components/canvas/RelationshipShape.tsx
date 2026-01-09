@@ -14,6 +14,8 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	relationship,
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
+	const textRef = useRef<Konva.Text>(null);
+	const [isEditing, setIsEditing] = useState(false);
 	const updateRelationship = useEditorStore(
 		(state) => state.updateRelationship
 	);
@@ -261,9 +263,64 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		e.cancelBubble = true;
 	};
 
-	const handleDblClick = () => {
-		// Double-click now just ensures selection (property panel will show)
-		selectElement(id, false);
+	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		// Double-click triggers text editing
+		e.cancelBubble = true;
+		handleTextDblClick(e);
+	};
+
+	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		e.cancelBubble = true;
+		setIsEditing(true);
+		
+		// Create HTML input for editing
+		const textNode = textRef.current;
+		const stage = textNode?.getStage();
+		if (!textNode || !stage) return;
+
+		// Get absolute position of text
+		const textPosition = textNode.getAbsolutePosition();
+		const stageBox = stage.container().getBoundingClientRect();
+		
+		// Create input element
+		const input = document.createElement('input');
+		input.value = name;
+		input.style.position = 'absolute';
+		input.style.top = `${stageBox.top + textPosition.y + height / 2 - 15}px`;
+		input.style.left = `${stageBox.left + textPosition.x}px`;
+		input.style.width = `${width}px`;
+		input.style.height = '30px';
+		input.style.fontSize = '14px';
+		input.style.fontWeight = 'bold';
+		input.style.textAlign = 'center';
+		input.style.border = '2px solid #3b82f6';
+		input.style.borderRadius = '4px';
+		input.style.padding = '4px';
+		input.style.zIndex = '1000';
+		input.style.backgroundColor = 'white';
+		
+		document.body.appendChild(input);
+		input.focus();
+		input.select();
+
+		const removeInput = () => {
+			document.body.removeChild(input);
+			setIsEditing(false);
+		};
+
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				updateRelationship(id, { name: input.value });
+				removeInput();
+			} else if (e.key === 'Escape') {
+				removeInput();
+			}
+		});
+
+		input.addEventListener('blur', () => {
+			updateRelationship(id, { name: input.value });
+			removeInput();
+		});
 	};
 
 	// Diamond points: top, right, bottom, left
@@ -325,11 +382,11 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				shadowOpacity={0.3}
 				onClick={handleClick}
 				onTap={handleTap}
-				onDblClick={handleDblClick}
 			/>
 
 			{/* Relationship name */}
 			<Text
+				ref={textRef}
 				text={name}
 				width={width}
 				height={height}
@@ -340,7 +397,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				fill={colors.text}
 				onClick={handleClick}
 				onTap={handleTap}
-				onDblClick={handleDblClick}
+				listening={!isEditing}
 			/>
 
 			{/* Selection indicator */}
