@@ -151,7 +151,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 
 	// Determine stroke style
 	const strokeColor = selected ? "#3b82f6" : colors.stroke;
-	const strokeWidth = selected ? 2.5 : 2;
+	const strokeWidth = selected ? 2 : 1.5;
 	const isTotalParticipation = participation === "total";
 
 	// Simple approach: just shift all points by a fixed amount
@@ -176,6 +176,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 				points={points}
 				stroke={strokeColor}
 				strokeWidth={strokeWidth}
+				hitStrokeWidth={10}
 				lineCap="round"
 				lineJoin="round"
 				onClick={handleClick}
@@ -193,6 +194,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 					lineCap="round"
 					lineJoin="round"
 					onClick={handleClick}
+					hitStrokeWidth={10}
 					listening={false}
 				/>
 			)}
