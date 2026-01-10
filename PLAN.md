@@ -40,16 +40,108 @@ This document tracks planned features and improvements for the ER diagram editor
 
 **Why:** Dramatically improves workflow and user productivity
 
-#### 2. Diagram Validation
-**Priority:** High | **Impact:** High
-- [ ] Validate ER diagram structure
-- [ ] Check for orphaned entities/relationships
-- [ ] Validate cardinality constraints
-- [ ] Ensure proper entity-relationship connections
-- [ ] Show warnings/errors in validation panel
-- [ ] Real-time validation feedback
+#### 2. Diagram Validation System
+**Priority:** High | **Impact:** High | **Status:** 🚧 In Planning
 
-**Why:** Ensures diagram correctness and professional quality
+**Overview:** Comprehensive validation system matching Java app behavior, with query parameter control for Moodle integration.
+
+**Requirements:**
+- Query parameter: `?validation=false` to disable (default: enabled)
+- Real-time validation on shape changes (immediate, no debouncing)
+- Visual warning indicators (red circle with exclamation mark)
+- Tooltip inspection (shadcn tooltip) showing warning messages
+- Include warnings in XML export for teacher review
+
+**Implementation Phases:**
+
+**Phase 1: Core Infrastructure**
+- [ ] Update type definitions: Add `hasWarning: boolean` and `warnings: string[]` to Entity, Relationship, Attribute
+- [ ] Add `validationEnabled: boolean` to EditorState (default: true)
+- [ ] Create `src/lib/validation.ts` with validation functions:
+  - `validateEntity(entity, diagram): string[]`
+  - `validateRelationship(relationship, diagram): string[]`
+  - `validateAttribute(attribute, diagram): string[]`
+  - `validateConnection(connection, diagram): string[]`
+  - `validateDiagram(diagram): ValidationError[]`
+
+**Phase 2: Query Parameter Integration**
+- [ ] Read `?validation=false` query parameter on app load
+- [ ] Initialize `validationEnabled` in EditorState based on query param
+- [ ] Skip validation logic when `validationEnabled === false`
+
+**Phase 3: Validation Rules Implementation**
+- [ ] **Entity Rules:**
+  - Must have at least one attribute
+  - Must have at least one key attribute
+  - Weak entities must have a discriminant attribute
+- [ ] **Relationship Rules:**
+  - Must connect at least 2 entities
+  - All connections must have cardinality defined
+  - All connections must have participation defined
+- [ ] **Attribute Rules:**
+  - Must connect to exactly one entity OR one relationship (XOR)
+  - Cannot be both key and derived
+  - Partial key only valid for weak entity attributes
+- [ ] **Connection Rules:**
+  - Must connect valid elements (fromElement and toElement exist)
+  - Cardinality must be valid format (1, N, or 1:N)
+  - Participation must be "partial" or "total"
+
+**Phase 4: Store Integration**
+- [ ] Add validation actions to `editorStore.ts`:
+  - `validateElement(id: string): void` - validate single element
+  - `validateAll(): void` - validate entire diagram
+  - `getValidationErrors(): ValidationError[]` - get all errors
+  - `clearWarnings(id: string): void` - clear warnings for element
+- [ ] Auto-validate on mutations:
+  - Entity added/updated/deleted
+  - Relationship added/updated/deleted
+  - Attribute added/updated/deleted
+  - Connection added/updated/deleted
+  - Property panel changes (on blur for text, immediate for checkboxes)
+
+**Phase 5: Visual Warning Display**
+- [ ] Create `src/components/icons/WarningIcon.tsx`:
+  - Red circle (#ef4444) with white exclamation mark
+  - Size: 16px
+  - Position: top-right corner
+- [ ] Add warning icon rendering to:
+  - `EntityShape.tsx` - render if `hasWarning === true`
+  - `RelationshipShape.tsx` - render if `hasWarning === true`
+  - `AttributeShape.tsx` - render if `hasWarning === true`
+
+**Phase 6: Warning Inspection UI (shadcn Tooltip)**
+- [ ] Wrap warning icons with shadcn Tooltip component
+- [ ] Tooltip content:
+  - Element name/type
+  - List of warning messages (one per line)
+  - Format: "⚠️ Warning: [message]"
+- [ ] Show on hover over warning icon
+
+**Phase 7: XML Export Integration**
+- [ ] Include warnings in XML export:
+  ```xml
+  <Warnings>
+    <Element id="entity-1">
+      <Warning>Entity must have at least one key attribute</Warning>
+    </Element>
+  </Warnings>
+  ```
+- [ ] Add to both standard and Java XML formats
+
+**Phase 8: Performance Optimization**
+- [ ] Validate immediately on shape changes (no debouncing needed)
+- [ ] Incremental validation: only validate affected elements
+- [ ] Cache validation results until element changes
+
+**Why:** Ensures diagram correctness, matches Java app behavior, enables teacher review via Moodle integration
+
+**Technical Notes:**
+- Validation runs synchronously (immediate feedback)
+- No debouncing needed for shapes (unlike text input)
+- Warning icons use Konva Group positioning
+- Tooltip uses shadcn component for consistency
+- Warnings included in export for teacher review workflow
 
 #### 3. Selection Improvements
 **Priority:** High | **Impact:** Medium
