@@ -619,19 +619,28 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		const pointer = stage.getPointerPosition();
 		if (!pointer) return;
 
+		const scaleBy = 1.05;
+		const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+
+		// Clamp the scale to min (0.1) and max (3.0)
+		const clampedScale = Math.max(0.1, Math.min(3, newScale));
+
+		// Only adjust position if scale actually changed
+		// This prevents phantom scrolling when at zoom limits
+		if (clampedScale === oldScale) {
+			return; // No change, don't move canvas
+		}
+
+		setZoom(clampedScale);
+
 		const mousePointTo = {
 			x: (pointer.x - stage.x()) / oldScale,
 			y: (pointer.y - stage.y()) / oldScale,
 		};
 
-		const scaleBy = 1.05;
-		const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-
-		setZoom(newScale);
-
 		const newPos = {
-			x: pointer.x - mousePointTo.x * newScale,
-			y: pointer.y - mousePointTo.y * newScale,
+			x: pointer.x - mousePointTo.x * clampedScale,
+			y: pointer.y - mousePointTo.y * clampedScale,
 		};
 
 		stage.position(newPos);
