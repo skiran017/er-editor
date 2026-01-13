@@ -1,4 +1,4 @@
-import type { Diagram, Entity, Relationship, Attribute, EntityAttribute, Cardinality, Participation } from '../types';
+import type { Diagram, Entity, Relationship } from '../types';
 
 /**
  * Serialize our Diagram format to Java app XML format (ERDatabaseModel)

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Group, Line, Text } from "react-konva";
+import { Group, Line, Text, Circle } from "react-konva";
 import type { Relationship, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getClosestEdge, getBestAvailableEdge } from "../../lib/utils";
@@ -22,6 +22,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 	const diagram = useEditorStore((state) => state.diagram);
+	const viewport = useEditorStore((state) => state.viewport);
 
 	const {
 		id,
@@ -31,7 +32,11 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		size,
 		isWeak,
 		rotation = 0,
+		hasWarning,
+		warnings,
 	} = relationship;
+	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
+	const warningTooltipRef = useRef<HTMLDivElement | null>(null);
 
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
@@ -48,6 +53,97 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		});
 		return () => observer.disconnect();
 	}, []);
+
+	// Handle warning tooltip - use requestAnimationFrame to avoid rendering conflicts
+	useEffect(() => {
+		if (!hasWarning) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		if (!showWarningTooltip) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		// Use requestAnimationFrame to ensure DOM is ready and avoid rendering conflicts
+		const rafId = requestAnimationFrame(() => {
+			const groupNode = groupRef.current;
+			const stage = groupNode?.getStage();
+			if (!groupNode || !stage) return;
+
+			// Get absolute screen position of warning badge (accounts for zoom and pan)
+			// Badge is at (width - 10, 10) relative to the group
+			const badgeRelativePos = { x: width - 10, y: 10 };
+			const badgeAbsolutePos = groupNode.getAbsolutePosition();
+			const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+			const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+			
+			const stageBox = stage.container().getBoundingClientRect();
+
+			// Create tooltip element
+			const tooltip = document.createElement('div');
+			tooltip.setAttribute('data-warning-tooltip', 'true');
+			tooltip.style.position = 'absolute';
+			tooltip.style.top = `${stageBox.top + badgeScreenY + 20}px`;
+			tooltip.style.left = `${stageBox.left + badgeScreenX - 140}px`;
+			tooltip.style.backgroundColor = '#fee2e2';
+			tooltip.style.border = '1px solid #ef4444';
+			tooltip.style.borderRadius = '4px';
+			tooltip.style.padding = '8px 12px';
+			tooltip.style.zIndex = '1000';
+			tooltip.style.maxWidth = '300px';
+			tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+			tooltip.style.fontSize = '12px';
+			tooltip.style.color = '#991b1b';
+			tooltip.style.pointerEvents = 'none'; // Don't interfere with canvas
+			const currentWarnings = warnings || [];
+			tooltip.innerHTML = `<strong>Validation Warnings:</strong><ul style="margin: 4px 0 0 0; padding-left: 20px;">${currentWarnings.map(w => `<li>${w}</li>`).join('') || ''}</ul>`;
+			
+			document.body.appendChild(tooltip);
+			warningTooltipRef.current = tooltip;
+		});
+
+		// Update tooltip position if it's already visible and viewport changes
+		if (warningTooltipRef.current && showWarningTooltip) {
+			const updateRafId = requestAnimationFrame(() => {
+				const groupNode = groupRef.current;
+				const stage = groupNode?.getStage();
+				if (!groupNode || !stage || !warningTooltipRef.current) return;
+
+				const badgeRelativePos = { x: width - 10, y: 10 };
+				const badgeAbsolutePos = groupNode.getAbsolutePosition();
+				const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+				const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+				const stageBox = stage.container().getBoundingClientRect();
+
+				warningTooltipRef.current.style.top = `${stageBox.top + badgeScreenY + 20}px`;
+				warningTooltipRef.current.style.left = `${stageBox.left + badgeScreenX - 140}px`;
+			});
+			return () => {
+				cancelAnimationFrame(rafId);
+				cancelAnimationFrame(updateRafId);
+				if (warningTooltipRef.current?.parentNode) {
+					document.body.removeChild(warningTooltipRef.current);
+					warningTooltipRef.current = null;
+				}
+			};
+		}
+
+		return () => {
+			cancelAnimationFrame(rafId);
+			if (warningTooltipRef.current?.parentNode) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+		};
+	}, [hasWarning, showWarningTooltip, viewport.scale, viewport.position.x, viewport.position.y, size.width, size.height, warnings]);
 
 	// Diamond dimensions
 	const width = size.width;
@@ -409,6 +505,39 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 					strokeWidth={1}
 					dash={[5, 5]}
 				/>
+			)}
+
+			{/* Warning indicator */}
+			{hasWarning && (
+				<Group
+					x={width - 10}
+					y={10}
+					onMouseEnter={(e) => {
+						e.cancelBubble = true;
+						setShowWarningTooltip(true);
+					}}
+					onMouseLeave={(e) => {
+						e.cancelBubble = true;
+						setShowWarningTooltip(false);
+					}}
+				>
+					<Circle
+						radius={8}
+						fill="#ef4444"
+						stroke="#991b1b"
+						strokeWidth={1}
+					/>
+					<Text
+						text="!"
+						x={-4}
+						y={-6}
+						fontSize={12}
+						fontStyle="bold"
+						fill="white"
+						align="center"
+						verticalAlign="middle"
+					/>
+				</Group>
 			)}
 		</Group>
 	);

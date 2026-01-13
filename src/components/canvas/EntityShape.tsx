@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Group, Rect, Text } from "react-konva";
+import { Group, Rect, Text, Circle } from "react-konva";
 import type { Entity, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getClosestEdge, getBestAvailableEdge } from "../../lib/utils";
@@ -18,10 +18,23 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 	const diagram = useEditorStore((state) => state.diagram);
+	const viewport = useEditorStore((state) => state.viewport);
 
-	const { id, name, position, size, selected, isWeak, rotation = 0 } = entity;
+	const {
+		id,
+		name,
+		position,
+		size,
+		selected,
+		isWeak,
+		rotation = 0,
+		hasWarning,
+		warnings,
+	} = entity;
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
+	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
+	const warningTooltipRef = useRef<HTMLDivElement | null>(null);
 
 	// Get theme-aware colors
 	const [colors, setColors] = useState(getThemeColorsSync());
@@ -36,6 +49,105 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		});
 		return () => observer.disconnect();
 	}, []);
+
+	// Handle warning tooltip - use requestAnimationFrame to avoid rendering conflicts
+	useEffect(() => {
+		if (!hasWarning) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		if (!showWarningTooltip) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		// Use requestAnimationFrame to ensure DOM is ready and avoid rendering conflicts
+		const rafId = requestAnimationFrame(() => {
+			const groupNode = groupRef.current;
+			const stage = groupNode?.getStage();
+			if (!groupNode || !stage) return;
+
+			// Get absolute screen position of warning badge (accounts for zoom and pan)
+			// Badge is at (size.width - 10, 10) relative to the group
+			const badgeRelativePos = { x: size.width - 10, y: 10 };
+			const badgeAbsolutePos = groupNode.getAbsolutePosition();
+			const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+			const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+
+			const stageBox = stage.container().getBoundingClientRect();
+
+			// Create tooltip element
+			const tooltip = document.createElement("div");
+			tooltip.setAttribute("data-warning-tooltip", "true");
+			tooltip.style.position = "absolute";
+			tooltip.style.top = `${stageBox.top + badgeScreenY + 20}px`;
+			tooltip.style.left = `${stageBox.left + badgeScreenX - 140}px`;
+			tooltip.style.backgroundColor = "#fee2e2";
+			tooltip.style.border = "1px solid #ef4444";
+			tooltip.style.borderRadius = "4px";
+			tooltip.style.padding = "8px 12px";
+			tooltip.style.zIndex = "1000";
+			tooltip.style.maxWidth = "300px";
+			tooltip.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+			tooltip.style.fontSize = "12px";
+			tooltip.style.color = "#991b1b";
+			tooltip.style.pointerEvents = "none"; // Don't interfere with canvas
+			const currentWarnings = warnings || [];
+			tooltip.innerHTML = `<strong>Validation Warnings:</strong><ul style="margin: 4px 0 0 0; padding-left: 20px;">${
+				currentWarnings.map((w) => `<li>${w}</li>`).join("") || ""
+			}</ul>`;
+
+			document.body.appendChild(tooltip);
+			warningTooltipRef.current = tooltip;
+		});
+
+		// Update tooltip position if it's already visible and viewport changes
+		if (warningTooltipRef.current && showWarningTooltip) {
+			const updateRafId = requestAnimationFrame(() => {
+				const groupNode = groupRef.current;
+				const stage = groupNode?.getStage();
+				if (!groupNode || !stage || !warningTooltipRef.current) return;
+
+				const badgeRelativePos = { x: size.width - 10, y: 10 };
+				const badgeAbsolutePos = groupNode.getAbsolutePosition();
+				const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+				const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+				const stageBox = stage.container().getBoundingClientRect();
+
+				warningTooltipRef.current.style.top = `${
+					stageBox.top + badgeScreenY + 20
+				}px`;
+				warningTooltipRef.current.style.left = `${
+					stageBox.left + badgeScreenX - 140
+				}px`;
+			});
+			return () => cancelAnimationFrame(updateRafId);
+		}
+
+		return () => {
+			cancelAnimationFrame(rafId);
+			if (warningTooltipRef.current?.parentNode) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+		};
+	}, [
+		hasWarning,
+		showWarningTooltip,
+		viewport.scale,
+		viewport.position.x,
+		viewport.position.y,
+		size.width,
+		size.height,
+		warnings,
+	]);
 
 	// Handle drag move (update position in real-time for smooth dragging)
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -262,7 +374,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		e.cancelBubble = true;
 		setIsEditing(true);
-		
+
 		// Create HTML input for editing
 		const textNode = textRef.current;
 		const stage = textNode?.getStage();
@@ -271,24 +383,24 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		// Get absolute position of text
 		const textPosition = textNode.getAbsolutePosition();
 		const stageBox = stage.container().getBoundingClientRect();
-		
+
 		// Create input element
-		const input = document.createElement('input');
+		const input = document.createElement("input");
 		input.value = name;
-		input.style.position = 'absolute';
+		input.style.position = "absolute";
 		input.style.top = `${stageBox.top + textPosition.y}px`;
 		input.style.left = `${stageBox.left + textPosition.x}px`;
 		input.style.width = `${size.width}px`;
-		input.style.height = '30px';
-		input.style.fontSize = '16px';
-		input.style.fontWeight = 'bold';
-		input.style.textAlign = 'center';
-		input.style.border = '2px solid #3b82f6';
-		input.style.borderRadius = '4px';
-		input.style.padding = '4px';
-		input.style.zIndex = '1000';
-		input.style.backgroundColor = 'white';
-		
+		input.style.height = "30px";
+		input.style.fontSize = "16px";
+		input.style.fontWeight = "bold";
+		input.style.textAlign = "center";
+		input.style.border = "2px solid #3b82f6";
+		input.style.borderRadius = "4px";
+		input.style.padding = "4px";
+		input.style.zIndex = "1000";
+		input.style.backgroundColor = "white";
+
 		document.body.appendChild(input);
 		input.focus();
 		input.select();
@@ -298,16 +410,16 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 			setIsEditing(false);
 		};
 
-		input.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
 				updateEntity(id, { name: input.value });
 				removeInput();
-			} else if (e.key === 'Escape') {
+			} else if (e.key === "Escape") {
 				removeInput();
 			}
 		});
 
-		input.addEventListener('blur', () => {
+		input.addEventListener("blur", () => {
 			updateEntity(id, { name: input.value });
 			removeInput();
 		});
@@ -366,6 +478,34 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 				onDblClick={handleTextDblClick}
 				listening={!isEditing}
 			/>
+
+			{/* Warning indicator */}
+			{hasWarning && (
+				<Group
+					x={size.width - 10}
+					y={10}
+					onMouseEnter={(e) => {
+						e.cancelBubble = true;
+						setShowWarningTooltip(true);
+					}}
+					onMouseLeave={(e) => {
+						e.cancelBubble = true;
+						setShowWarningTooltip(false);
+					}}
+				>
+					<Circle radius={8} fill="#ef4444" stroke="#991b1b" strokeWidth={1} />
+					<Text
+						text="!"
+						x={-4}
+						y={-6}
+						fontSize={12}
+						fontStyle="bold"
+						fill="white"
+						align="center"
+						verticalAlign="middle"
+					/>
+				</Group>
+			)}
 		</Group>
 	);
 };

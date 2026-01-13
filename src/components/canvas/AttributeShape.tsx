@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Group, Ellipse, Text, Line } from "react-konva";
+import { Group, Ellipse, Text, Line, Circle } from "react-konva";
 import type { Attribute } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getThemeColorsSync } from "../../lib/themeColors";
@@ -25,6 +25,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 	const entities = useEditorStore((state) => state.diagram.entities);
+	const viewport = useEditorStore((state) => state.viewport);
 
 	// Get theme-aware colors (must be before early returns)
 	const [colors, setColors] = useState(getThemeColorsSync());
@@ -49,7 +50,11 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		isMultivalued,
 		isDerived,
 		entityId,
+		hasWarning,
+		warnings,
 	} = attribute;
+	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
+	const warningTooltipRef = useRef<HTMLDivElement | null>(null);
 
 	// Find parent entity or relationship
 	const parentEntity = entityId
@@ -59,20 +64,134 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	const parentRelationship = attribute.relationshipId
 		? relationships.find((r) => r.id === attribute.relationshipId)
 		: null;
+	const parentElement = parentEntity || parentRelationship;
 
+	// Calculate ellipse size based on text (needed for tooltip positioning)
+	const textWidth = name.length * 8 + 20; // Approximate width
+	const ellipseWidth = Math.max(80, textWidth);
+	const ellipseHeight = 30;
+
+	// Handle warning tooltip - use requestAnimationFrame to avoid rendering conflicts
+	// MUST be called before any early returns (React Hooks rule)
+	useEffect(() => {
+		if (!hasWarning) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		if (!showWarningTooltip) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		// Use requestAnimationFrame to ensure DOM is ready and avoid rendering conflicts
+		const rafId = requestAnimationFrame(() => {
+			const groupNode = groupRef.current;
+			const stage = groupNode?.getStage();
+			if (!groupNode || !stage) return;
+
+			// Get absolute screen position of warning badge (accounts for zoom and pan)
+			// Badge is at (ellipseWidth / 2 - 10, -ellipseHeight / 2 + 10) relative to the group
+			const badgeRelativePos = {
+				x: ellipseWidth / 2 - 10,
+				y: -ellipseHeight / 2 + 10,
+			};
+			const badgeAbsolutePos = groupNode.getAbsolutePosition();
+			const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+			const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+
+			const stageBox = stage.container().getBoundingClientRect();
+
+			// Create tooltip element
+			const tooltip = document.createElement("div");
+			tooltip.setAttribute("data-warning-tooltip", "true");
+			tooltip.style.position = "absolute";
+			tooltip.style.top = `${stageBox.top + badgeScreenY + 20}px`;
+			tooltip.style.left = `${stageBox.left + badgeScreenX - 140}px`;
+			tooltip.style.backgroundColor = "#fee2e2";
+			tooltip.style.border = "1px solid #ef4444";
+			tooltip.style.borderRadius = "4px";
+			tooltip.style.padding = "8px 12px";
+			tooltip.style.zIndex = "1000";
+			tooltip.style.maxWidth = "300px";
+			tooltip.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+			tooltip.style.fontSize = "12px";
+			tooltip.style.color = "#991b1b";
+			tooltip.style.pointerEvents = "none"; // Don't interfere with canvas
+			const currentWarnings = warnings || [];
+			tooltip.innerHTML = `<strong>Validation Warnings:</strong><ul style="margin: 4px 0 0 0; padding-left: 20px;">${
+				currentWarnings.map((w) => `<li>${w}</li>`).join("") || ""
+			}</ul>`;
+
+			document.body.appendChild(tooltip);
+			warningTooltipRef.current = tooltip;
+		});
+
+		// Update tooltip position if it's already visible and viewport changes
+		if (warningTooltipRef.current && showWarningTooltip) {
+			const updateRafId = requestAnimationFrame(() => {
+				const groupNode = groupRef.current;
+				const stage = groupNode?.getStage();
+				if (!groupNode || !stage || !warningTooltipRef.current) return;
+
+				const badgeRelativePos = {
+					x: ellipseWidth / 2 - 10,
+					y: -ellipseHeight / 2 + 10,
+				};
+				const badgeAbsolutePos = groupNode.getAbsolutePosition();
+				const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+				const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+				const stageBox = stage.container().getBoundingClientRect();
+
+				warningTooltipRef.current.style.top = `${
+					stageBox.top + badgeScreenY + 20
+				}px`;
+				warningTooltipRef.current.style.left = `${
+					stageBox.left + badgeScreenX - 140
+				}px`;
+			});
+			return () => {
+				cancelAnimationFrame(rafId);
+				cancelAnimationFrame(updateRafId);
+				if (warningTooltipRef.current?.parentNode) {
+					document.body.removeChild(warningTooltipRef.current);
+					warningTooltipRef.current = null;
+				}
+			};
+		}
+
+		return () => {
+			cancelAnimationFrame(rafId);
+			if (warningTooltipRef.current?.parentNode) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+		};
+	}, [
+		hasWarning,
+		showWarningTooltip,
+		viewport.scale,
+		viewport.position.x,
+		viewport.position.y,
+		ellipseWidth,
+		ellipseHeight,
+		warnings,
+	]);
+
+	// Early returns MUST come after all hooks
 	if (!parentEntity && !parentRelationship) {
 		return null;
 	}
 
-	const parentElement = parentEntity || parentRelationship;
 	if (!parentElement) {
 		return null;
 	}
-
-	// Calculate ellipse size based on text
-	const textWidth = name.length * 8 + 20; // Approximate width
-	const ellipseWidth = Math.max(80, textWidth);
-	const ellipseHeight = 30;
 
 	// Calculate actual text width for underline (more accurate)
 	const actualTextWidth = name.length * 7; // Approximate character width
@@ -239,7 +358,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		e.cancelBubble = true;
 		setIsEditing(true);
-		
+
 		// Create HTML input for editing
 		const textNode = textRef.current;
 		const stage = textNode?.getStage();
@@ -248,23 +367,23 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		// Get absolute position of text
 		const textPosition = textNode.getAbsolutePosition();
 		const stageBox = stage.container().getBoundingClientRect();
-		
+
 		// Create input element
-		const input = document.createElement('input');
+		const input = document.createElement("input");
 		input.value = name;
-		input.style.position = 'absolute';
+		input.style.position = "absolute";
 		input.style.top = `${stageBox.top + textPosition.y}px`;
 		input.style.left = `${stageBox.left + textPosition.x}px`;
 		input.style.width = `${100}px`;
-		input.style.height = '24px';
-		input.style.fontSize = '12px';
-		input.style.textAlign = 'center';
-		input.style.border = '2px solid #3b82f6';
-		input.style.borderRadius = '4px';
-		input.style.padding = '2px';
-		input.style.zIndex = '1000';
-		input.style.backgroundColor = 'white';
-		
+		input.style.height = "24px";
+		input.style.fontSize = "12px";
+		input.style.textAlign = "center";
+		input.style.border = "2px solid #3b82f6";
+		input.style.borderRadius = "4px";
+		input.style.padding = "2px";
+		input.style.zIndex = "1000";
+		input.style.backgroundColor = "white";
+
 		document.body.appendChild(input);
 		input.focus();
 		input.select();
@@ -274,16 +393,16 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 			setIsEditing(false);
 		};
 
-		input.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
 				updateAttributeById(id, { name: input.value });
 				removeInput();
-			} else if (e.key === 'Escape') {
+			} else if (e.key === "Escape") {
 				removeInput();
 			}
 		});
 
-		input.addEventListener('blur', () => {
+		input.addEventListener("blur", () => {
 			updateAttributeById(id, { name: input.value });
 			removeInput();
 		});
@@ -330,6 +449,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 				onDragEnd={handleDragEnd}
 				onClick={handleClick}
 				onDblClick={handleDblClick}
+				hitStrokeWidth={10}
 			>
 				{/* Outer ellipse for multivalued attributes */}
 				{isMultivalued && (
@@ -399,6 +519,39 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 						strokeWidth={2}
 						dash={[5, 5]}
 					/>
+				)}
+
+				{/* Warning indicator */}
+				{hasWarning && (
+					<Group
+						x={ellipseWidth / 2 - 10}
+						y={-ellipseHeight / 2 + 10}
+						onMouseEnter={(e) => {
+							e.cancelBubble = true;
+							setShowWarningTooltip(true);
+						}}
+						onMouseLeave={(e) => {
+							e.cancelBubble = true;
+							setShowWarningTooltip(false);
+						}}
+					>
+						<Circle
+							radius={8}
+							fill="#ef4444"
+							stroke="#991b1b"
+							strokeWidth={1}
+						/>
+						<Text
+							text="!"
+							x={-4}
+							y={-6}
+							fontSize={12}
+							fontStyle="bold"
+							fill="white"
+							align="center"
+							verticalAlign="middle"
+						/>
+					</Group>
 				)}
 			</Group>
 		</>

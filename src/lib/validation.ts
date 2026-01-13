@@ -7,8 +7,11 @@ import type { Entity, Relationship, Attribute, Connection, Diagram, ValidationEr
 
 /**
  * Validate an entity and return warning messages
+ * @param entity - Entity to validate
+ * @param _diagram - Diagram context (kept for API consistency)
  */
-export function validateEntity(entity: Entity, diagram: Diagram): string[] {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function validateEntity(entity: Entity, _diagram: Diagram): string[] {
   const warnings: string[] = [];
 
   // Rule: Entity must have at least one attribute
@@ -16,10 +19,13 @@ export function validateEntity(entity: Entity, diagram: Diagram): string[] {
     warnings.push('Entity must have at least one attribute');
   }
 
-  // Rule: Entity must have at least one key attribute
-  const hasKeyAttribute = entity.attributes.some(attr => attr.isKey);
-  if (!hasKeyAttribute) {
-    warnings.push('Entity must have at least one key attribute');
+  // Rule: Regular entities must have at least one key attribute
+  // Weak entities don't need regular keys (they use partial keys)
+  if (!entity.isWeak) {
+    const hasKeyAttribute = entity.attributes.some(attr => attr.isKey);
+    if (!hasKeyAttribute) {
+      warnings.push('Entity must have at least one key attribute');
+    }
   }
 
   // Rule: Weak entities must have a discriminant attribute
@@ -45,10 +51,22 @@ export function validateRelationship(relationship: Relationship, diagram: Diagra
   }
 
   // Rule: All connections must have cardinality defined
-  const connections = diagram.connections.filter(conn => 
+  const connections = diagram.connections.filter(conn =>
     conn.fromId === relationship.id || conn.toId === relationship.id
   );
-  
+
+  // Check that each entity has a connection
+  for (const entityId of relationship.entityIds) {
+    const hasConnection = connections.some(conn =>
+      (conn.fromId === relationship.id && conn.toId === entityId) ||
+      (conn.toId === relationship.id && conn.fromId === entityId)
+    );
+    if (!hasConnection) {
+      warnings.push(`Relationship must have a connection to entity ${entityId}`);
+    }
+  }
+
+  // Rule: All connections must have cardinality defined
   for (const connection of connections) {
     if (!connection.cardinality || connection.cardinality.trim() === '') {
       warnings.push('All connections must have cardinality defined');
@@ -76,7 +94,7 @@ export function validateAttribute(attribute: Attribute, diagram: Diagram): strin
   // Rule: Attribute must connect to exactly one entity OR one relationship (XOR)
   const hasEntity = !!attribute.entityId;
   const hasRelationship = !!attribute.relationshipId;
-  
+
   if (!hasEntity && !hasRelationship) {
     warnings.push('Attribute must connect to exactly one entity or relationship');
   } else if (hasEntity && hasRelationship) {
@@ -89,10 +107,14 @@ export function validateAttribute(attribute: Attribute, diagram: Diagram): strin
   }
 
   // Rule: Partial key only valid for weak entity attributes
-  if (attribute.isPartialKey && attribute.entityId) {
-    const parentEntity = diagram.entities.find(e => e.id === attribute.entityId);
-    if (parentEntity && !parentEntity.isWeak) {
-      warnings.push('Partial key only valid for weak entity attributes');
+  if (attribute.isPartialKey) {
+    if (attribute.relationshipId) {
+      warnings.push('Partial key cannot be used for relationship attributes');
+    } else if (attribute.entityId) {
+      const parentEntity = diagram.entities.find(e => e.id === attribute.entityId);
+      if (parentEntity && !parentEntity.isWeak) {
+        warnings.push('Partial key only valid for weak entity attributes');
+      }
     }
   }
 
@@ -107,9 +129,9 @@ export function validateConnection(connection: Connection, diagram: Diagram): st
 
   // Rule: Must connect valid elements
   const fromElement = diagram.entities.find(e => e.id === connection.fromId) ||
-                      diagram.relationships.find(r => r.id === connection.fromId);
+    diagram.relationships.find(r => r.id === connection.fromId);
   const toElement = diagram.entities.find(e => e.id === connection.toId) ||
-                    diagram.relationships.find(r => r.id === connection.toId);
+    diagram.relationships.find(r => r.id === connection.toId);
 
   if (!fromElement) {
     warnings.push('Connection source element does not exist');
@@ -127,9 +149,9 @@ export function validateConnection(connection: Connection, diagram: Diagram): st
   }
 
   // Rule: Participation must be "partial" or "total"
-  if (connection.participation && 
-      connection.participation !== 'partial' && 
-      connection.participation !== 'total') {
+  if (connection.participation &&
+    connection.participation !== 'partial' &&
+    connection.participation !== 'total') {
     warnings.push('Participation must be "partial" or "total"');
   }
 

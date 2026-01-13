@@ -805,6 +805,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		const stage = stageRef.current;
 		if (!stage) return;
 
+		// Check if click originated from a warning badge or popover
+		const target = e.evt.target as HTMLElement;
+		if (target?.closest('[data-warning-popover]') || target?.closest('button')) {
+			return;
+		}
+
 		const pointer = stage.getPointerPosition();
 		if (!pointer) return;
 
@@ -981,15 +987,15 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					return attrSide === side;
 				});
 				
-				// Offset the position based on number of existing attributes on this side
-				let attributePosition = { ...basePosition };
-				if (side === 'right' || side === 'left') {
-					// Stack vertically for left/right sides
-					attributePosition.y += existingAttributesOnSide.length * spacing;
-				} else {
-					// Stack horizontally for top/bottom sides
-					attributePosition.x += existingAttributesOnSide.length * spacing;
-				}
+			// Offset the position based on number of existing attributes on this side
+			const attributePosition = { ...basePosition };
+			if (side === 'right' || side === 'left') {
+				// Stack vertically for left/right sides
+				attributePosition.y += existingAttributesOnSide.length * spacing;
+			} else {
+				// Stack horizontally for top/bottom sides
+				attributePosition.x += existingAttributesOnSide.length * spacing;
+			}
 				
 				addAttribute(targetEntity.id, {
 					name: `Attribute ${attributeCount + 1}`,
@@ -1070,15 +1076,15 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					return attrSide === side;
 				});
 				
-				// Offset the position based on number of existing attributes on this side
-				let attributePosition = { ...basePosition };
-				if (side === 'right' || side === 'left') {
-					// Stack vertically for left/right sides
-					attributePosition.y += existingAttributesOnSide.length * spacing;
-				} else {
-					// Stack horizontally for top/bottom sides
-					attributePosition.x += existingAttributesOnSide.length * spacing;
-				}
+			// Offset the position based on number of existing attributes on this side
+			const attributePosition = { ...basePosition };
+			if (side === 'right' || side === 'left') {
+				// Stack vertically for left/right sides
+				attributePosition.y += existingAttributesOnSide.length * spacing;
+			} else {
+				// Stack horizontally for top/bottom sides
+				attributePosition.x += existingAttributesOnSide.length * spacing;
+			}
 				
 				addRelationshipAttribute(targetRelationship.id, {
 					name: `Attribute ${attributeCount + 1}`,

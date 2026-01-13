@@ -17,15 +17,27 @@ function App() {
 		useThemeStore.getState().setTheme(theme);
 	}, []);
 
+	// Initialize validation from query parameter
+	useEffect(() => {
+		const urlParams = new URLSearchParams(window.location.search);
+		const validationParam = urlParams.get("validation");
+		// Default: enabled (true), only disabled if ?validation=false
+		const validationEnabled = validationParam !== "false";
+		useEditorStore.getState().setValidationEnabled(validationEnabled);
+	}, []);
+
 	// Keyboard shortcuts
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			// Don't interfere with input fields, textareas, or contenteditable elements
+			// Don't interfere with input fields, textareas, contenteditable elements, or buttons
 			const target = e.target as HTMLElement;
 			if (
 				target.tagName === "INPUT" ||
 				target.tagName === "TEXTAREA" ||
-				target.isContentEditable
+				target.tagName === "BUTTON" ||
+				target.isContentEditable ||
+				target.closest("button") ||
+				target.closest("[data-warning-popover]")
 			) {
 				return;
 			}
