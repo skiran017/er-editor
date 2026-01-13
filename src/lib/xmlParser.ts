@@ -1,9 +1,43 @@
 import type { Diagram, Entity, Relationship, Attribute, Connection, LineShape, ArrowShape, EntityAttribute, Position, Cardinality, Participation, ConnectionPoint, ConnectionStyle } from '../types';
+import { parseJavaXMLToDiagram } from './javaXmlParser';
+
+/**
+ * Detect XML format and parse accordingly
+ */
+export function detectXMLFormat(xmlString: string): 'java' | 'standard' {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+  const root = xmlDoc.documentElement;
+  
+  if (root.tagName === 'ERDatabaseModel') {
+    return 'java';
+  } else if (root.tagName === 'ERDiagram') {
+    return 'standard';
+  }
+  
+  // Default to standard format for backward compatibility
+  return 'standard';
+}
 
 /**
  * Parse XML string into Diagram object
+ * Auto-detects format (Java app format or standard format)
  */
 export function parseXMLToDiagram(xmlString: string): Diagram {
+  const format = detectXMLFormat(xmlString);
+  
+  if (format === 'java') {
+    return parseJavaXMLToDiagram(xmlString);
+  }
+  
+  // Standard format parsing
+  return parseStandardXMLToDiagram(xmlString);
+}
+
+/**
+ * Parse standard XML format (ERDiagram) into Diagram object
+ */
+function parseStandardXMLToDiagram(xmlString: string): Diagram {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
 
@@ -297,3 +331,4 @@ function parseArrow(elem: Element): ArrowShape {
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
+

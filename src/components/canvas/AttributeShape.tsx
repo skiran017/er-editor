@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Group, Ellipse, Text, Line } from "react-konva";
+import { Group, Ellipse, Text, Line, Circle } from "react-konva";
 import type { Attribute } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getThemeColorsSync } from "../../lib/themeColors";
+import { getClosestEdge } from "../../lib/utils";
 import Konva from "konva";
 
 interface AttributeShapeProps {
@@ -13,12 +14,18 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	attribute,
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
+	const textRef = useRef<Konva.Text>(null);
+	const [isEditing, setIsEditing] = useState(false);
 	const updateAttributePosition = useEditorStore(
 		(state) => state.updateAttributePosition
+	);
+	const updateAttributeById = useEditorStore(
+		(state) => state.updateAttributeById
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
 	const entities = useEditorStore((state) => state.diagram.entities);
+	const viewport = useEditorStore((state) => state.viewport);
 
 	// Get theme-aware colors (must be before early returns)
 	const [colors, setColors] = useState(getThemeColorsSync());
@@ -43,7 +50,11 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		isMultivalued,
 		isDerived,
 		entityId,
+		hasWarning,
+		warnings,
 	} = attribute;
+	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
+	const warningTooltipRef = useRef<HTMLDivElement | null>(null);
 
 	// Find parent entity or relationship
 	const parentEntity = entityId
@@ -53,30 +64,268 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	const parentRelationship = attribute.relationshipId
 		? relationships.find((r) => r.id === attribute.relationshipId)
 		: null;
-
-	if (!parentEntity && !parentRelationship) {
-		return null;
-	}
-
 	const parentElement = parentEntity || parentRelationship;
-	if (!parentElement) {
-		return null;
-	}
 
-	// Calculate ellipse size based on text
+	// Calculate ellipse size based on text (needed for tooltip positioning)
 	const textWidth = name.length * 8 + 20; // Approximate width
 	const ellipseWidth = Math.max(80, textWidth);
 	const ellipseHeight = 30;
 
+	// Handle warning tooltip - use requestAnimationFrame to avoid rendering conflicts
+	// MUST be called before any early returns (React Hooks rule)
+	useEffect(() => {
+		if (!hasWarning) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		if (!showWarningTooltip) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		// Use requestAnimationFrame to ensure DOM is ready and avoid rendering conflicts
+		const rafId = requestAnimationFrame(() => {
+			const groupNode = groupRef.current;
+			const stage = groupNode?.getStage();
+			if (!groupNode || !stage) return;
+
+			// Get absolute screen position of warning badge (accounts for zoom and pan)
+			// Badge is at (ellipseWidth / 2 - 10, -ellipseHeight / 2 + 10) relative to the group
+			const badgeRelativePos = {
+				x: ellipseWidth / 2 - 10,
+				y: -ellipseHeight / 2 + 10,
+			};
+			const badgeAbsolutePos = groupNode.getAbsolutePosition();
+			const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+			const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+
+			const stageBox = stage.container().getBoundingClientRect();
+
+			// Create tooltip element
+			const tooltip = document.createElement("div");
+			tooltip.setAttribute("data-warning-tooltip", "true");
+			tooltip.style.position = "absolute";
+			tooltip.style.top = `${stageBox.top + badgeScreenY + 20}px`;
+			tooltip.style.left = `${stageBox.left + badgeScreenX - 140}px`;
+			tooltip.style.backgroundColor = "#fee2e2";
+			tooltip.style.border = "1px solid #ef4444";
+			tooltip.style.borderRadius = "4px";
+			tooltip.style.padding = "8px 12px";
+			tooltip.style.zIndex = "1000";
+			tooltip.style.maxWidth = "300px";
+			tooltip.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+			tooltip.style.fontSize = "12px";
+			tooltip.style.color = "#991b1b";
+			tooltip.style.pointerEvents = "none"; // Don't interfere with canvas
+			const currentWarnings = warnings || [];
+			tooltip.innerHTML = `<strong>Validation Warnings:</strong><ul style="margin: 4px 0 0 0; padding-left: 20px;">${
+				currentWarnings.map((w) => `<li>${w}</li>`).join("") || ""
+			}</ul>`;
+
+			document.body.appendChild(tooltip);
+			warningTooltipRef.current = tooltip;
+		});
+
+		// Update tooltip position if it's already visible and viewport changes
+		if (warningTooltipRef.current && showWarningTooltip) {
+			const updateRafId = requestAnimationFrame(() => {
+				const groupNode = groupRef.current;
+				const stage = groupNode?.getStage();
+				if (!groupNode || !stage || !warningTooltipRef.current) return;
+
+				const badgeRelativePos = {
+					x: ellipseWidth / 2 - 10,
+					y: -ellipseHeight / 2 + 10,
+				};
+				const badgeAbsolutePos = groupNode.getAbsolutePosition();
+				const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+				const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+				const stageBox = stage.container().getBoundingClientRect();
+
+				warningTooltipRef.current.style.top = `${
+					stageBox.top + badgeScreenY + 20
+				}px`;
+				warningTooltipRef.current.style.left = `${
+					stageBox.left + badgeScreenX - 140
+				}px`;
+			});
+			return () => {
+				cancelAnimationFrame(rafId);
+				cancelAnimationFrame(updateRafId);
+				if (warningTooltipRef.current?.parentNode) {
+					document.body.removeChild(warningTooltipRef.current);
+					warningTooltipRef.current = null;
+				}
+			};
+		}
+
+		return () => {
+			cancelAnimationFrame(rafId);
+			if (warningTooltipRef.current?.parentNode) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+		};
+	}, [
+		hasWarning,
+		showWarningTooltip,
+		viewport.scale,
+		viewport.position.x,
+		viewport.position.y,
+		ellipseWidth,
+		ellipseHeight,
+		warnings,
+	]);
+
+	// Early returns MUST come after all hooks
+	if (!parentEntity && !parentRelationship) {
+		return null;
+	}
+
+	if (!parentElement) {
+		return null;
+	}
+
 	// Calculate actual text width for underline (more accurate)
 	const actualTextWidth = name.length * 7; // Approximate character width
 
-	// Calculate connection points
-	// Parent element right edge to attribute left edge
-	const parentRightX = parentElement.position.x + parentElement.size.width;
-	const parentRightY = parentElement.position.y + parentElement.size.height / 2;
-	const attributeLeftX = position.x;
-	const attributeLeftY = position.y + ellipseHeight / 2;
+	// Calculate connection points dynamically based on closest edges
+	// This ensures the line adjusts when either the parent or attribute moves
+	// Note: In Konva, the Group is at (position.x, position.y) and Ellipse is centered at (0,0) within group
+	// So the actual ellipse center in absolute coordinates is (position.x, position.y)
+	const attributeCenter = {
+		x: position.x,
+		y: position.y,
+	};
+	const parentCenter = {
+		x: parentElement.position.x + parentElement.size.width / 2,
+		y: parentElement.position.y + parentElement.size.height / 2,
+	};
+
+	// Find closest edge on parent element
+	const parentEdge = getClosestEdge(attributeCenter, {
+		position: parentElement.position,
+		size: parentElement.size,
+	});
+
+	// Find closest edge on attribute (simplified - attributes are ovals, so we use center-relative calculation)
+	// For attributes, we'll connect from the side closest to the parent
+	const attributeEdge = getClosestEdge(parentCenter, {
+		position: { x: position.x, y: position.y },
+		size: { width: ellipseWidth, height: ellipseHeight },
+	});
+
+	// Calculate actual connection point positions
+	const getConnectionPoint = (
+		elem: {
+			position: { x: number; y: number };
+			size: { width: number; height: number };
+		},
+		edge: "top" | "right" | "bottom" | "left",
+		isAttribute: boolean = false,
+		targetPoint?: { x: number; y: number } // For ellipse: point we're connecting to
+	) => {
+		// For attributes (ellipses), the center is at (position.x, position.y) because
+		// the Group is at (position.x, position.y) and Ellipse is centered at (0,0) within the group
+		// For entities/relationships (rectangles), the center is at position + size/2
+		const centerX = isAttribute
+			? elem.position.x
+			: elem.position.x + elem.size.width / 2;
+		const centerY = isAttribute
+			? elem.position.y
+			: elem.position.y + elem.size.height / 2;
+
+		if (isAttribute && targetPoint) {
+			// For attributes (ovals), calculate intersection with ellipse edge
+			// In Konva, ellipse center is at (0,0) within the Group, so centerX/centerY = elem.position
+			const radiusX = elem.size.width / 2;
+			const radiusY = elem.size.height / 2;
+
+			// Calculate direction vector from ellipse center to target point
+			const dx = targetPoint.x - centerX;
+			const dy = targetPoint.y - centerY;
+
+			// Normalize direction
+			const length = Math.sqrt(dx * dx + dy * dy);
+			if (length < 0.001) {
+				// Fallback to edge-based calculation if points are too close
+				switch (edge) {
+					case "top":
+						return { x: centerX, y: centerY - radiusY };
+					case "right":
+						return { x: centerX + radiusX, y: centerY };
+					case "bottom":
+						return { x: centerX, y: centerY + radiusY };
+					case "left":
+						return { x: centerX - radiusX, y: centerY };
+					default:
+						return { x: centerX, y: centerY };
+				}
+			}
+
+			// Find intersection point on ellipse using parametric equation
+			// Ellipse centered at (centerX, centerY): ((x-centerX)/radiusX)^2 + ((y-centerY)/radiusY)^2 = 1
+			// Line from center to target: x = centerX + t*dx, y = centerY + t*dy
+			// Substituting: (t*dx/radiusX)^2 + (t*dy/radiusY)^2 = 1
+			// Solving: t^2 * (dx^2/radiusX^2 + dy^2/radiusY^2) = 1
+			// Therefore: t = sqrt(1 / (dx^2/radiusX^2 + dy^2/radiusY^2))
+			const dxNorm = dx / radiusX;
+			const dyNorm = dy / radiusY;
+			const t = Math.sqrt(1 / (dxNorm * dxNorm + dyNorm * dyNorm));
+
+			// Return intersection point on ellipse edge
+			return {
+				x: centerX + t * dx,
+				y: centerY + t * dy,
+			};
+		} else if (isAttribute) {
+			// Fallback: use ellipse edge if no target point
+			const radiusX = elem.size.width / 2;
+			const radiusY = elem.size.height / 2;
+			switch (edge) {
+				case "top":
+					return { x: centerX, y: centerY - radiusY };
+				case "right":
+					return { x: centerX + radiusX, y: centerY };
+				case "bottom":
+					return { x: centerX, y: centerY + radiusY };
+				case "left":
+					return { x: centerX - radiusX, y: centerY };
+				default:
+					return { x: centerX, y: centerY };
+			}
+		} else {
+			// For entities/relationships (rectangles/diamonds)
+			switch (edge) {
+				case "top":
+					return { x: centerX, y: elem.position.y };
+				case "right":
+					return { x: elem.position.x + elem.size.width, y: centerY };
+				case "bottom":
+					return { x: centerX, y: elem.position.y + elem.size.height };
+				case "left":
+					return { x: elem.position.x, y: centerY };
+				default:
+					return { x: centerX, y: centerY };
+			}
+		}
+	};
+
+	const parentPoint = getConnectionPoint(parentElement, parentEdge);
+	// For ellipse, calculate intersection point on the actual ellipse edge
+	const attributePoint = getConnectionPoint(
+		{ position, size: { width: ellipseWidth, height: ellipseHeight } },
+		attributeEdge,
+		true,
+		parentPoint // Pass parent point to calculate proper ellipse intersection
+	);
 
 	// Handle drag move
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -100,6 +349,65 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		}
 	};
 
+	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		// Double-click triggers text editing
+		e.cancelBubble = true;
+		handleTextDblClick(e);
+	};
+
+	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		e.cancelBubble = true;
+		setIsEditing(true);
+
+		// Create HTML input for editing
+		const textNode = textRef.current;
+		const stage = textNode?.getStage();
+		if (!textNode || !stage) return;
+
+		// Get absolute position of text
+		const textPosition = textNode.getAbsolutePosition();
+		const stageBox = stage.container().getBoundingClientRect();
+
+		// Create input element
+		const input = document.createElement("input");
+		input.value = name;
+		input.style.position = "absolute";
+		input.style.top = `${stageBox.top + textPosition.y}px`;
+		input.style.left = `${stageBox.left + textPosition.x}px`;
+		input.style.width = `${100}px`;
+		input.style.height = "24px";
+		input.style.fontSize = "12px";
+		input.style.textAlign = "center";
+		input.style.border = "2px solid #3b82f6";
+		input.style.borderRadius = "4px";
+		input.style.padding = "2px";
+		input.style.zIndex = "1000";
+		input.style.backgroundColor = "white";
+
+		document.body.appendChild(input);
+		input.focus();
+		input.select();
+
+		const removeInput = () => {
+			document.body.removeChild(input);
+			setIsEditing(false);
+		};
+
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
+				updateAttributeById(id, { name: input.value });
+				removeInput();
+			} else if (e.key === "Escape") {
+				removeInput();
+			}
+		});
+
+		input.addEventListener("blur", () => {
+			updateAttributeById(id, { name: input.value });
+			removeInput();
+		});
+	};
+
 	// Determine stroke style based on attribute properties
 	let strokeColor = colors.stroke;
 	let strokeWidth = 2;
@@ -116,9 +424,14 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 	return (
 		<>
-			{/* Connection line from parent element to attribute - SOLID line */}
+			{/* Connection line from parent element to attribute - dynamically calculated */}
 			<Line
-				points={[parentRightX, parentRightY, attributeLeftX, attributeLeftY]}
+				points={[
+					parentPoint.x,
+					parentPoint.y,
+					attributePoint.x,
+					attributePoint.y,
+				]}
 				stroke={selected ? "#3b82f6" : "#6b7280"}
 				strokeWidth={selected ? 2 : 1.5}
 				lineCap="round"
@@ -135,6 +448,8 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 				onDragMove={handleDragMove}
 				onDragEnd={handleDragEnd}
 				onClick={handleClick}
+				onDblClick={handleDblClick}
+				hitStrokeWidth={10}
 			>
 				{/* Outer ellipse for multivalued attributes */}
 				{isMultivalued && (
@@ -163,6 +478,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 				{/* Attribute name - centered inside ellipse */}
 				<Text
+					ref={textRef}
 					text={name}
 					x={-ellipseWidth / 2}
 					y={-ellipseHeight / 2}
@@ -173,6 +489,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 					fontSize={14}
 					fill={isKey ? "#f59e0b" : colors.text}
 					fontStyle={isKey ? "bold" : "normal"}
+					listening={!isEditing}
 				/>
 
 				{/* Key indicator - solid underline for key attributes */}
@@ -202,6 +519,39 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 						strokeWidth={2}
 						dash={[5, 5]}
 					/>
+				)}
+
+				{/* Warning indicator */}
+				{hasWarning && (
+					<Group
+						x={ellipseWidth / 2 - 10}
+						y={-ellipseHeight / 2 + 10}
+						onMouseEnter={(e) => {
+							e.cancelBubble = true;
+							setShowWarningTooltip(true);
+						}}
+						onMouseLeave={(e) => {
+							e.cancelBubble = true;
+							setShowWarningTooltip(false);
+						}}
+					>
+						<Circle
+							radius={8}
+							fill="#ef4444"
+							stroke="#991b1b"
+							strokeWidth={1}
+						/>
+						<Text
+							text="!"
+							x={-4}
+							y={-6}
+							fontSize={12}
+							fontStyle="bold"
+							fill="white"
+							align="center"
+							verticalAlign="middle"
+						/>
+					</Group>
 				)}
 			</Group>
 		</>

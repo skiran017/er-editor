@@ -619,19 +619,28 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		const pointer = stage.getPointerPosition();
 		if (!pointer) return;
 
+		const scaleBy = 1.05;
+		const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+
+		// Clamp the scale to min (0.1) and max (3.0)
+		const clampedScale = Math.max(0.1, Math.min(3, newScale));
+
+		// Only adjust position if scale actually changed
+		// This prevents phantom scrolling when at zoom limits
+		if (clampedScale === oldScale) {
+			return; // No change, don't move canvas
+		}
+
+		setZoom(clampedScale);
+
 		const mousePointTo = {
 			x: (pointer.x - stage.x()) / oldScale,
 			y: (pointer.y - stage.y()) / oldScale,
 		};
 
-		const scaleBy = 1.05;
-		const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-
-		setZoom(newScale);
-
 		const newPos = {
-			x: pointer.x - mousePointTo.x * newScale,
-			y: pointer.y - mousePointTo.y * newScale,
+			x: pointer.x - mousePointTo.x * clampedScale,
+			y: pointer.y - mousePointTo.y * clampedScale,
 		};
 
 		stage.position(newPos);
@@ -805,6 +814,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		const stage = stageRef.current;
 		if (!stage) return;
 
+		// Check if click originated from a warning badge or popover
+		const target = e.evt.target as HTMLElement;
+		if (target?.closest('[data-warning-popover]') || target?.closest('button')) {
+			return;
+		}
+
 		const pointer = stage.getPointerPosition();
 		if (!pointer) return;
 
@@ -831,10 +846,35 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 		// Check if clicking on an entity or relationship (for attribute mode)
 		if (mode === "attribute") {
+			// First, check if clicking on an existing attribute - if so, don't create
+			const clickedNode = e.target;
+			
+			// Check if directly clicking on an attribute Group
+			if (clickedNode) {
+				const groupId = clickedNode.id ? clickedNode.id() : null;
+				if (groupId) {
+					const isAttribute = attributes.find((a) => a.id === groupId);
+					if (isAttribute) {
+						// Clicked on an attribute, don't create a new one
+						return;
+					}
+				}
+				
+				// Also check if clicking on a child of an attribute (Ellipse or Text)
+				const parent = clickedNode.getParent();
+				if (parent && parent.id) {
+					const parentId = parent.id();
+					const isAttributeChild = attributes.find((a) => a.id === parentId);
+					if (isAttributeChild) {
+						// Clicked on an attribute's child element, don't create a new one
+						return;
+					}
+				}
+			}
+
 			// Find the entity or relationship that was clicked on or nearest one
 			let targetEntity = null;
 			let targetRelationship = null;
-			const clickedNode = e.target;
 
 			// Check if clicking directly on an entity or relationship
 			if (clickedNode && clickedNode.getType() === "Group") {
@@ -886,55 +926,182 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 			if (targetEntity) {
 				// Add attribute to the entity
+				// Count existing attributes for this entity
+				const attributeCount = attributes.filter(a => a.entityId === targetEntity.id).length;
+				
+				// Calculate position based on click location relative to entity
+				const entityCenterX = targetEntity.position.x + targetEntity.size.width / 2;
+				const entityCenterY = targetEntity.position.y + targetEntity.size.height / 2;
+				const dx = pos.x - entityCenterX;
+				const dy = pos.y - entityCenterY;
+				
+				// Determine which side was clicked based on angle
+				const angle = Math.atan2(dy, dx);
+				const offset = 60; // Distance from entity edge
+				const spacing = 40; // Vertical spacing between attributes on the same side
+				let side: 'right' | 'bottom' | 'left' | 'top';
+				let basePosition: { x: number; y: number };
+				
+				// Top: -3π/4 to -π/4, Right: -π/4 to π/4, Bottom: π/4 to 3π/4, Left: 3π/4 to -3π/4
+				if (angle >= -Math.PI / 4 && angle < Math.PI / 4) {
+					// Right side
+					side = 'right';
+					basePosition = {
+						x: targetEntity.position.x + targetEntity.size.width + offset,
+						y: targetEntity.position.y + targetEntity.size.height / 2,
+					};
+				} else if (angle >= Math.PI / 4 && angle < (3 * Math.PI) / 4) {
+					// Bottom side
+					side = 'bottom';
+					basePosition = {
+						x: targetEntity.position.x + targetEntity.size.width / 2,
+						y: targetEntity.position.y + targetEntity.size.height + offset,
+					};
+				} else if (angle >= (3 * Math.PI) / 4 || angle < -(3 * Math.PI) / 4) {
+					// Left side
+					side = 'left';
+					basePosition = {
+						x: targetEntity.position.x - offset,
+						y: targetEntity.position.y + targetEntity.size.height / 2,
+					};
+				} else {
+					// Top side
+					side = 'top';
+					basePosition = {
+						x: targetEntity.position.x + targetEntity.size.width / 2,
+						y: targetEntity.position.y - offset,
+					};
+				}
+				
+				// Check for existing attributes on the same side and adjust position
+				const existingAttributesOnSide = attributes.filter(a => {
+					if (a.entityId !== targetEntity.id) return false;
+					
+					// Determine which side this attribute is on
+					const attrDx = a.position.x - entityCenterX;
+					const attrDy = a.position.y - entityCenterY;
+					const attrAngle = Math.atan2(attrDy, attrDx);
+					
+					let attrSide: 'right' | 'bottom' | 'left' | 'top';
+					if (attrAngle >= -Math.PI / 4 && attrAngle < Math.PI / 4) {
+						attrSide = 'right';
+					} else if (attrAngle >= Math.PI / 4 && attrAngle < (3 * Math.PI) / 4) {
+						attrSide = 'bottom';
+					} else if (attrAngle >= (3 * Math.PI) / 4 || attrAngle < -(3 * Math.PI) / 4) {
+						attrSide = 'left';
+					} else {
+						attrSide = 'top';
+					}
+					
+					return attrSide === side;
+				});
+				
+			// Offset the position based on number of existing attributes on this side
+			const attributePosition = { ...basePosition };
+			if (side === 'right' || side === 'left') {
+				// Stack vertically for left/right sides
+				attributePosition.y += existingAttributesOnSide.length * spacing;
+			} else {
+				// Stack horizontally for top/bottom sides
+				attributePosition.x += existingAttributesOnSide.length * spacing;
+			}
+				
 				addAttribute(targetEntity.id, {
-					name: "New Attribute",
+					name: `Attribute ${attributeCount + 1}`,
 					isKey: false,
 					isPartialKey: false,
 					isMultivalued: false,
 					isDerived: false,
-				});
-				// Update position to clicked position after creation
-				// Use a small delay to ensure attribute is created first
-				requestAnimationFrame(() => {
-					const state = useEditorStore.getState();
-					// Find the most recently created attribute for this entity
-					const entityAttributes = state.diagram.attributes.filter(
-						(a) => a.entityId === targetEntity.id
-					);
-					if (entityAttributes.length > 0) {
-						// Get the last one (most recently added)
-						const newAttribute = entityAttributes[entityAttributes.length - 1];
-						if (newAttribute && newAttribute.name === "New Attribute") {
-							updateAttributePosition(newAttribute.id, pos);
-						}
-					}
-				});
+				}, attributePosition);
 			} else if (targetRelationship) {
 				// Add attribute to the relationship
+				// Count existing attributes for this relationship
+				const attributeCount = attributes.filter(a => a.relationshipId === targetRelationship.id).length;
+				
+				// Calculate position based on click location relative to relationship
+				const relCenterX = targetRelationship.position.x + targetRelationship.size.width / 2;
+				const relCenterY = targetRelationship.position.y + targetRelationship.size.height / 2;
+				const dx = pos.x - relCenterX;
+				const dy = pos.y - relCenterY;
+				
+				// Determine which side was clicked based on angle
+				const angle = Math.atan2(dy, dx);
+				const offset = 60; // Distance from relationship edge
+				const spacing = 40; // Vertical spacing between attributes on the same side
+				let side: 'right' | 'bottom' | 'left' | 'top';
+				let basePosition: { x: number; y: number };
+				
+				// Top: -3π/4 to -π/4, Right: -π/4 to π/4, Bottom: π/4 to 3π/4, Left: 3π/4 to -3π/4
+				if (angle >= -Math.PI / 4 && angle < Math.PI / 4) {
+					// Right side
+					side = 'right';
+					basePosition = {
+						x: targetRelationship.position.x + targetRelationship.size.width + offset,
+						y: targetRelationship.position.y + targetRelationship.size.height / 2,
+					};
+				} else if (angle >= Math.PI / 4 && angle < (3 * Math.PI) / 4) {
+					// Bottom side
+					side = 'bottom';
+					basePosition = {
+						x: targetRelationship.position.x + targetRelationship.size.width / 2,
+						y: targetRelationship.position.y + targetRelationship.size.height + offset,
+					};
+				} else if (angle >= (3 * Math.PI) / 4 || angle < -(3 * Math.PI) / 4) {
+					// Left side
+					side = 'left';
+					basePosition = {
+						x: targetRelationship.position.x - offset,
+						y: targetRelationship.position.y + targetRelationship.size.height / 2,
+					};
+				} else {
+					// Top side
+					side = 'top';
+					basePosition = {
+						x: targetRelationship.position.x + targetRelationship.size.width / 2,
+						y: targetRelationship.position.y - offset,
+					};
+				}
+				
+				// Check for existing attributes on the same side and adjust position
+				const existingAttributesOnSide = attributes.filter(a => {
+					if (a.relationshipId !== targetRelationship.id) return false;
+					
+					// Determine which side this attribute is on
+					const attrDx = a.position.x - relCenterX;
+					const attrDy = a.position.y - relCenterY;
+					const attrAngle = Math.atan2(attrDy, attrDx);
+					
+					let attrSide: 'right' | 'bottom' | 'left' | 'top';
+					if (attrAngle >= -Math.PI / 4 && attrAngle < Math.PI / 4) {
+						attrSide = 'right';
+					} else if (attrAngle >= Math.PI / 4 && attrAngle < (3 * Math.PI) / 4) {
+						attrSide = 'bottom';
+					} else if (attrAngle >= (3 * Math.PI) / 4 || attrAngle < -(3 * Math.PI) / 4) {
+						attrSide = 'left';
+					} else {
+						attrSide = 'top';
+					}
+					
+					return attrSide === side;
+				});
+				
+			// Offset the position based on number of existing attributes on this side
+			const attributePosition = { ...basePosition };
+			if (side === 'right' || side === 'left') {
+				// Stack vertically for left/right sides
+				attributePosition.y += existingAttributesOnSide.length * spacing;
+			} else {
+				// Stack horizontally for top/bottom sides
+				attributePosition.x += existingAttributesOnSide.length * spacing;
+			}
+				
 				addRelationshipAttribute(targetRelationship.id, {
-					name: "New Attribute",
+					name: `Attribute ${attributeCount + 1}`,
 					isKey: false,
 					isPartialKey: false,
 					isMultivalued: false,
 					isDerived: false,
-				});
-				// Update position to clicked position after creation
-				// Use a small delay to ensure attribute is created first
-				requestAnimationFrame(() => {
-					const state = useEditorStore.getState();
-					// Find the most recently created attribute for this relationship
-					const relationshipAttributes = state.diagram.attributes.filter(
-						(a) => a.relationshipId === targetRelationship.id
-					);
-					if (relationshipAttributes.length > 0) {
-						// Get the last one (most recently added)
-						const newAttribute =
-							relationshipAttributes[relationshipAttributes.length - 1];
-						if (newAttribute && newAttribute.name === "New Attribute") {
-							updateAttributePosition(newAttribute.id, pos);
-						}
-					}
-				});
+				}, attributePosition);
 			}
 			return;
 		}
@@ -942,8 +1109,10 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		if (e.target === e.target.getStage()) {
 			if (mode === "entity") {
 				addEntity(pos);
-			} else if (mode === "relationship") {
+			} else if (mode === "relationship" || mode === "relationship-1-1" || mode === "relationship-1-n" || mode === "relationship-n-n") {
 				addRelationship(pos);
+				// Store the relationship type for later use when creating connections
+				// The cardinality will be set when connections are made
 			} else if (
 				mode === "line" ||
 				mode === "arrow-left" ||

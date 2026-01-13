@@ -3,6 +3,7 @@ import { Group, Line, Text, Circle } from "react-konva";
 import type { Connection } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getThemeColorsSync } from "../../lib/themeColors";
+import { convertToOrthogonalPath } from "../../lib/utils";
 import Konva from "konva";
 
 interface ConnectionShapeProps {
@@ -107,16 +108,25 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	const toPos = getConnectionPointPosition(toElement, toPoint);
 
 	// Build points array: from -> waypoints -> to
-	const points: number[] = [fromPos.x, fromPos.y];
+	const straightPoints: number[] = [fromPos.x, fromPos.y];
 	waypoints.forEach((wp) => {
-		points.push(wp.x, wp.y);
+		straightPoints.push(wp.x, wp.y);
 	});
-	points.push(toPos.x, toPos.y);
+	straightPoints.push(toPos.x, toPos.y);
+
+	// Convert to orthogonal path (horizontal + vertical only) - matches Java app behavior
+	// Pass edge information for smart routing (filter out 'center' as it's not a valid edge)
+	const points = convertToOrthogonalPath(
+		straightPoints,
+		fromPoint !== "center" ? fromPoint : undefined,
+		toPoint !== "center" ? toPoint : undefined
+	);
 
 	// Calculate label position (default to midpoint if not set)
+	// Use original straight points for label positioning to keep it centered
 	const defaultLabelPos = {
-		x: (points[0] + points[points.length - 2]) / 2,
-		y: (points[1] + points[points.length - 1]) / 2,
+		x: (straightPoints[0] + straightPoints[straightPoints.length - 2]) / 2,
+		y: (straightPoints[1] + straightPoints[straightPoints.length - 1]) / 2,
 	};
 	const labelPos = labelPosition || defaultLabelPos;
 
@@ -141,54 +151,23 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 
 	// Determine stroke style
 	const strokeColor = selected ? "#3b82f6" : colors.stroke;
-	const strokeWidth = selected ? 2.5 : 2;
+	const strokeWidth = selected ? 2 : 1.5;
 	const isTotalParticipation = participation === "total";
 
-	// Calculate offset points for double line (perpendicular to each segment)
-	const getOffsetPoints = (
-		originalPoints: number[],
-		offset: number
-	): number[] => {
-		if (originalPoints.length < 4) return originalPoints;
+	// Simple approach: just shift all points by a fixed amount
+	const getParallelLine = (): number[] => {
+		if (points.length < 4) return points;
 
-		const offsetPoints: number[] = [];
+		const parallelPoints: number[] = [];
+		const offset = 5; // Fixed offset in pixels
 
-		// Process each segment
-		for (let i = 0; i < originalPoints.length - 2; i += 2) {
-			const x1 = originalPoints[i];
-			const y1 = originalPoints[i + 1];
-			const x2 = originalPoints[i + 2];
-			const y2 = originalPoints[i + 3];
-
-			// Calculate direction vector
-			const dx = x2 - x1;
-			const dy = y2 - y1;
-			const length = Math.sqrt(dx * dx + dy * dy);
-
-			if (length > 0.1) {
-				// Perpendicular vector (normalized, pointing to the right side)
-				const perpX = -dy / length;
-				const perpY = dx / length;
-
-				// Apply offset to start point (only for first segment)
-				if (i === 0) {
-					offsetPoints.push(x1 + perpX * offset, y1 + perpY * offset);
-				}
-				// Apply offset to end point
-				offsetPoints.push(x2 + perpX * offset, y2 + perpY * offset);
-			} else {
-				// Degenerate segment, just copy points
-				if (i === 0) {
-					offsetPoints.push(x1, y1);
-				}
-				offsetPoints.push(x2, y2);
-			}
+		// Just shift all points by offset diagonally (right and down)
+		for (let i = 0; i < points.length; i += 2) {
+			parallelPoints.push(points[i] + offset, points[i + 1] + offset);
 		}
 
-		return offsetPoints;
+		return parallelPoints;
 	};
-
-	const offsetDistance = 3; // Distance between double lines in pixels
 
 	return (
 		<Group ref={groupRef} listening={true}>
@@ -197,6 +176,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 				points={points}
 				stroke={strokeColor}
 				strokeWidth={strokeWidth}
+				hitStrokeWidth={10}
 				lineCap="round"
 				lineJoin="round"
 				onClick={handleClick}
@@ -205,18 +185,17 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 				shadowOpacity={0.3}
 			/>
 
-			{/* Second line for total participation (double line) */}
+			{/* Parallel line for total participation (double line) */}
 			{isTotalParticipation && (
 				<Line
-					points={getOffsetPoints(points, offsetDistance)}
+					points={getParallelLine()}
 					stroke={strokeColor}
 					strokeWidth={strokeWidth}
 					lineCap="round"
 					lineJoin="round"
 					onClick={handleClick}
-					shadowEnabled={selected}
-					shadowBlur={5}
-					shadowOpacity={0.3}
+					hitStrokeWidth={10}
+					listening={false}
 				/>
 			)}
 

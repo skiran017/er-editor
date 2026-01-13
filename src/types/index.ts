@@ -36,6 +36,8 @@ export interface Attribute extends BaseElement {
   entityId?: string; // Parent entity ID (optional - can be on relationship)
   relationshipId?: string; // Parent relationship ID (optional - for relationship attributes)
   type: 'attribute';
+  hasWarning?: boolean; // Indicates if attribute has validation warnings
+  warnings?: string[]; // List of warning messages
 }
 
 export interface Entity extends BaseElement {
@@ -45,6 +47,8 @@ export interface Entity extends BaseElement {
   isWeak: boolean;
   size: Size;
   rotation?: number;
+  hasWarning?: boolean; // Indicates if entity has validation warnings
+  warnings?: string[]; // List of warning messages
 }
 
 export interface Relationship extends BaseElement {
@@ -57,6 +61,8 @@ export interface Relationship extends BaseElement {
   isWeak: boolean; // Weak/identifying relationship (double border)
   size: Size;
   rotation?: number;
+  hasWarning?: boolean; // Indicates if relationship has validation warnings
+  warnings?: string[]; // List of warning messages
 }
 
 // Connection point on an element (which edge/side)
@@ -121,7 +127,7 @@ export interface EditorState {
     scale: number;
     position: Position;
   };
-  mode: 'select' | 'pan' | 'entity' | 'relationship' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connect';
+  mode: 'select' | 'pan' | 'entity' | 'relationship' | 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connect';
   drawingLine: {
     isDrawing: boolean;
     startPoint: Position | null;
@@ -134,6 +140,9 @@ export interface EditorState {
     currentPoint: Position | null;
     waypoints: Position[];
   };
+  nextEntityNumber: number;
+  nextRelationshipNumber: number;
+  validationEnabled: boolean; // Whether validation is enabled (controlled via query param)
 }
 
 export interface ValidationError {

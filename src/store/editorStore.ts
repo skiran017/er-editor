@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
-import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram } from '../types';
+import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram, ValidationError } from '../types';
+import { getClosestEdge, getBestAvailableEdge } from '../lib/utils';
+import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram } from '../lib/validation';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -10,8 +12,8 @@ interface EditorStore extends EditorState {
   deleteEntity: (id: string) => void;
 
   // Attribute actions
-  addAttribute: (entityId: string, attribute: Omit<EntityAttribute, 'id'>) => void;
-  addRelationshipAttribute: (relationshipId: string, attribute: Omit<EntityAttribute, 'id'>) => void;
+  addAttribute: (entityId: string, attribute: Omit<EntityAttribute, 'id'>, customPosition?: Position) => void;
+  addRelationshipAttribute: (relationshipId: string, attribute: Omit<EntityAttribute, 'id'>, customPosition?: Position) => void;
   updateAttribute: (entityId: string, attributeId: string, updates: Partial<EntityAttribute>) => void;
   updateAttributeById: (attributeId: string, updates: Partial<Attribute>) => void;
   deleteAttribute: (entityId: string, attributeId: string) => void;
@@ -52,6 +54,13 @@ interface EditorStore extends EditorState {
 
   // Mode actions
   setMode: (mode: EditorState['mode']) => void;
+
+  // Validation actions
+  setValidationEnabled: (enabled: boolean) => void;
+  validateElement: (id: string) => void;
+  validateAll: () => void;
+  getValidationErrors: () => ValidationError[];
+  clearWarnings: (id: string) => void;
 
   // Drawing state actions
   setDrawingLine: (isDrawing: boolean, startPoint?: Position | null, currentPoint?: Position | null) => void;
@@ -110,6 +119,146 @@ const getConnectionPointPosition = (element: Entity | Relationship, point: Conne
   }
 };
 
+/**
+ * Auto-adjust connection points when an element moves
+ * Finds all connections involving the moved element and recalculates the closest edges
+ */
+const updateConnectionPointsOnMove = (
+  state: EditorState,
+  movedElementId: string,
+  movedElement: Entity | Relationship
+): void => {
+  // Find all connections involving this element
+  const connections = state.diagram.connections.filter(
+    (conn) => conn.fromId === movedElementId || conn.toId === movedElementId
+  );
+
+  connections.forEach((connection) => {
+    // Find the other element in the connection
+    const otherElementId = connection.fromId === movedElementId
+      ? connection.toId
+      : connection.fromId;
+
+    const otherElement = state.diagram.entities.find(e => e.id === otherElementId) ||
+      state.diagram.relationships.find(r => r.id === otherElementId);
+
+    if (!otherElement) return;
+
+    // Calculate centers for both elements
+    const movedCenter = {
+      x: movedElement.position.x + movedElement.size.width / 2,
+      y: movedElement.position.y + movedElement.size.height / 2,
+    };
+    const otherCenter = {
+      x: otherElement.position.x + otherElement.size.width / 2,
+      y: otherElement.position.y + otherElement.size.height / 2,
+    };
+
+    // Determine new closest edges
+    // For relationships, use edge distribution to avoid overlapping connections
+    // For entities, use closest edge
+    let newFromPoint: ConnectionPoint;
+    let newToPoint: ConnectionPoint;
+
+    if (connection.fromId === movedElementId) {
+      // Moved element is the source (fromId)
+      // Find which edge of movedElement is closest to otherElement's center
+      if (movedElement.type === 'relationship') {
+        // Use edge distribution for relationships
+        newFromPoint = getBestAvailableEdge(
+          movedElementId,
+          state.diagram.connections.filter(c => c.id !== connection.id), // Exclude current connection
+          otherCenter,
+          movedElement
+        ) as ConnectionPoint;
+      } else {
+        newFromPoint = getClosestEdge(otherCenter, {
+          position: movedElement.position,
+          size: movedElement.size,
+        }) as ConnectionPoint;
+      }
+
+      // Find which edge of otherElement is closest to movedElement's center
+      if (otherElement.type === 'relationship') {
+        // Use edge distribution for relationships
+        newToPoint = getBestAvailableEdge(
+          otherElementId,
+          state.diagram.connections.filter(c => c.id !== connection.id), // Exclude current connection
+          movedCenter,
+          otherElement
+        ) as ConnectionPoint;
+      } else {
+        newToPoint = getClosestEdge(movedCenter, {
+          position: otherElement.position,
+          size: otherElement.size,
+        }) as ConnectionPoint;
+      }
+    } else {
+      // Moved element is the target (toId)
+      // Find which edge of otherElement is closest to movedElement's center
+      if (otherElement.type === 'relationship') {
+        // Use edge distribution for relationships
+        newFromPoint = getBestAvailableEdge(
+          otherElementId,
+          state.diagram.connections.filter(c => c.id !== connection.id), // Exclude current connection
+          movedCenter,
+          otherElement
+        ) as ConnectionPoint;
+      } else {
+        newFromPoint = getClosestEdge(movedCenter, {
+          position: otherElement.position,
+          size: otherElement.size,
+        }) as ConnectionPoint;
+      }
+
+      // Find which edge of movedElement is closest to otherElement's center
+      if (movedElement.type === 'relationship') {
+        // Use edge distribution for relationships
+        newToPoint = getBestAvailableEdge(
+          movedElementId,
+          state.diagram.connections.filter(c => c.id !== connection.id), // Exclude current connection
+          otherCenter,
+          movedElement
+        ) as ConnectionPoint;
+      } else {
+        newToPoint = getClosestEdge(otherCenter, {
+          position: movedElement.position,
+          size: movedElement.size,
+        }) as ConnectionPoint;
+      }
+    }
+
+    // Update connection points
+    connection.fromPoint = newFromPoint;
+    connection.toPoint = newToPoint;
+
+    // Recalculate connection path
+    const fromElement = connection.fromId === movedElementId
+      ? movedElement
+      : otherElement;
+    const toElement = connection.toId === movedElementId
+      ? movedElement
+      : otherElement;
+
+    const fromPos = getConnectionPointPosition(fromElement, connection.fromPoint);
+    const toPos = getConnectionPointPosition(toElement, connection.toPoint);
+
+    // Rebuild points array: from -> waypoints -> to
+    const points: number[] = [fromPos.x, fromPos.y];
+    connection.waypoints.forEach((wp) => {
+      points.push(wp.x, wp.y);
+    });
+    points.push(toPos.x, toPos.y);
+    connection.points = points;
+
+    // Update position (bounding box)
+    connection.position = {
+      x: Math.min(fromPos.x, toPos.x),
+      y: Math.min(fromPos.y, toPos.y),
+    };
+  });
+};
+
 export const useEditorStore = create<EditorStore>()(
   temporal(
     immer((set, get) => ({
@@ -144,6 +293,9 @@ export const useEditorStore = create<EditorStore>()(
         currentPoint: null,
         waypoints: [],
       },
+      nextEntityNumber: 1,
+      nextRelationshipNumber: 1,
+      validationEnabled: true, // Default: enabled, can be disabled via ?validation=false
 
       // Entity actions
       addEntity: (position) => {
@@ -151,7 +303,7 @@ export const useEditorStore = create<EditorStore>()(
           const newEntity: Entity = {
             id: generateId(),
             type: 'entity',
-            name: 'New Entity',
+            name: `Entity ${state.nextEntityNumber}`,
             position,
             selected: false,
             attributes: [],
@@ -160,6 +312,14 @@ export const useEditorStore = create<EditorStore>()(
             rotation: 0,
           };
           state.diagram.entities.push(newEntity);
+          state.nextEntityNumber += 1;
+
+          // Auto-validate if enabled
+          if (state.validationEnabled) {
+            const warnings = validateEntity(newEntity, state.diagram);
+            newEntity.hasWarning = warnings.length > 0;
+            newEntity.warnings = warnings;
+          }
         });
       },
 
@@ -167,7 +327,34 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const entity = state.diagram.entities.find((e) => e.id === id);
           if (entity) {
+            const positionChanged = updates.position && (
+              updates.position.x !== entity.position.x ||
+              updates.position.y !== entity.position.y
+            );
+
             Object.assign(entity, updates);
+
+            // Auto-adjust connection points if position changed
+            if (positionChanged) {
+              updateConnectionPointsOnMove(state, id, entity);
+            }
+
+            // Auto-validate if enabled
+            if (state.validationEnabled) {
+              const warnings = validateEntity(entity, state.diagram);
+              entity.hasWarning = warnings.length > 0;
+              entity.warnings = warnings;
+
+              // Also validate affected relationships
+              const affectedRelationships = state.diagram.relationships.filter(r =>
+                r.entityIds.includes(id)
+              );
+              for (const rel of affectedRelationships) {
+                const relWarnings = validateRelationship(rel, state.diagram);
+                rel.hasWarning = relWarnings.length > 0;
+                rel.warnings = relWarnings;
+              }
+            }
           }
         });
       },
@@ -189,26 +376,39 @@ export const useEditorStore = create<EditorStore>()(
 
           // Remove from selection
           state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
+
+          // Auto-validate affected relationships if enabled
+          if (state.validationEnabled) {
+            const affectedRelationships = state.diagram.relationships.filter(r =>
+              r.entityIds.includes(id)
+            );
+            for (const rel of affectedRelationships) {
+              const warnings = validateRelationship(rel, state.diagram);
+              rel.hasWarning = warnings.length > 0;
+              rel.warnings = warnings;
+            }
+          }
         });
       },
 
       // Attribute actions
-      addAttribute: (entityId, attribute) => {
+      addAttribute: (entityId, attribute, customPosition) => {
         set((state) => {
           const entity = state.diagram.entities.find((e) => e.id === entityId);
           if (entity) {
             const attributeId = generateId();
-            // Calculate position relative to entity (to the right side)
+            // Calculate position relative to entity (to the right side by default)
             const attributeCount = state.diagram.attributes.filter(a => a.entityId === entityId).length;
+            const defaultPosition = {
+              x: entity.position.x + entity.size.width + 40,
+              y: entity.position.y + 20 + attributeCount * 30,
+            };
             const newAttribute: Attribute = {
               id: attributeId,
               type: 'attribute',
               ...attribute,
               entityId,
-              position: {
-                x: entity.position.x + entity.size.width + 40,
-                y: entity.position.y + 20 + attributeCount * 30,
-              },
+              position: customPosition || defaultPosition,
               selected: false,
             };
             // Add to both entity's attributes array and diagram's attributes array
@@ -221,6 +421,18 @@ export const useEditorStore = create<EditorStore>()(
               isDerived: attribute.isDerived,
             });
             state.diagram.attributes.push(newAttribute);
+
+            // Auto-validate if enabled
+            if (state.validationEnabled) {
+              const warnings = validateAttribute(newAttribute, state.diagram);
+              newAttribute.hasWarning = warnings.length > 0;
+              newAttribute.warnings = warnings;
+
+              // Also validate parent entity
+              const entityWarnings = validateEntity(entity, state.diagram);
+              entity.hasWarning = entityWarnings.length > 0;
+              entity.warnings = entityWarnings;
+            }
           }
         });
       },
@@ -244,6 +456,20 @@ export const useEditorStore = create<EditorStore>()(
             if (updates.isPartialKey !== undefined) canvasAttribute.isPartialKey = updates.isPartialKey;
             if (updates.isMultivalued !== undefined) canvasAttribute.isMultivalued = updates.isMultivalued;
             if (updates.isDerived !== undefined) canvasAttribute.isDerived = updates.isDerived;
+
+            // Auto-validate if enabled
+            if (state.validationEnabled) {
+              const warnings = validateAttribute(canvasAttribute, state.diagram);
+              canvasAttribute.hasWarning = warnings.length > 0;
+              canvasAttribute.warnings = warnings;
+
+              // Also validate parent entity
+              if (entity) {
+                const entityWarnings = validateEntity(entity, state.diagram);
+                entity.hasWarning = entityWarnings.length > 0;
+                entity.warnings = entityWarnings;
+              }
+            }
           }
         });
       },
@@ -256,6 +482,13 @@ export const useEditorStore = create<EditorStore>()(
           }
           // Also remove from canvas attributes
           state.diagram.attributes = state.diagram.attributes.filter((a) => a.id !== attributeId);
+
+          // Auto-validate parent entity if enabled
+          if (state.validationEnabled && entity) {
+            const warnings = validateEntity(entity, state.diagram);
+            entity.hasWarning = warnings.length > 0;
+            entity.warnings = warnings;
+          }
         });
       },
 
@@ -265,26 +498,31 @@ export const useEditorStore = create<EditorStore>()(
           const attribute = state.diagram.attributes.find((a) => a.id === attributeId);
           if (attribute) {
             attribute.position = position;
+
+            // Note: Attributes use lines (not connections) that are calculated dynamically in AttributeShape
+            // The line automatically updates when attribute or parent position changes
+            // No explicit connection point adjustment needed for attributes
           }
         });
       },
 
-      addRelationshipAttribute: (relationshipId, attribute) => {
+      addRelationshipAttribute: (relationshipId, attribute, customPosition) => {
         set((state) => {
           const relationship = state.diagram.relationships.find((r) => r.id === relationshipId);
           if (relationship) {
             const attributeId = generateId();
-            // Calculate position relative to relationship (to the right side)
+            // Calculate position relative to relationship (to the right side by default)
             const attributeCount = state.diagram.attributes.filter(a => a.relationshipId === relationshipId).length;
+            const defaultPosition = {
+              x: relationship.position.x + relationship.size.width + 40,
+              y: relationship.position.y + 20 + attributeCount * 30,
+            };
             const newAttribute: Attribute = {
               id: attributeId,
               type: 'attribute',
               ...attribute,
               relationshipId,
-              position: {
-                x: relationship.position.x + relationship.size.width + 40,
-                y: relationship.position.y + 20 + attributeCount * 30,
-              },
+              position: customPosition || defaultPosition,
               selected: false,
             };
             // Add to both relationship's attributes array and diagram's attributes array
@@ -333,6 +571,31 @@ export const useEditorStore = create<EditorStore>()(
                 }
               }
             }
+
+            // Auto-validate if enabled
+            if (state.validationEnabled) {
+              const warnings = validateAttribute(canvasAttribute, state.diagram);
+              canvasAttribute.hasWarning = warnings.length > 0;
+              canvasAttribute.warnings = warnings;
+
+              // Also validate parent entity or relationship
+              if (canvasAttribute.entityId) {
+                const entity = state.diagram.entities.find((e) => e.id === canvasAttribute.entityId);
+                if (entity) {
+                  const entityWarnings = validateEntity(entity, state.diagram);
+                  entity.hasWarning = entityWarnings.length > 0;
+                  entity.warnings = entityWarnings;
+                }
+              }
+              if (canvasAttribute.relationshipId) {
+                const relationship = state.diagram.relationships.find((r) => r.id === canvasAttribute.relationshipId);
+                if (relationship) {
+                  const relWarnings = validateRelationship(relationship, state.diagram);
+                  relationship.hasWarning = relWarnings.length > 0;
+                  relationship.warnings = relWarnings;
+                }
+              }
+            }
           }
         });
       },
@@ -358,6 +621,26 @@ export const useEditorStore = create<EditorStore>()(
           }
           // Remove from canvas attributes
           state.diagram.attributes = state.diagram.attributes.filter((a) => a.id !== attributeId);
+
+          // Auto-validate parent if enabled
+          if (state.validationEnabled && canvasAttribute) {
+            if (canvasAttribute.entityId) {
+              const entity = state.diagram.entities.find((e) => e.id === canvasAttribute.entityId);
+              if (entity) {
+                const warnings = validateEntity(entity, state.diagram);
+                entity.hasWarning = warnings.length > 0;
+                entity.warnings = warnings;
+              }
+            }
+            if (canvasAttribute.relationshipId) {
+              const relationship = state.diagram.relationships.find((r) => r.id === canvasAttribute.relationshipId);
+              if (relationship) {
+                const warnings = validateRelationship(relationship, state.diagram);
+                relationship.hasWarning = warnings.length > 0;
+                relationship.warnings = warnings;
+              }
+            }
+          }
         });
       },
 
@@ -367,7 +650,7 @@ export const useEditorStore = create<EditorStore>()(
           const newRelationship: Relationship = {
             id: generateId(),
             type: 'relationship',
-            name: 'New Relationship',
+            name: `Relationship ${state.nextRelationshipNumber}`,
             position,
             selected: false,
             entityIds: [],
@@ -379,6 +662,14 @@ export const useEditorStore = create<EditorStore>()(
             rotation: 0,
           };
           state.diagram.relationships.push(newRelationship);
+          state.nextRelationshipNumber += 1;
+
+          // Auto-validate if enabled
+          if (state.validationEnabled) {
+            const warnings = validateRelationship(newRelationship, state.diagram);
+            newRelationship.hasWarning = warnings.length > 0;
+            newRelationship.warnings = warnings;
+          }
         });
       },
 
@@ -386,7 +677,24 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const relationship = state.diagram.relationships.find((r) => r.id === id);
           if (relationship) {
+            const positionChanged = updates.position && (
+              updates.position.x !== relationship.position.x ||
+              updates.position.y !== relationship.position.y
+            );
+
             Object.assign(relationship, updates);
+
+            // Auto-adjust connection points if position changed
+            if (positionChanged) {
+              updateConnectionPointsOnMove(state, id, relationship);
+            }
+
+            // Auto-validate if enabled
+            if (state.validationEnabled) {
+              const warnings = validateRelationship(relationship, state.diagram);
+              relationship.hasWarning = warnings.length > 0;
+              relationship.warnings = warnings;
+            }
           }
         });
       },
@@ -400,11 +708,30 @@ export const useEditorStore = create<EditorStore>()(
             (c) => c.fromId !== id && c.toId !== id
           );
           state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
+
+          // Auto-validate affected entities if enabled
+          if (state.validationEnabled) {
+            // Find entities that were connected to this relationship
+            const affectedEntityIds = new Set<string>();
+            state.diagram.connections.forEach(conn => {
+              if (conn.fromId === id) affectedEntityIds.add(conn.toId);
+              if (conn.toId === id) affectedEntityIds.add(conn.fromId);
+            });
+
+            for (const entityId of affectedEntityIds) {
+              const entity = state.diagram.entities.find(e => e.id === entityId);
+              if (entity) {
+                const warnings = validateEntity(entity, state.diagram);
+                entity.hasWarning = warnings.length > 0;
+                entity.warnings = warnings;
+              }
+            }
+          }
         });
       },
 
       // Connection actions
-      addConnection: (fromId, toId, fromPoint = 'right' as ConnectionPoint, toPoint = 'left' as ConnectionPoint, waypoints = [] as Position[], style = 'straight' as ConnectionStyle) => {
+      addConnection: (fromId, toId, fromPoint = 'right' as ConnectionPoint, toPoint = 'left' as ConnectionPoint, waypoints = [] as Position[], style = 'orthogonal' as ConnectionStyle) => {
         set((state) => {
           const fromElement = state.diagram.entities.find(e => e.id === fromId) ||
             state.diagram.relationships.find(r => r.id === fromId);
@@ -451,6 +778,33 @@ export const useEditorStore = create<EditorStore>()(
               fromElement.entityIds.push(toId);
             }
           }
+
+          // Auto-validate if enabled
+          if (state.validationEnabled) {
+            // Validate connection
+            validateConnection(newConnection, state.diagram);
+
+            // Validate both connected elements
+            if (fromElement.type === 'entity') {
+              const warnings = validateEntity(fromElement, state.diagram);
+              fromElement.hasWarning = warnings.length > 0;
+              fromElement.warnings = warnings;
+            } else if (fromElement.type === 'relationship') {
+              const warnings = validateRelationship(fromElement, state.diagram);
+              fromElement.hasWarning = warnings.length > 0;
+              fromElement.warnings = warnings;
+            }
+
+            if (toElement.type === 'entity') {
+              const warnings = validateEntity(toElement, state.diagram);
+              toElement.hasWarning = warnings.length > 0;
+              toElement.warnings = warnings;
+            } else if (toElement.type === 'relationship') {
+              const warnings = validateRelationship(toElement, state.diagram);
+              toElement.hasWarning = warnings.length > 0;
+              toElement.warnings = warnings;
+            }
+          }
         });
       },
 
@@ -478,6 +832,11 @@ export const useEditorStore = create<EditorStore>()(
                 connection.points = points;
               }
             }
+
+            // Auto-validate if enabled
+            if (state.validationEnabled) {
+              validateConnection(connection, state.diagram);
+            }
           }
         });
       },
@@ -485,11 +844,14 @@ export const useEditorStore = create<EditorStore>()(
       deleteConnection: (id) => {
         set((state) => {
           const connection = state.diagram.connections.find(c => c.id === id);
+          let fromElement: Entity | Relationship | undefined;
+          let toElement: Entity | Relationship | undefined;
+
           if (connection) {
             // Remove from relationship entityIds
-            const fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
+            fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
               state.diagram.relationships.find(r => r.id === connection.fromId);
-            const toElement = state.diagram.entities.find(e => e.id === connection.toId) ||
+            toElement = state.diagram.entities.find(e => e.id === connection.toId) ||
               state.diagram.relationships.find(r => r.id === connection.toId);
 
             if (fromElement?.type === 'relationship' && toElement?.type === 'entity') {
@@ -503,6 +865,29 @@ export const useEditorStore = create<EditorStore>()(
             (c) => c.id !== id
           );
           state.selectedIds = state.selectedIds.filter(sid => sid !== id);
+
+          // Auto-validate both connected elements if enabled
+          if (state.validationEnabled && connection) {
+            if (fromElement?.type === 'entity') {
+              const warnings = validateEntity(fromElement, state.diagram);
+              fromElement.hasWarning = warnings.length > 0;
+              fromElement.warnings = warnings;
+            } else if (fromElement?.type === 'relationship') {
+              const warnings = validateRelationship(fromElement, state.diagram);
+              fromElement.hasWarning = warnings.length > 0;
+              fromElement.warnings = warnings;
+            }
+
+            if (toElement?.type === 'entity') {
+              const warnings = validateEntity(toElement, state.diagram);
+              toElement.hasWarning = warnings.length > 0;
+              toElement.warnings = warnings;
+            } else if (toElement?.type === 'relationship') {
+              const warnings = validateRelationship(toElement, state.diagram);
+              toElement.hasWarning = warnings.length > 0;
+              toElement.warnings = warnings;
+            }
+          }
         });
       },
 
@@ -795,6 +1180,96 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      // Validation actions
+      setValidationEnabled: (enabled) => {
+        set((state) => {
+          state.validationEnabled = enabled;
+        });
+      },
+
+      validateElement: (id) => {
+        set((state) => {
+          if (!state.validationEnabled) return;
+
+          const element = state.diagram.entities.find(e => e.id === id) ||
+            state.diagram.relationships.find(r => r.id === id) ||
+            state.diagram.attributes.find(a => a.id === id) ||
+            state.diagram.connections.find(c => c.id === id);
+
+          if (!element) return;
+
+          let warnings: string[] = [];
+
+          if (element.type === 'entity') {
+            warnings = validateEntity(element, state.diagram);
+            element.hasWarning = warnings.length > 0;
+            element.warnings = warnings;
+          } else if (element.type === 'relationship') {
+            warnings = validateRelationship(element, state.diagram);
+            element.hasWarning = warnings.length > 0;
+            element.warnings = warnings;
+          } else if (element.type === 'attribute') {
+            warnings = validateAttribute(element, state.diagram);
+            element.hasWarning = warnings.length > 0;
+            element.warnings = warnings;
+          } else if (element.type === 'connection') {
+            warnings = validateConnection(element, state.diagram);
+            // Connections don't have hasWarning/warnings fields, but we can still validate
+          }
+        });
+      },
+
+      validateAll: () => {
+        set((state) => {
+          if (!state.validationEnabled) return;
+
+          // Validate all entities
+          for (const entity of state.diagram.entities) {
+            const warnings = validateEntity(entity, state.diagram);
+            entity.hasWarning = warnings.length > 0;
+            entity.warnings = warnings;
+          }
+
+          // Validate all relationships
+          for (const relationship of state.diagram.relationships) {
+            const warnings = validateRelationship(relationship, state.diagram);
+            relationship.hasWarning = warnings.length > 0;
+            relationship.warnings = warnings;
+          }
+
+          // Validate all attributes
+          for (const attribute of state.diagram.attributes) {
+            const warnings = validateAttribute(attribute, state.diagram);
+            attribute.hasWarning = warnings.length > 0;
+            attribute.warnings = warnings;
+          }
+
+          // Validate all connections (they don't have warning fields, but we validate for completeness)
+          for (const connection of state.diagram.connections) {
+            validateConnection(connection, state.diagram);
+          }
+        });
+      },
+
+      getValidationErrors: (): ValidationError[] => {
+        const state = get();
+        if (!state.validationEnabled) return [];
+        return validateDiagram(state.diagram);
+      },
+
+      clearWarnings: (id) => {
+        set((state) => {
+          const element = state.diagram.entities.find(e => e.id === id) ||
+            state.diagram.relationships.find(r => r.id === id) ||
+            state.diagram.attributes.find(a => a.id === id);
+
+          if (element && (element.type === 'entity' || element.type === 'relationship' || element.type === 'attribute')) {
+            element.hasWarning = false;
+            element.warnings = [];
+          }
+        });
+      },
+
       // Drawing state actions
       setDrawingLine: (isDrawing: boolean, startPoint: Position | null = null, currentPoint: Position | null = null) => {
         set((state) => {
@@ -828,6 +1303,25 @@ export const useEditorStore = create<EditorStore>()(
               attributes: [...diagram.attributes],
             };
             state.selectedIds = [];
+
+            // Update counters based on loaded entities/relationships
+            // Find the highest number in entity names
+            const entityNumbers = diagram.entities
+              .map(e => {
+                const match = e.name.match(/Entity (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(n => n > 0);
+            state.nextEntityNumber = entityNumbers.length > 0 ? Math.max(...entityNumbers) + 1 : 1;
+
+            // Find the highest number in relationship names
+            const relationshipNumbers = diagram.relationships
+              .map(r => {
+                const match = r.name.match(/Relationship (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(n => n > 0);
+            state.nextRelationshipNumber = relationshipNumbers.length > 0 ? Math.max(...relationshipNumbers) + 1 : 1;
           } else {
             // Merge with existing diagram
             state.diagram.entities.push(...diagram.entities);
@@ -836,6 +1330,52 @@ export const useEditorStore = create<EditorStore>()(
             state.diagram.lines.push(...diagram.lines);
             state.diagram.arrows.push(...diagram.arrows);
             state.diagram.attributes.push(...diagram.attributes);
+
+            // Update counters for merged content too
+            const allEntityNumbers = state.diagram.entities
+              .map(e => {
+                const match = e.name.match(/Entity (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(n => n > 0);
+            state.nextEntityNumber = allEntityNumbers.length > 0 ? Math.max(...allEntityNumbers) + 1 : state.nextEntityNumber;
+
+            const allRelationshipNumbers = state.diagram.relationships
+              .map(r => {
+                const match = r.name.match(/Relationship (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+              })
+              .filter(n => n > 0);
+            state.nextRelationshipNumber = allRelationshipNumbers.length > 0 ? Math.max(...allRelationshipNumbers) + 1 : state.nextRelationshipNumber;
+          }
+
+          // Auto-validate all elements if enabled
+          if (state.validationEnabled) {
+            // Validate all entities
+            for (const entity of state.diagram.entities) {
+              const warnings = validateEntity(entity, state.diagram);
+              entity.hasWarning = warnings.length > 0;
+              entity.warnings = warnings;
+            }
+
+            // Validate all relationships
+            for (const relationship of state.diagram.relationships) {
+              const warnings = validateRelationship(relationship, state.diagram);
+              relationship.hasWarning = warnings.length > 0;
+              relationship.warnings = warnings;
+            }
+
+            // Validate all attributes
+            for (const attribute of state.diagram.attributes) {
+              const warnings = validateAttribute(attribute, state.diagram);
+              attribute.hasWarning = warnings.length > 0;
+              attribute.warnings = warnings;
+            }
+
+            // Validate all connections (they don't have warning fields, but we validate for completeness)
+            for (const connection of state.diagram.connections) {
+              validateConnection(connection, state.diagram);
+            }
           }
         });
       },

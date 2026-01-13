@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Group, Line, Text } from "react-konva";
+import { Group, Line, Text, Circle } from "react-konva";
 import type { Relationship, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
-import { getClosestEdge } from "../../lib/utils";
+import { getClosestEdge, getBestAvailableEdge } from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
 import Konva from "konva";
 
@@ -14,11 +14,15 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	relationship,
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
+	const textRef = useRef<Konva.Text>(null);
+	const [isEditing, setIsEditing] = useState(false);
 	const updateRelationship = useEditorStore(
 		(state) => state.updateRelationship
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
+	const diagram = useEditorStore((state) => state.diagram);
+	const viewport = useEditorStore((state) => state.viewport);
 
 	const {
 		id,
@@ -28,7 +32,11 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		size,
 		isWeak,
 		rotation = 0,
+		hasWarning,
+		warnings,
 	} = relationship;
+	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
+	const warningTooltipRef = useRef<HTMLDivElement | null>(null);
 
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
@@ -45,6 +53,97 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		});
 		return () => observer.disconnect();
 	}, []);
+
+	// Handle warning tooltip - use requestAnimationFrame to avoid rendering conflicts
+	useEffect(() => {
+		if (!hasWarning) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		if (!showWarningTooltip) {
+			if (warningTooltipRef.current) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+			return;
+		}
+
+		// Use requestAnimationFrame to ensure DOM is ready and avoid rendering conflicts
+		const rafId = requestAnimationFrame(() => {
+			const groupNode = groupRef.current;
+			const stage = groupNode?.getStage();
+			if (!groupNode || !stage) return;
+
+			// Get absolute screen position of warning badge (accounts for zoom and pan)
+			// Badge is at (width - 10, 10) relative to the group
+			const badgeRelativePos = { x: width - 10, y: 10 };
+			const badgeAbsolutePos = groupNode.getAbsolutePosition();
+			const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+			const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+			
+			const stageBox = stage.container().getBoundingClientRect();
+
+			// Create tooltip element
+			const tooltip = document.createElement('div');
+			tooltip.setAttribute('data-warning-tooltip', 'true');
+			tooltip.style.position = 'absolute';
+			tooltip.style.top = `${stageBox.top + badgeScreenY + 20}px`;
+			tooltip.style.left = `${stageBox.left + badgeScreenX - 140}px`;
+			tooltip.style.backgroundColor = '#fee2e2';
+			tooltip.style.border = '1px solid #ef4444';
+			tooltip.style.borderRadius = '4px';
+			tooltip.style.padding = '8px 12px';
+			tooltip.style.zIndex = '1000';
+			tooltip.style.maxWidth = '300px';
+			tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+			tooltip.style.fontSize = '12px';
+			tooltip.style.color = '#991b1b';
+			tooltip.style.pointerEvents = 'none'; // Don't interfere with canvas
+			const currentWarnings = warnings || [];
+			tooltip.innerHTML = `<strong>Validation Warnings:</strong><ul style="margin: 4px 0 0 0; padding-left: 20px;">${currentWarnings.map(w => `<li>${w}</li>`).join('') || ''}</ul>`;
+			
+			document.body.appendChild(tooltip);
+			warningTooltipRef.current = tooltip;
+		});
+
+		// Update tooltip position if it's already visible and viewport changes
+		if (warningTooltipRef.current && showWarningTooltip) {
+			const updateRafId = requestAnimationFrame(() => {
+				const groupNode = groupRef.current;
+				const stage = groupNode?.getStage();
+				if (!groupNode || !stage || !warningTooltipRef.current) return;
+
+				const badgeRelativePos = { x: width - 10, y: 10 };
+				const badgeAbsolutePos = groupNode.getAbsolutePosition();
+				const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
+				const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
+				const stageBox = stage.container().getBoundingClientRect();
+
+				warningTooltipRef.current.style.top = `${stageBox.top + badgeScreenY + 20}px`;
+				warningTooltipRef.current.style.left = `${stageBox.left + badgeScreenX - 140}px`;
+			});
+			return () => {
+				cancelAnimationFrame(rafId);
+				cancelAnimationFrame(updateRafId);
+				if (warningTooltipRef.current?.parentNode) {
+					document.body.removeChild(warningTooltipRef.current);
+					warningTooltipRef.current = null;
+				}
+			};
+		}
+
+		return () => {
+			cancelAnimationFrame(rafId);
+			if (warningTooltipRef.current?.parentNode) {
+				document.body.removeChild(warningTooltipRef.current);
+				warningTooltipRef.current = null;
+			}
+		};
+	}, [hasWarning, showWarningTooltip, viewport.scale, viewport.position.x, viewport.position.y, size.width, size.height, warnings]);
 
 	// Diamond dimensions
 	const width = size.width;
@@ -187,18 +286,65 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			} else {
 				// Complete connection
 				if (drawingConnection.fromId && drawingConnection.fromId !== id) {
-					const toEdge = getClosestEdge(
-						relationshipRelativePos,
-						tempElement
-					) as ConnectionPoint;
-					addConnection(
-						drawingConnection.fromId,
-						id,
-						drawingConnection.fromPoint || "right",
-						toEdge,
-						drawingConnection.waypoints,
-						"straight"
-					);
+					// Find the fromElement (entity or relationship we're connecting from)
+					const fromElement =
+						diagram.entities.find((e) => e.id === drawingConnection.fromId) ||
+						diagram.relationships.find(
+							(r) => r.id === drawingConnection.fromId
+						);
+
+					if (fromElement) {
+						// Calculate the center of the fromElement
+						const fromCenter = {
+							x: fromElement.position.x + fromElement.size.width / 2,
+							y: fromElement.position.y + fromElement.size.height / 2,
+						};
+
+						// Calculate the center of the current relationship (toRelationship)
+						const toCenter = {
+							x: relationship.position.x + relationship.size.width / 2,
+							y: relationship.position.y + relationship.size.height / 2,
+						};
+
+						// For relationships, use edge distribution to avoid overlapping connections
+						// Determine which edge of the current relationship (toRelationship) is best available
+						const toEdge = getBestAvailableEdge(
+							id,
+							diagram.connections,
+							fromCenter,
+							relationship
+						) as ConnectionPoint;
+
+						// For entities connecting to relationship, use closest edge
+						// For relationships connecting to entities, use closest edge
+						const fromEdge = getClosestEdge(
+							toCenter,
+							fromElement
+						) as ConnectionPoint;
+
+						addConnection(
+							drawingConnection.fromId,
+							id,
+							fromEdge,
+							toEdge,
+							drawingConnection.waypoints,
+							"orthogonal"
+						);
+					} else {
+						// Fallback to old behavior if fromElement not found
+						const toEdge = getClosestEdge(
+							relationshipRelativePos,
+							tempElement
+						) as ConnectionPoint;
+						addConnection(
+							drawingConnection.fromId,
+							id,
+							drawingConnection.fromPoint || "right",
+							toEdge,
+							drawingConnection.waypoints,
+							"orthogonal"
+						);
+					}
 					setDrawingConnection(false, null, null, null, []);
 				} else {
 					// Cancel
@@ -213,9 +359,64 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		e.cancelBubble = true;
 	};
 
-	const handleDblClick = () => {
-		// Double-click now just ensures selection (property panel will show)
-		selectElement(id, false);
+	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		// Double-click triggers text editing
+		e.cancelBubble = true;
+		handleTextDblClick(e);
+	};
+
+	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		e.cancelBubble = true;
+		setIsEditing(true);
+		
+		// Create HTML input for editing
+		const textNode = textRef.current;
+		const stage = textNode?.getStage();
+		if (!textNode || !stage) return;
+
+		// Get absolute position of text
+		const textPosition = textNode.getAbsolutePosition();
+		const stageBox = stage.container().getBoundingClientRect();
+		
+		// Create input element
+		const input = document.createElement('input');
+		input.value = name;
+		input.style.position = 'absolute';
+		input.style.top = `${stageBox.top + textPosition.y + height / 2 - 15}px`;
+		input.style.left = `${stageBox.left + textPosition.x}px`;
+		input.style.width = `${width}px`;
+		input.style.height = '30px';
+		input.style.fontSize = '14px';
+		input.style.fontWeight = 'bold';
+		input.style.textAlign = 'center';
+		input.style.border = '2px solid #3b82f6';
+		input.style.borderRadius = '4px';
+		input.style.padding = '4px';
+		input.style.zIndex = '1000';
+		input.style.backgroundColor = 'white';
+		
+		document.body.appendChild(input);
+		input.focus();
+		input.select();
+
+		const removeInput = () => {
+			document.body.removeChild(input);
+			setIsEditing(false);
+		};
+
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				updateRelationship(id, { name: input.value });
+				removeInput();
+			} else if (e.key === 'Escape') {
+				removeInput();
+			}
+		});
+
+		input.addEventListener('blur', () => {
+			updateRelationship(id, { name: input.value });
+			removeInput();
+		});
 	};
 
 	// Diamond points: top, right, bottom, left
@@ -277,11 +478,11 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				shadowOpacity={0.3}
 				onClick={handleClick}
 				onTap={handleTap}
-				onDblClick={handleDblClick}
 			/>
 
 			{/* Relationship name */}
 			<Text
+				ref={textRef}
 				text={name}
 				width={width}
 				height={height}
@@ -292,7 +493,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				fill={colors.text}
 				onClick={handleClick}
 				onTap={handleTap}
-				onDblClick={handleDblClick}
+				listening={!isEditing}
 			/>
 
 			{/* Selection indicator */}
@@ -304,6 +505,39 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 					strokeWidth={1}
 					dash={[5, 5]}
 				/>
+			)}
+
+			{/* Warning indicator */}
+			{hasWarning && (
+				<Group
+					x={width - 10}
+					y={10}
+					onMouseEnter={(e) => {
+						e.cancelBubble = true;
+						setShowWarningTooltip(true);
+					}}
+					onMouseLeave={(e) => {
+						e.cancelBubble = true;
+						setShowWarningTooltip(false);
+					}}
+				>
+					<Circle
+						radius={8}
+						fill="#ef4444"
+						stroke="#991b1b"
+						strokeWidth={1}
+					/>
+					<Text
+						text="!"
+						x={-4}
+						y={-6}
+						fontSize={12}
+						fontStyle="bold"
+						fill="white"
+						align="center"
+						verticalAlign="middle"
+					/>
+				</Group>
 			)}
 		</Group>
 	);
