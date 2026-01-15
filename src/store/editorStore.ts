@@ -3,7 +3,7 @@ import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
 import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram, ValidationError } from '../types';
 import { getClosestEdge, getBestAvailableEdge } from '../lib/utils';
-import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram } from '../lib/validation';
+import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram, checkUniqueEntityName, checkUniqueRelationshipName, checkUniqueAttributeName } from '../lib/validation';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -329,6 +329,13 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const entity = state.diagram.entities.find((e) => e.id === id);
           if (entity) {
+            // Prevent duplicate names
+            if (updates.name !== undefined && updates.name !== entity.name) {
+              if (!checkUniqueEntityName(id, updates.name, state.diagram)) {
+                return; // Don't update if name is duplicate
+              }
+            }
+
             const positionChanged = updates.position && (
               updates.position.x !== entity.position.x ||
               updates.position.y !== entity.position.y
@@ -545,6 +552,19 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const canvasAttribute = state.diagram.attributes.find((a) => a.id === attributeId);
           if (canvasAttribute) {
+            // Prevent duplicate names within the same parent
+            if (updates.name !== undefined && updates.name !== canvasAttribute.name) {
+              if (!checkUniqueAttributeName(
+                attributeId,
+                updates.name,
+                canvasAttribute.entityId,
+                canvasAttribute.relationshipId,
+                state.diagram
+              )) {
+                return; // Don't update if name is duplicate
+              }
+            }
+
             Object.assign(canvasAttribute, updates);
             // Also update in parent entity or relationship
             if (canvasAttribute.entityId) {
@@ -679,6 +699,13 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const relationship = state.diagram.relationships.find((r) => r.id === id);
           if (relationship) {
+            // Prevent duplicate names
+            if (updates.name !== undefined && updates.name !== relationship.name) {
+              if (!checkUniqueRelationshipName(id, updates.name, state.diagram)) {
+                return; // Don't update if name is duplicate
+              }
+            }
+
             const positionChanged = updates.position && (
               updates.position.x !== relationship.position.x ||
               updates.position.y !== relationship.position.y

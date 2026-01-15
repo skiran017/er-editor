@@ -406,22 +406,35 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		input.select();
 
 		const removeInput = () => {
-			document.body.removeChild(input);
+			if (input.parentNode === document.body) {
+				document.body.removeChild(input);
+			}
 			setIsEditing(false);
 		};
+
+		let isRemoved = false;
 
 		input.addEventListener("keydown", (e) => {
 			if (e.key === "Enter") {
 				updateEntity(id, { name: input.value });
-				removeInput();
+				if (!isRemoved) {
+					isRemoved = true;
+					removeInput();
+				}
 			} else if (e.key === "Escape") {
-				removeInput();
+				if (!isRemoved) {
+					isRemoved = true;
+					removeInput();
+				}
 			}
 		});
 
 		input.addEventListener("blur", () => {
-			updateEntity(id, { name: input.value });
-			removeInput();
+			if (!isRemoved) {
+				updateEntity(id, { name: input.value });
+				isRemoved = true;
+				removeInput();
+			}
 		});
 	};
 

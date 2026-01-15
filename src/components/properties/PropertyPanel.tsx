@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, Plus, Trash2, Key, Database, Link, Circle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Plus, Trash2, Key, Database, Link, Circle, AlertCircle } from "lucide-react";
 import { useEditorStore } from "../../store/editorStore";
 import type {
 	Entity,
@@ -9,6 +9,11 @@ import type {
 	ConnectionPoint,
 	ConnectionStyle,
 } from "../../types";
+import {
+	checkUniqueEntityName,
+	checkUniqueRelationshipName,
+	checkUniqueAttributeName,
+} from "../../lib/validation";
 
 export const PropertyPanel: React.FC = () => {
 	const selectedIds = useEditorStore((state) => state.selectedIds);
@@ -65,6 +70,7 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 	const entity = useEditorStore((state) =>
 		state.diagram.entities.find((e) => e.id === entityId)
 	);
+	const diagram = useEditorStore((state) => state.diagram);
 
 	const updateEntity = useEditorStore((state) => state.updateEntity);
 	const addAttribute = useEditorStore((state) => state.addAttribute);
@@ -73,14 +79,32 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 
 	const [newAttributeName, setNewAttributeName] = useState("");
+	const [localName, setLocalName] = useState(entity?.name || "");
+
+	// Sync local name when entity changes
+	useEffect(() => {
+		if (entity) {
+			setLocalName(entity.name);
+		}
+	}, [entity?.id, entity?.name]);
 
 	// Don't render if entity not found
 	if (!entity) {
 		return null;
 	}
 
+	// Check for unique name
+	const isNameUnique = checkUniqueEntityName(entity.id, localName, diagram);
+	const nameError = !isNameUnique ? "An entity with this name already exists" : null;
+
 	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		updateEntity(entity.id, { name: e.target.value });
+		const newName = e.target.value;
+		setLocalName(newName);
+		
+		// Only update store if name is unique
+		if (checkUniqueEntityName(entity.id, newName, diagram)) {
+			updateEntity(entity.id, { name: newName });
+		}
 	};
 
 	const handleWeakEntityToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,12 +163,41 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 					</label>
 					<input
 						type="text"
-						value={entity.name}
+						value={localName}
 						onChange={handleNameChange}
-						className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-transparent ${
+							nameError
+								? "border-red-500 focus:ring-red-500 dark:border-red-500"
+								: "border-gray-300 dark:border-gray-600 focus:ring-blue-500"
+						} dark:bg-gray-800 dark:text-gray-200`}
 						placeholder="Enter entity name"
 					/>
+					{nameError && (
+						<p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+							<AlertCircle size={14} />
+							{nameError}
+						</p>
+					)}
 				</div>
+
+				{/* Validation Warnings */}
+				{entity.hasWarning && entity.warnings && entity.warnings.length > 0 && (
+					<div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+						<div className="flex items-start gap-2">
+							<AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+							<div className="flex-1">
+								<h4 className="text-sm font-medium text-red-800 dark:text-red-300 mb-1">
+									Validation Warnings
+								</h4>
+								<ul className="text-sm text-red-700 dark:text-red-400 list-disc list-inside space-y-1">
+									{entity.warnings.map((warning, index) => (
+										<li key={index}>{warning}</li>
+									))}
+								</ul>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* Weak Entity Toggle */}
 				<div className="flex items-center gap-2">
@@ -320,20 +373,45 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 		state.diagram.relationships.find((r) => r.id === relationshipId)
 	);
 	const entities = useEditorStore((state) => state.diagram.entities);
+	const diagram = useEditorStore((state) => state.diagram);
 
 	const updateRelationship = useEditorStore(
 		(state) => state.updateRelationship
 	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 	const [newAttributeName, setNewAttributeName] = useState("");
+	const [localName, setLocalName] = useState(relationship?.name || "");
+
+	// Sync local name when relationship changes
+	useEffect(() => {
+		if (relationship) {
+			setLocalName(relationship.name);
+		}
+	}, [relationship?.id, relationship?.name]);
 
 	// Don't render if relationship not found
 	if (!relationship) {
 		return null;
 	}
 
+	// Check for unique name
+	const isNameUnique = checkUniqueRelationshipName(
+		relationship.id,
+		localName,
+		diagram
+	);
+	const nameError = !isNameUnique
+		? "A relationship with this name already exists"
+		: null;
+
 	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		updateRelationship(relationship.id, { name: e.target.value });
+		const newName = e.target.value;
+		setLocalName(newName);
+		
+		// Only update store if name is unique
+		if (checkUniqueRelationshipName(relationship.id, newName, diagram)) {
+			updateRelationship(relationship.id, { name: newName });
+		}
 	};
 
 	// Get connected entities
@@ -369,12 +447,43 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 					</label>
 					<input
 						type="text"
-						value={relationship.name}
+						value={localName}
 						onChange={handleNameChange}
-						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+						className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-transparent ${
+							nameError
+								? "border-red-500 focus:ring-red-500 dark:border-red-500"
+								: "border-gray-300 dark:border-gray-600 focus:ring-purple-500"
+						} dark:bg-gray-800 dark:text-gray-200`}
 						placeholder="Enter relationship name"
 					/>
+					{nameError && (
+						<p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+							<AlertCircle size={14} />
+							{nameError}
+						</p>
+					)}
 				</div>
+
+				{/* Validation Warnings */}
+				{relationship.hasWarning &&
+					relationship.warnings &&
+					relationship.warnings.length > 0 && (
+						<div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+							<div className="flex items-start gap-2">
+								<AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+								<div className="flex-1">
+									<h4 className="text-sm font-medium text-red-800 dark:text-red-300 mb-1">
+										Validation Warnings
+									</h4>
+									<ul className="text-sm text-red-700 dark:text-red-400 list-disc list-inside space-y-1">
+										{relationship.warnings.map((warning, index) => (
+											<li key={index}>{warning}</li>
+										))}
+									</ul>
+								</div>
+							</div>
+						</div>
+					)}
 
 				{/* Weak Relationship */}
 				<div className="flex items-center gap-2">
@@ -959,11 +1068,20 @@ const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
 	);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
+	const diagram = useEditorStore((state) => state.diagram);
 
 	const updateAttributeById = useEditorStore(
 		(state) => state.updateAttributeById
 	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
+	const [localName, setLocalName] = useState(attribute?.name || "");
+
+	// Sync local name when attribute changes
+	useEffect(() => {
+		if (attribute) {
+			setLocalName(attribute.name);
+		}
+	}, [attribute?.id, attribute?.name]);
 
 	// Don't render if attribute not found
 	if (!attribute) {
@@ -978,8 +1096,34 @@ const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
 		? relationships.find((r) => r.id === attribute.relationshipId)
 		: null;
 
+	// Check for unique name within parent
+	const isNameUnique = checkUniqueAttributeName(
+		attribute.id,
+		localName,
+		attribute.entityId,
+		attribute.relationshipId,
+		diagram
+	);
+	const nameError = !isNameUnique
+		? "An attribute with this name already exists in the same parent"
+		: null;
+
 	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		updateAttributeById(attribute.id, { name: e.target.value });
+		const newName = e.target.value;
+		setLocalName(newName);
+		
+		// Only update store if name is unique
+		if (
+			checkUniqueAttributeName(
+				attribute.id,
+				newName,
+				attribute.entityId,
+				attribute.relationshipId,
+				diagram
+			)
+		) {
+			updateAttributeById(attribute.id, { name: newName });
+		}
 	};
 
 	return (
@@ -1010,12 +1154,43 @@ const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
 					</label>
 					<input
 						type="text"
-						value={attribute.name}
+						value={localName}
 						onChange={handleNameChange}
-						className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+						className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-transparent ${
+							nameError
+								? "border-red-500 focus:ring-red-500 dark:border-red-500"
+								: "border-gray-300 dark:border-gray-600 focus:ring-green-500"
+						} dark:bg-gray-800 dark:text-gray-200`}
 						placeholder="Enter attribute name"
 					/>
+					{nameError && (
+						<p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+							<AlertCircle size={14} />
+							{nameError}
+						</p>
+					)}
 				</div>
+
+				{/* Validation Warnings */}
+				{attribute.hasWarning &&
+					attribute.warnings &&
+					attribute.warnings.length > 0 && (
+						<div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+							<div className="flex items-start gap-2">
+								<AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+								<div className="flex-1">
+									<h4 className="text-sm font-medium text-red-800 dark:text-red-300 mb-1">
+										Validation Warnings
+									</h4>
+									<ul className="text-sm text-red-700 dark:text-red-400 list-disc list-inside space-y-1">
+										{attribute.warnings.map((warning, index) => (
+											<li key={index}>{warning}</li>
+										))}
+									</ul>
+								</div>
+							</div>
+						</div>
+					)}
 
 				{/* Parent Element */}
 				<div>

@@ -215,3 +215,72 @@ export function validateDiagram(diagram: Diagram): ValidationError[] {
   return errors;
 }
 
+/**
+ * Check if an entity name is unique (excluding the current entity)
+ */
+export function checkUniqueEntityName(
+  currentEntityId: string,
+  name: string,
+  diagram: Diagram
+): boolean {
+  const trimmedName = name.trim();
+  if (!trimmedName) return true; // Empty names are handled elsewhere
+
+  return !diagram.entities.some(
+    (entity) => entity.id !== currentEntityId && entity.name.trim().toLowerCase() === trimmedName.toLowerCase()
+  );
+}
+
+/**
+ * Check if a relationship name is unique (excluding the current relationship)
+ */
+export function checkUniqueRelationshipName(
+  currentRelationshipId: string,
+  name: string,
+  diagram: Diagram
+): boolean {
+  const trimmedName = name.trim();
+  if (!trimmedName) return true; // Empty names are handled elsewhere
+
+  return !diagram.relationships.some(
+    (relationship) =>
+      relationship.id !== currentRelationshipId &&
+      relationship.name.trim().toLowerCase() === trimmedName.toLowerCase()
+  );
+}
+
+/**
+ * Check if an attribute name is unique within its parent (entity or relationship)
+ * Attributes can have the same name if they belong to different parents
+ */
+export function checkUniqueAttributeName(
+  currentAttributeId: string,
+  name: string,
+  parentEntityId: string | undefined,
+  parentRelationshipId: string | undefined,
+  diagram: Diagram
+): boolean {
+  const trimmedName = name.trim();
+  if (!trimmedName) return true; // Empty names are handled elsewhere
+
+  // Check attributes of the same parent
+  if (parentEntityId) {
+    return !diagram.attributes.some(
+      (attr) =>
+        attr.id !== currentAttributeId &&
+        attr.entityId === parentEntityId &&
+        attr.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+  }
+
+  if (parentRelationshipId) {
+    return !diagram.attributes.some(
+      (attr) =>
+        attr.id !== currentAttributeId &&
+        attr.relationshipId === parentRelationshipId &&
+        attr.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+  }
+
+  return true; // No parent, can't check uniqueness
+}

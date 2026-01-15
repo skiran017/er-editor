@@ -389,22 +389,35 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		input.select();
 
 		const removeInput = () => {
-			document.body.removeChild(input);
+			if (input.parentNode === document.body) {
+				document.body.removeChild(input);
+			}
 			setIsEditing(false);
 		};
+
+		let isRemoved = false;
 
 		input.addEventListener("keydown", (e) => {
 			if (e.key === "Enter") {
 				updateAttributeById(id, { name: input.value });
-				removeInput();
+				if (!isRemoved) {
+					isRemoved = true;
+					removeInput();
+				}
 			} else if (e.key === "Escape") {
-				removeInput();
+				if (!isRemoved) {
+					isRemoved = true;
+					removeInput();
+				}
 			}
 		});
 
 		input.addEventListener("blur", () => {
-			updateAttributeById(id, { name: input.value });
-			removeInput();
+			if (!isRemoved) {
+				updateAttributeById(id, { name: input.value });
+				isRemoved = true;
+				removeInput();
+			}
 		});
 	};
 
