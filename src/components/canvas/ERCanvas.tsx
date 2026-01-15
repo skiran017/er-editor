@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { Stage, Layer, Transformer, Line, Rect } from "react-konva";
 import Konva from "konva";
+import { Maximize2 } from "lucide-react";
 import { useEditorStore } from "../../store/editorStore";
 import { EntityShape } from "./EntityShape";
 import { RelationshipShape } from "./RelationshipShape";
@@ -1480,9 +1481,34 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				</Layer>
 			</Stage>
 
-			{/* Zoom indicator */}
-			<div className="absolute bottom-4 right-4 bg-white px-3 py-1 rounded shadow text-sm">
-				{Math.round(viewport.scale * 100)}%
+			{/* Zoom indicator and Recenter button */}
+			<div className="absolute bottom-4 right-4 flex items-center gap-2">
+				{/* Recenter button */}
+				<button
+					onClick={() => {
+						// Reset zoom to 1 (100%)
+						setZoom(1);
+						
+						// Reset position to (0, 0)
+						setViewportPosition({ x: 0, y: 0 });
+						
+						// Update stage position immediately
+						if (stageRef.current) {
+							stageRef.current.position({ x: 0, y: 0 });
+							stageRef.current.scale({ x: 1, y: 1 });
+							stageRef.current.batchDraw();
+						}
+					}}
+					className="p-2 bg-white dark:bg-gray-800 rounded shadow hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
+					title="Recenter diagram (Reset zoom and position)"
+				>
+					<Maximize2 size={16} className="text-gray-700 dark:text-gray-300" />
+				</button>
+				
+				{/* Zoom indicator */}
+				<div className="bg-white dark:bg-gray-800 px-3 py-1 rounded shadow text-sm border border-gray-200 dark:border-gray-700">
+					{Math.round(viewport.scale * 100)}%
+				</div>
 			</div>
 		</div>
 	);
