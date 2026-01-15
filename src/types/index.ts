@@ -142,7 +142,8 @@ export interface EditorState {
   };
   nextEntityNumber: number;
   nextRelationshipNumber: number;
-  validationEnabled: boolean; // Whether validation is enabled (controlled via query param)
+  examMode: boolean; // Whether exam mode is enabled (controlled via ?examMode=true query param)
+  validationEnabled: boolean; // Whether validation is enabled (controlled via Menu toggle, default: false)
 }
 
 export interface ValidationError {

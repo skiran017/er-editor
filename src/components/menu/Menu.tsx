@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useThemeStore, type Theme } from "../../store/themeStore";
+import { useEditorStore } from "../../store/editorStore";
+import { Switch } from "../ui/switch";
 
 interface MenuItem {
 	id: string;
@@ -46,6 +48,11 @@ export const Menu: React.FC<MenuProps> = ({
 	const [isOpen, setIsOpen] = useState(false);
 	const theme = useThemeStore((state) => state.theme);
 	const setTheme = useThemeStore((state) => state.setTheme);
+	const examMode = useEditorStore((state) => state.examMode);
+	const validationEnabled = useEditorStore((state) => state.validationEnabled);
+	const setValidationEnabled = useEditorStore(
+		(state) => state.setValidationEnabled
+	);
 
 	const menuItems: MenuItem[] = [
 		{
@@ -54,8 +61,10 @@ export const Menu: React.FC<MenuProps> = ({
 			icon: Upload,
 			shortcut: "Cmd+O",
 			onClick: () => {
-				onImport();
-				setIsOpen(false);
+				if (!examMode) {
+					onImport();
+					setIsOpen(false);
+				}
 			},
 		},
 		{
@@ -64,8 +73,10 @@ export const Menu: React.FC<MenuProps> = ({
 			icon: Download,
 			shortcut: "Cmd+S",
 			onClick: () => {
-				onExportXML();
-				setIsOpen(false);
+				if (!examMode) {
+					onExportXML();
+					setIsOpen(false);
+				}
 			},
 		},
 		...(onExportJavaXML
@@ -76,8 +87,10 @@ export const Menu: React.FC<MenuProps> = ({
 						icon: Download,
 						shortcut: "Cmd+Shift+S",
 						onClick: () => {
-							onExportJavaXML();
-							setIsOpen(false);
+							if (!examMode) {
+								onExportJavaXML();
+								setIsOpen(false);
+							}
 						},
 					} as MenuItem,
 			  ]
@@ -88,8 +101,10 @@ export const Menu: React.FC<MenuProps> = ({
 			icon: Image,
 			shortcut: "Cmd+Shift+E",
 			onClick: () => {
-				onExportImage();
-				setIsOpen(false);
+				if (!examMode) {
+					onExportImage();
+					setIsOpen(false);
+				}
 			},
 		},
 		{
@@ -178,6 +193,35 @@ export const Menu: React.FC<MenuProps> = ({
 					<div className="absolute top-12 left-0 w-64 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-xl z-50 py-2">
 						{menuItems.map((item) => {
 							if (item.separator) {
+								// Show validation toggle after separator-1 (before shortcuts)
+								if (item.id === "separator-1") {
+									return (
+										<React.Fragment key={item.id}>
+											<div className="h-px bg-gray-200 dark:bg-gray-700 my-2" />
+											{/* Validation Toggle */}
+											<div className="px-4 py-2">
+												<div className="flex items-center justify-between">
+													<label
+														htmlFor="validation-toggle"
+														className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+													>
+														Validation
+													</label>
+													<Switch
+														id="validation-toggle"
+														checked={validationEnabled}
+														onCheckedChange={(checked) => {
+															if (!examMode) {
+																setValidationEnabled(checked);
+															}
+														}}
+														disabled={examMode}
+													/>
+												</div>
+											</div>
+										</React.Fragment>
+									);
+								}
 								return (
 									<div
 										key={item.id}
@@ -185,6 +229,14 @@ export const Menu: React.FC<MenuProps> = ({
 									/>
 								);
 							}
+
+							// Disable import and export items in exam mode
+							const isDisabled =
+								examMode &&
+								(item.id === "import" ||
+									item.id === "export-xml" ||
+									item.id === "export-java-xml" ||
+									item.id === "export-image");
 
 							if (item.id === "theme") {
 								return (
@@ -224,18 +276,27 @@ export const Menu: React.FC<MenuProps> = ({
 								<button
 									key={item.id}
 									onClick={item.onClick}
+									disabled={isDisabled}
 									className={cn(
-										"w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left text-gray-700 dark:text-gray-300",
+										"w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left",
+										isDisabled
+											? "opacity-50 cursor-not-allowed text-gray-400 dark:text-gray-600"
+											: "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300",
 										item.id === "reset" &&
+											!isDisabled &&
 											"text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
 									)}
 								>
 									<Icon
 										size={18}
-										className="text-gray-600 dark:text-gray-400"
+										className={
+											isDisabled
+												? "text-gray-400 dark:text-gray-600"
+												: "text-gray-600 dark:text-gray-400"
+										}
 									/>
 									<span className="flex-1">{item.label}</span>
-									{item.shortcut && (
+									{item.shortcut && !isDisabled && (
 										<span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
 											{item.shortcut}
 										</span>

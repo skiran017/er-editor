@@ -55,7 +55,8 @@ interface EditorStore extends EditorState {
   // Mode actions
   setMode: (mode: EditorState['mode']) => void;
 
-  // Validation actions
+  // Exam mode and validation actions
+  setExamMode: (enabled: boolean) => void;
   setValidationEnabled: (enabled: boolean) => void;
   validateElement: (id: string) => void;
   validateAll: () => void;
@@ -295,7 +296,8 @@ export const useEditorStore = create<EditorStore>()(
       },
       nextEntityNumber: 1,
       nextRelationshipNumber: 1,
-      validationEnabled: true, // Default: enabled, can be disabled via ?validation=false
+      examMode: false, // Default: false, enabled via ?examMode=true
+      validationEnabled: false, // Default: false, controlled via Menu toggle
 
       // Entity actions
       addEntity: (position) => {
@@ -1180,10 +1182,61 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
-      // Validation actions
+      // Exam mode and validation actions
+      setExamMode: (enabled) => {
+        set((state) => {
+          state.examMode = enabled;
+          // When exam mode is enabled, disable validation toggle (it will be disabled in UI)
+          // Validation should remain as user set it, but toggle will be disabled
+        });
+      },
+
       setValidationEnabled: (enabled) => {
         set((state) => {
           state.validationEnabled = enabled;
+          
+          // If validation is being enabled, validate all existing elements
+          if (enabled) {
+            // Validate all entities
+            for (const entity of state.diagram.entities) {
+              const warnings = validateEntity(entity, state.diagram);
+              entity.hasWarning = warnings.length > 0;
+              entity.warnings = warnings;
+            }
+
+            // Validate all relationships
+            for (const relationship of state.diagram.relationships) {
+              const warnings = validateRelationship(relationship, state.diagram);
+              relationship.hasWarning = warnings.length > 0;
+              relationship.warnings = warnings;
+            }
+
+            // Validate all attributes
+            for (const attribute of state.diagram.attributes) {
+              const warnings = validateAttribute(attribute, state.diagram);
+              attribute.hasWarning = warnings.length > 0;
+              attribute.warnings = warnings;
+            }
+
+            // Validate all connections
+            for (const connection of state.diagram.connections) {
+              validateConnection(connection, state.diagram);
+            }
+          } else {
+            // If validation is being disabled, clear all warnings
+            for (const entity of state.diagram.entities) {
+              entity.hasWarning = false;
+              entity.warnings = [];
+            }
+            for (const relationship of state.diagram.relationships) {
+              relationship.hasWarning = false;
+              relationship.warnings = [];
+            }
+            for (const attribute of state.diagram.attributes) {
+              attribute.hasWarning = false;
+              attribute.warnings = [];
+            }
+          }
         });
       },
 
