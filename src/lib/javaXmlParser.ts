@@ -80,6 +80,8 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
     const oneToOne = relationshipSets.querySelectorAll('RelationshipSetOneToOne');
     const oneToN = relationshipSets.querySelectorAll('RelationshipSetOneToN');
     const nToN = relationshipSets.querySelectorAll('RelationshipSetNToN');
+    const identifyingOneToOne = relationshipSets.querySelectorAll('IdentifyingRelationshipSetOneToOne');
+    const identifyingOneToN = relationshipSets.querySelectorAll('IdentifyingRelationshipSetOneToN');
 
     oneToOne.forEach((elem) => {
       const relationship = parseJavaRelationship(elem, 'OneToOne', idMap);
@@ -93,6 +95,16 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
 
     nToN.forEach((elem) => {
       const relationship = parseJavaRelationship(elem, 'NToN', idMap);
+      diagram.relationships.push(relationship);
+    });
+
+    identifyingOneToOne.forEach((elem) => {
+      const relationship = parseJavaRelationship(elem, 'OneToOne', idMap);
+      diagram.relationships.push(relationship);
+    });
+
+    identifyingOneToN.forEach((elem) => {
+      const relationship = parseJavaRelationship(elem, 'OneToN', idMap);
       diagram.relationships.push(relationship);
     });
   }
@@ -157,11 +169,13 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
     diagram.relationships.forEach((relationship) => {
       const javaId = Array.from(idMap.entries()).find(([, ourId]) => ourId === relationship.id)?.[0];
       if (javaId) {
-        // Try all relationship types
+        // Try all relationship types (including Identifying* for total participation)
         const oneToOne = diagramSection.querySelector(`RelationshipSetOneToOne[refid="${javaId}"]`);
         const oneToN = diagramSection.querySelector(`RelationshipSetOneToN[refid="${javaId}"]`);
         const nToN = diagramSection.querySelector(`RelationshipSetNToN[refid="${javaId}"]`);
-        const posElem = oneToOne || oneToN || nToN;
+        const identifyingOneToOne = diagramSection.querySelector(`IdentifyingRelationshipSetOneToOne[refid="${javaId}"]`);
+        const identifyingOneToN = diagramSection.querySelector(`IdentifyingRelationshipSetOneToN[refid="${javaId}"]`);
+        const posElem = oneToOne || oneToN || nToN || identifyingOneToOne || identifyingOneToN;
         if (posElem) {
           const pos = posElem.querySelector('Position');
           if (pos) {

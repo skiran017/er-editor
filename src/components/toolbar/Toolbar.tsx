@@ -39,12 +39,7 @@ import { cn } from "../../lib/utils";
 import { serializeDiagramToXML } from "../../lib/xmlSerializer";
 import { serializeDiagramToJavaXML } from "../../lib/javaXmlSerializer";
 import { parseXMLToDiagram } from "../../lib/xmlParser";
-import {
-	downloadFile,
-	pickFile,
-	readFileAsText,
-	showConfirmDialog,
-} from "../../lib/fileUtils";
+import { downloadFile, pickFile, readFileAsText } from "../../lib/fileUtils";
 import {
 	getDiagramBounds,
 	remapDiagramIds,
@@ -93,6 +88,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 	const [importDialogOpen, setImportDialogOpen] = useState(false);
 	const [pendingImportedDiagram, setPendingImportedDiagram] =
 		useState<Diagram | null>(null);
+	const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
 	const undo = useUndo();
 	const redo = useRedo();
@@ -340,24 +336,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 		});
 	};
 
-	const handleResetCanvas = async () => {
-		const confirmed = await showConfirmDialog(
-			"Are you sure you want to reset the canvas? This will delete all elements.",
+	const handleResetCanvas = () => {
+		setResetDialogOpen(true);
+	};
+
+	const handleResetCanvasConfirm = () => {
+		loadDiagram(
+			{
+				entities: [],
+				relationships: [],
+				connections: [],
+				lines: [],
+				arrows: [],
+				attributes: [],
+			},
+			true,
 		);
-		if (confirmed) {
-			loadDiagram(
-				{
-					entities: [],
-					relationships: [],
-					connections: [],
-					lines: [],
-					arrows: [],
-					attributes: [],
-				},
-				true,
-			);
-			showToast("Canvas reset", "success");
-		}
+		setResetDialogOpen(false);
+		showToast("Canvas reset", "success");
 	};
 
 	const handleShowShortcuts = () => {
@@ -404,6 +400,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 						<AlertDialogCancel className="w-full sm:w-auto">
 							Cancel
 						</AlertDialogCancel>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Reset canvas confirmation dialog */}
+			<AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Reset canvas</AlertDialogTitle>
+						<AlertDialogDescription>
+							Are you sure you want to reset the canvas? This will delete all
+							elements.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<Button variant="destructive" onClick={handleResetCanvasConfirm}>
+							Reset
+						</Button>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>

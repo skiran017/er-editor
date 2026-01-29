@@ -16,7 +16,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	const groupRef = useRef<Konva.Group>(null);
 	const updateConnection = useEditorStore((state) => state.updateConnection);
 	const updateConnectionWaypoint = useEditorStore(
-		(state) => state.updateConnectionWaypoint
+		(state) => state.updateConnectionWaypoint,
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
@@ -62,7 +62,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	// Recalculate connection points based on current element positions
 	const getConnectionPointPosition = (
 		element: typeof fromElement,
-		point: typeof fromPoint
+		point: typeof fromPoint,
 	) => {
 		const centerX = element.position.x + element.size.width / 2;
 		const centerY = element.position.y + element.size.height / 2;
@@ -119,7 +119,7 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	const points = convertToOrthogonalPath(
 		straightPoints,
 		fromPoint !== "center" ? fromPoint : undefined,
-		toPoint !== "center" ? toPoint : undefined
+		toPoint !== "center" ? toPoint : undefined,
 	);
 
 	// Calculate label position (default to midpoint if not set)
@@ -169,6 +169,42 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 		return parallelPoints;
 	};
 
+	// Cardinality arrow (Chen notation): solid triangle at ENTITY end, pointing into the entity
+	const showCardinalityArrow = cardinality === "1" && points.length >= 4;
+	const entityIsToEnd = toElement.type === "entity";
+	let arrowTipX: number;
+	let arrowTipY: number;
+	let arrowAngleDeg: number;
+	if (entityIsToEnd) {
+		// Entity at "to" end: arrow at end of path, tip pointing toward entity (toPos)
+		arrowTipX = points[points.length - 2];
+		arrowTipY = points[points.length - 1];
+		const prevX = points[points.length - 4];
+		const prevY = points[points.length - 3];
+		arrowAngleDeg =
+			(Math.atan2(arrowTipY - prevY, arrowTipX - prevX) * 180) / Math.PI;
+	} else {
+		// Entity at "from" end: arrow at start of path, tip pointing toward entity (fromPos)
+		arrowTipX = points[0];
+		arrowTipY = points[1];
+		const nextX = points[2];
+		const nextY = points[3];
+		// Direction from path (next) toward entity (tip)
+		arrowAngleDeg =
+			(Math.atan2(arrowTipY - nextY, arrowTipX - nextX) * 180) / Math.PI;
+	}
+	const arrowLength = 12;
+	const arrowWidth = 8;
+	// Triangle: tip at (0,0), base at (-arrowLength, ±arrowWidth/2)
+	const arrowPoints = [
+		0,
+		0,
+		-arrowLength,
+		-arrowWidth / 2,
+		-arrowLength,
+		arrowWidth / 2,
+	];
+
 	return (
 		<Group ref={groupRef} listening={true}>
 			{/* Main connection line */}
@@ -197,6 +233,24 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 					hitStrokeWidth={10}
 					listening={false}
 				/>
+			)}
+
+			{/* Cardinality arrow (solid triangle at entity end when cardinality is 1) */}
+			{showCardinalityArrow && (
+				<Group
+					x={arrowTipX}
+					y={arrowTipY}
+					rotation={arrowAngleDeg}
+					listening={false}
+				>
+					<Line
+						points={arrowPoints}
+						closed
+						fill={strokeColor}
+						stroke={strokeColor}
+						lineJoin="miter"
+					/>
+				</Group>
 			)}
 
 			{/* Waypoints (draggable intermediate points) */}

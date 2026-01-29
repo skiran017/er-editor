@@ -842,6 +842,24 @@ export const useEditorStore = create<EditorStore>()(
           const connection = state.diagram.connections.find((c) => c.id === id);
           if (connection) {
             Object.assign(connection, updates);
+
+            // Sync cardinality/participation to the relationship (for export and Relationship panel)
+            if (updates.cardinality !== undefined || updates.participation !== undefined) {
+              const rel = state.diagram.relationships.find(
+                (r) => r.id === connection.fromId || r.id === connection.toId
+              );
+              const entityId =
+                rel?.id === connection.fromId ? connection.toId : connection.fromId;
+              if (rel && entityId) {
+                if (updates.cardinality !== undefined) {
+                  rel.cardinalities[entityId] = updates.cardinality;
+                }
+                if (updates.participation !== undefined) {
+                  rel.participations[entityId] = updates.participation;
+                }
+              }
+            }
+
             // Recalculate points if from/to elements or waypoints changed
             if (updates.fromPoint || updates.toPoint || updates.waypoints) {
               const fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
@@ -1221,7 +1239,7 @@ export const useEditorStore = create<EditorStore>()(
       setValidationEnabled: (enabled) => {
         set((state) => {
           state.validationEnabled = enabled;
-          
+
           // If validation is being enabled, validate all existing elements
           if (enabled) {
             // Validate all entities

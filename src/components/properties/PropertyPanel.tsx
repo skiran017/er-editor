@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { X, Plus, Trash2, Key, Database, Link, Circle, AlertCircle } from "lucide-react";
+import {
+	X,
+	Plus,
+	Trash2,
+	Key,
+	Database,
+	Link,
+	Circle,
+	AlertCircle,
+} from "lucide-react";
 import { useEditorStore } from "../../store/editorStore";
 import type {
 	Entity,
@@ -68,7 +77,7 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 }) => {
 	// Get entity reactively from store
 	const entity = useEditorStore((state) =>
-		state.diagram.entities.find((e) => e.id === entityId)
+		state.diagram.entities.find((e) => e.id === entityId),
 	);
 	const diagram = useEditorStore((state) => state.diagram);
 
@@ -95,12 +104,14 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 
 	// Check for unique name
 	const isNameUnique = checkUniqueEntityName(entity.id, localName, diagram);
-	const nameError = !isNameUnique ? "An entity with this name already exists" : null;
+	const nameError = !isNameUnique
+		? "An entity with this name already exists"
+		: null;
 
 	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const newName = e.target.value;
 		setLocalName(newName);
-		
+
 		// Only update store if name is unique
 		if (checkUniqueEntityName(entity.id, newName, diagram)) {
 			updateEntity(entity.id, { name: newName });
@@ -126,7 +137,7 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 
 	const handleAttributeUpdate = (
 		attributeId: string,
-		updates: Partial<EntityAttribute>
+		updates: Partial<EntityAttribute>,
 	) => {
 		updateAttribute(entity.id, attributeId, updates);
 	};
@@ -370,14 +381,16 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 }) => {
 	// Get relationship reactively from store
 	const relationship = useEditorStore((state) =>
-		state.diagram.relationships.find((r) => r.id === relationshipId)
+		state.diagram.relationships.find((r) => r.id === relationshipId),
 	);
 	const entities = useEditorStore((state) => state.diagram.entities);
+	const connections = useEditorStore((state) => state.diagram.connections);
 	const diagram = useEditorStore((state) => state.diagram);
 
 	const updateRelationship = useEditorStore(
-		(state) => state.updateRelationship
+		(state) => state.updateRelationship,
 	);
+	const updateConnection = useEditorStore((state) => state.updateConnection);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 	const [newAttributeName, setNewAttributeName] = useState("");
 	const [localName, setLocalName] = useState(relationship?.name || "");
@@ -394,11 +407,19 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 		return null;
 	}
 
+	// Find the connection that links this relationship to the given entity (so diagram stays in sync)
+	const getConnectionForEntity = (entityId: string) =>
+		connections.find(
+			(c) =>
+				(c.fromId === relationship.id && c.toId === entityId) ||
+				(c.fromId === entityId && c.toId === relationship.id),
+		);
+
 	// Check for unique name
 	const isNameUnique = checkUniqueRelationshipName(
 		relationship.id,
 		localName,
-		diagram
+		diagram,
 	);
 	const nameError = !isNameUnique
 		? "A relationship with this name already exists"
@@ -407,7 +428,7 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const newName = e.target.value;
 		setLocalName(newName);
-		
+
 		// Only update store if name is unique
 		if (checkUniqueRelationshipName(relationship.id, newName, diagram)) {
 			updateRelationship(relationship.id, { name: newName });
@@ -534,7 +555,7 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 												useEditorStore.getState().updateRelationship;
 											updateRelationship(relationship.id, {
 												attributes: relationship.attributes.map((a) =>
-													a.id === attr.id ? { ...a, name: e.target.value } : a
+													a.id === attr.id ? { ...a, name: e.target.value } : a,
 												),
 											});
 											// Also update canvas attribute
@@ -551,7 +572,7 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 												useEditorStore.getState().updateRelationship;
 											updateRelationship(relationship.id, {
 												attributes: relationship.attributes.filter(
-													(a) => a.id !== attr.id
+													(a) => a.id !== attr.id,
 												),
 											});
 											const deleteAttributeById =
@@ -583,8 +604,8 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 																	isPartialKey: e.target.checked
 																		? false
 																		: a.isPartialKey,
-															  }
-															: a
+																}
+															: a,
 													),
 												});
 												const updateAttributeById =
@@ -617,8 +638,8 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 																	...a,
 																	isPartialKey: e.target.checked,
 																	isKey: e.target.checked ? false : a.isKey,
-															  }
-															: a
+																}
+															: a,
 													),
 												});
 												const updateAttributeById =
@@ -645,7 +666,7 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 													attributes: relationship.attributes.map((a) =>
 														a.id === attr.id
 															? { ...a, isMultivalued: e.target.checked }
-															: a
+															: a,
 													),
 												});
 												const updateAttributeById =
@@ -671,7 +692,7 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 													attributes: relationship.attributes.map((a) =>
 														a.id === attr.id
 															? { ...a, isDerived: e.target.checked }
-															: a
+															: a,
 													),
 												});
 												const updateAttributeById =
@@ -791,12 +812,20 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 												<select
 													value={cardinality}
 													onChange={(e) => {
+														const newCardinality = e.target
+															.value as Cardinality;
 														updateRelationship(relationship.id, {
 															cardinalities: {
 																...relationship.cardinalities,
-																[entity.id]: e.target.value as Cardinality,
+																[entity.id]: newCardinality,
 															},
 														});
+														const conn = getConnectionForEntity(entity.id);
+														if (conn) {
+															updateConnection(conn.id, {
+																cardinality: newCardinality,
+															});
+														}
 													}}
 													className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
 												>
@@ -812,12 +841,20 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 												<select
 													value={participation}
 													onChange={(e) => {
+														const newParticipation = e.target
+															.value as Participation;
 														updateRelationship(relationship.id, {
 															participations: {
 																...relationship.participations,
-																[entity.id]: e.target.value as Participation,
+																[entity.id]: newParticipation,
 															},
 														});
+														const conn = getConnectionForEntity(entity.id);
+														if (conn) {
+															updateConnection(conn.id, {
+																participation: newParticipation,
+															});
+														}
 													}}
 													className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
 												>
@@ -846,14 +883,14 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 }) => {
 	// Get connection reactively from store
 	const connection = useEditorStore((state) =>
-		state.diagram.connections.find((c) => c.id === connectionId)
+		state.diagram.connections.find((c) => c.id === connectionId),
 	);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
 
 	const updateConnection = useEditorStore((state) => state.updateConnection);
 	const removeConnectionWaypoint = useEditorStore(
-		(state) => state.removeConnectionWaypoint
+		(state) => state.removeConnectionWaypoint,
 	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 
@@ -877,7 +914,7 @@ const ConnectionPropertyPanel: React.FC<ConnectionPropertyPanelProps> = ({
 	};
 
 	const handleParticipationChange = (
-		e: React.ChangeEvent<HTMLSelectElement>
+		e: React.ChangeEvent<HTMLSelectElement>,
 	) => {
 		updateConnection(connection.id, {
 			participation: e.target.value as Participation,
@@ -1064,14 +1101,14 @@ const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
 }) => {
 	// Get attribute reactively from store
 	const attribute = useEditorStore((state) =>
-		state.diagram.attributes.find((a) => a.id === attributeId)
+		state.diagram.attributes.find((a) => a.id === attributeId),
 	);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
 	const diagram = useEditorStore((state) => state.diagram);
 
 	const updateAttributeById = useEditorStore(
-		(state) => state.updateAttributeById
+		(state) => state.updateAttributeById,
 	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 	const [localName, setLocalName] = useState(attribute?.name || "");
@@ -1102,7 +1139,7 @@ const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
 		localName,
 		attribute.entityId,
 		attribute.relationshipId,
-		diagram
+		diagram,
 	);
 	const nameError = !isNameUnique
 		? "An attribute with this name already exists in the same parent"
@@ -1111,7 +1148,7 @@ const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
 	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const newName = e.target.value;
 		setLocalName(newName);
-		
+
 		// Only update store if name is unique
 		if (
 			checkUniqueAttributeName(
@@ -1119,7 +1156,7 @@ const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
 				newName,
 				attribute.entityId,
 				attribute.relationshipId,
-				diagram
+				diagram,
 			)
 		) {
 			updateAttributeById(attribute.id, { name: newName });
@@ -1201,8 +1238,8 @@ const AttributePropertyPanel: React.FC<AttributePropertyPanelProps> = ({
 						{parentEntity
 							? `Entity: ${parentEntity.name}`
 							: parentRelationship
-							? `Relationship: ${parentRelationship.name}`
-							: "Unknown"}
+								? `Relationship: ${parentRelationship.name}`
+								: "Unknown"}
 					</div>
 				</div>
 
