@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
 import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram, ValidationError } from '../types';
-import { getClosestEdge, getBestAvailableEdge } from '../lib/utils';
+import { getClosestEdge, getBestAvailableEdge, areEntitiesConnected, connectionExists } from '../lib/utils';
 import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram, checkUniqueEntityName, checkUniqueRelationshipName, checkUniqueAttributeName } from '../lib/validation';
 
 interface EditorStore extends EditorState {
@@ -69,6 +69,10 @@ interface EditorStore extends EditorState {
 
   // Import/Export actions
   loadDiagram: (diagram: Diagram, replace: boolean) => void;
+
+  // Quick relationship (1:1, 1:N, N:N) – two-click flow
+  setPendingQuickRelationship: (payload: { firstEntityId: string; mode: 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' } | null) => void;
+  addRelationshipBetweenEntities: (entityId1: string, entityId2: string, type: '1-1' | '1-n' | 'n-n') => void;
 
   // Utility
   getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | undefined;
@@ -298,6 +302,7 @@ export const useEditorStore = create<EditorStore>()(
       nextRelationshipNumber: 1,
       examMode: false, // Default: false, enabled via ?examMode=true
       validationEnabled: false, // Default: false, controlled via Menu toggle
+      pendingQuickRelationship: null,
 
       // Entity actions
       addEntity: (position) => {
@@ -762,6 +767,8 @@ export const useEditorStore = create<EditorStore>()(
       // Connection actions
       addConnection: (fromId, toId, fromPoint = 'right' as ConnectionPoint, toPoint = 'left' as ConnectionPoint, waypoints = [] as Position[], style = 'orthogonal' as ConnectionStyle) => {
         set((state) => {
+          if (connectionExists(state.diagram, fromId, toId)) return;
+
           const fromElement = state.diagram.entities.find(e => e.id === fromId) ||
             state.diagram.relationships.find(r => r.id === fromId);
           const toElement = state.diagram.entities.find(e => e.id === toId) ||
@@ -1224,6 +1231,7 @@ export const useEditorStore = create<EditorStore>()(
             startPoint: null,
             currentPoint: null,
           };
+          state.pendingQuickRelationship = null;
         });
       },
 
@@ -1474,6 +1482,113 @@ export const useEditorStore = create<EditorStore>()(
             for (const connection of state.diagram.connections) {
               validateConnection(connection, state.diagram);
             }
+          }
+        });
+      },
+
+      setPendingQuickRelationship: (payload) => {
+        set((state) => {
+          state.pendingQuickRelationship = payload;
+        });
+      },
+
+      addRelationshipBetweenEntities: (entityId1, entityId2, type) => {
+        set((state) => {
+          if (entityId1 === entityId2) return;
+          const entity1 = state.diagram.entities.find((e) => e.id === entityId1);
+          const entity2 = state.diagram.entities.find((e) => e.id === entityId2);
+          if (!entity1 || !entity2) return;
+          if (areEntitiesConnected(state.diagram, entityId1, entityId2)) return;
+
+          const card1: Cardinality = type === 'n-n' ? 'N' : '1';
+          const card2: Cardinality = type === '1-1' ? '1' : 'N';
+
+          const relWidth = 120;
+          const relHeight = 80;
+          const center1 = {
+            x: entity1.position.x + entity1.size.width / 2,
+            y: entity1.position.y + entity1.size.height / 2,
+          };
+          const center2 = {
+            x: entity2.position.x + entity2.size.width / 2,
+            y: entity2.position.y + entity2.size.height / 2,
+          };
+          const midX = (center1.x + center2.x) / 2;
+          const midY = (center1.y + center2.y) / 2;
+          const relPosition: Position = {
+            x: midX - relWidth / 2,
+            y: midY - relHeight / 2,
+          };
+
+          const relId = generateId();
+          const newRel: Relationship = {
+            id: relId,
+            type: 'relationship',
+            name: `Relationship ${state.nextRelationshipNumber}`,
+            position: relPosition,
+            selected: false,
+            entityIds: [entityId1, entityId2],
+            attributes: [],
+            cardinalities: { [entityId1]: card1, [entityId2]: card2 },
+            participations: { [entityId1]: 'partial' as Participation, [entityId2]: 'partial' as Participation },
+            isWeak: false,
+            size: { width: relWidth, height: relHeight },
+            rotation: 0,
+          };
+          state.diagram.relationships.push(newRel);
+          state.nextRelationshipNumber += 1;
+
+          const relAsElement = { ...newRel, position: relPosition, size: { width: relWidth, height: relHeight } };
+          const relCenter = { x: midX, y: midY };
+
+          const relEdge1 = getClosestEdge(center1, relAsElement) as ConnectionPoint;
+          const relEdge2 = getClosestEdge(center2, relAsElement) as ConnectionPoint;
+          const entity1Edge = getClosestEdge(relCenter, entity1) as ConnectionPoint;
+          const entity2Edge = getClosestEdge(relCenter, entity2) as ConnectionPoint;
+
+          const fromPos1 = getConnectionPointPosition(relAsElement, relEdge1);
+          const toPos1 = getConnectionPointPosition(entity1, entity1Edge);
+          const fromPos2 = getConnectionPointPosition(relAsElement, relEdge2);
+          const toPos2 = getConnectionPointPosition(entity2, entity2Edge);
+
+          const conn1: Connection = {
+            id: generateId(),
+            type: 'connection',
+            fromId: relId,
+            toId: entityId1,
+            fromPoint: relEdge1,
+            toPoint: entity1Edge,
+            points: [fromPos1.x, fromPos1.y, toPos1.x, toPos1.y],
+            waypoints: [],
+            style: 'orthogonal',
+            cardinality: card1,
+            participation: 'partial',
+            position: { x: Math.min(fromPos1.x, toPos1.x), y: Math.min(fromPos1.y, toPos1.y) },
+            selected: false,
+          };
+          const conn2: Connection = {
+            id: generateId(),
+            type: 'connection',
+            fromId: relId,
+            toId: entityId2,
+            fromPoint: relEdge2,
+            toPoint: entity2Edge,
+            points: [fromPos2.x, fromPos2.y, toPos2.x, toPos2.y],
+            waypoints: [],
+            style: 'orthogonal',
+            cardinality: card2,
+            participation: 'partial',
+            position: { x: Math.min(fromPos2.x, toPos2.x), y: Math.min(fromPos2.y, toPos2.y) },
+            selected: false,
+          };
+          state.diagram.connections.push(conn1, conn2);
+
+          if (state.validationEnabled) {
+            const warningsRel = validateRelationship(newRel, state.diagram);
+            newRel.hasWarning = warningsRel.length > 0;
+            newRel.warnings = warningsRel;
+            validateConnection(conn1, state.diagram);
+            validateConnection(conn2, state.diagram);
           }
         });
       },

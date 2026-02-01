@@ -2,8 +2,15 @@ import React, { useRef, useEffect, useState } from "react";
 import { Group, Rect, Text, Circle } from "react-konva";
 import type { Entity, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
-import { getClosestEdge, getBestAvailableEdge } from "../../lib/utils";
+import {
+	getClosestEdge,
+	getBestAvailableEdge,
+	areEntitiesConnected,
+	connectionExists,
+	anotherRelationshipConnectsPair,
+} from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
+import { showToast } from "../ui/toast";
 import Konva from "konva";
 
 interface EntityShapeProps {
@@ -201,9 +208,18 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 
 	const drawingConnection = useEditorStore((state) => state.drawingConnection);
 	const setDrawingConnection = useEditorStore(
-		(state) => state.setDrawingConnection
+		(state) => state.setDrawingConnection,
 	);
 	const addConnection = useEditorStore((state) => state.addConnection);
+	const pendingQuickRelationship = useEditorStore(
+		(state) => state.pendingQuickRelationship,
+	);
+	const setPendingQuickRelationship = useEditorStore(
+		(state) => state.setPendingQuickRelationship,
+	);
+	const addRelationshipBetweenEntities = useEditorStore(
+		(state) => state.addRelationshipBetweenEntities,
+	);
 
 	// Handle touch tap events
 	const handleTap = (e: Konva.KonvaEventObject<PointerEvent | TouchEvent>) => {
@@ -218,6 +234,55 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	};
 
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		// Quick relationship (1:1, 1:N, N:N) – click first entity, then second entity
+		const isQuickRelationshipMode =
+			mode === "relationship-1-1" ||
+			mode === "relationship-1-n" ||
+			mode === "relationship-n-n";
+		if (isQuickRelationshipMode) {
+			e.cancelBubble = true;
+			if (!pendingQuickRelationship) {
+				setPendingQuickRelationship({ firstEntityId: id, mode });
+				showToast("Now click the second entity", "info", 2000);
+				return;
+			}
+			if (pendingQuickRelationship.firstEntityId === id) {
+				setPendingQuickRelationship(null);
+				return;
+			}
+			if (
+				areEntitiesConnected(
+					diagram,
+					pendingQuickRelationship.firstEntityId,
+					id,
+				)
+			) {
+				showToast("These entities are already connected", "warning");
+				setPendingQuickRelationship(null);
+				return;
+			}
+			const type =
+				mode === "relationship-1-1"
+					? "1-1"
+					: mode === "relationship-1-n"
+						? "1-n"
+						: "n-n";
+			const toastMessage =
+				type === "1-1"
+					? "1:1 relationship created"
+					: type === "1-n"
+						? "1:N relationship created"
+						: "N:N relationship created";
+			addRelationshipBetweenEntities(
+				pendingQuickRelationship.firstEntityId,
+				id,
+				type,
+			);
+			setPendingQuickRelationship(null);
+			showToast(toastMessage, "success");
+			return;
+		}
+
 		if (mode === "connect") {
 			e.cancelBubble = true;
 			const stage = e.target.getStage();
@@ -254,7 +319,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 				// Start connection - use entity-relative position to determine edge
 				const edge = getClosestEdge(
 					entityRelativePos,
-					tempElement
+					tempElement,
 				) as ConnectionPoint;
 				// Calculate the actual connection point position in stage coordinates
 				const centerX = entity.position.x + entity.size.width / 2;
@@ -290,10 +355,52 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 					const fromElement =
 						diagram.entities.find((e) => e.id === drawingConnection.fromId) ||
 						diagram.relationships.find(
-							(r) => r.id === drawingConnection.fromId
+							(r) => r.id === drawingConnection.fromId,
 						);
 
 					if (fromElement) {
+						// ER rule: two entities must not be connected directly; they must be linked via a relationship
+						if (fromElement.type === "entity") {
+							showToast(
+								"Connect entities through a relationship. Use Relationship 1:1, 1:N, or N:N to link two entities.",
+								"warning",
+							);
+							setDrawingConnection(false, null, null, null, []);
+							return;
+						}
+
+						// Don't create duplicate connection between same relationship and entity
+						if (connectionExists(diagram, drawingConnection.fromId, id)) {
+							showToast(
+								"A connection already exists between these elements.",
+								"warning",
+							);
+							setDrawingConnection(false, null, null, null, []);
+							return;
+						}
+
+						// Don't allow a second relationship between the same two entities (Connect tool)
+						if (fromElement.type === "relationship") {
+							const rel = fromElement;
+							// Block if adding this entity would create any pair (existing, id) already connected by another relationship
+							const wouldDuplicatePair = rel.entityIds.some((existingId) =>
+								anotherRelationshipConnectsPair(
+									diagram,
+									rel.id,
+									existingId,
+									id,
+								),
+							);
+							if (wouldDuplicatePair) {
+								showToast(
+									"These two entities are already connected by another relationship.",
+									"warning",
+								);
+								setDrawingConnection(false, null, null, null, []);
+								return;
+							}
+						}
+
 						// Calculate the center of the fromElement
 						const fromCenter = {
 							x: fromElement.position.x + fromElement.size.width / 2,
@@ -309,7 +416,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 						// Determine which edge of the current entity (toEntity) is closest to fromElement's center
 						const toEdge = getClosestEdge(
 							fromCenter,
-							entity
+							entity,
 						) as ConnectionPoint;
 
 						// For relationships, use edge distribution to avoid overlapping connections
@@ -320,12 +427,12 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 								drawingConnection.fromId!,
 								diagram.connections,
 								toCenter,
-								fromElement
+								fromElement,
 							) as ConnectionPoint;
 						} else {
 							fromEdge = getClosestEdge(
 								toCenter,
-								fromElement
+								fromElement,
 							) as ConnectionPoint;
 						}
 
@@ -335,13 +442,21 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 							fromEdge,
 							toEdge,
 							drawingConnection.waypoints,
-							"orthogonal"
+							"orthogonal",
 						);
 					} else {
 						// Fallback to old behavior if fromElement not found
+						if (connectionExists(diagram, drawingConnection.fromId, id)) {
+							showToast(
+								"A connection already exists between these elements.",
+								"warning",
+							);
+							setDrawingConnection(false, null, null, null, []);
+							return;
+						}
 						const toEdge = getClosestEdge(
 							entityRelativePos,
-							tempElement
+							tempElement,
 						) as ConnectionPoint;
 						addConnection(
 							drawingConnection.fromId,
@@ -349,7 +464,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 							drawingConnection.fromPoint || "right",
 							toEdge,
 							drawingConnection.waypoints,
-							"orthogonal"
+							"orthogonal",
 						);
 					}
 					setDrawingConnection(false, null, null, null, []);

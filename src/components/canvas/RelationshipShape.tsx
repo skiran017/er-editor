@@ -2,8 +2,14 @@ import React, { useRef, useEffect, useState } from "react";
 import { Group, Line, Text, Circle } from "react-konva";
 import type { Relationship, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
-import { getClosestEdge, getBestAvailableEdge } from "../../lib/utils";
+import {
+	getClosestEdge,
+	getBestAvailableEdge,
+	connectionExists,
+	anotherRelationshipConnectsPair,
+} from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
+import { showToast } from "../ui/toast";
 import Konva from "konva";
 
 interface RelationshipShapeProps {
@@ -17,7 +23,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	const textRef = useRef<Konva.Text>(null);
 	const [isEditing, setIsEditing] = useState(false);
 	const updateRelationship = useEditorStore(
-		(state) => state.updateRelationship
+		(state) => state.updateRelationship,
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
@@ -84,28 +90,28 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			const badgeAbsolutePos = groupNode.getAbsolutePosition();
 			const badgeScreenX = badgeAbsolutePos.x + badgeRelativePos.x;
 			const badgeScreenY = badgeAbsolutePos.y + badgeRelativePos.y;
-			
+
 			const stageBox = stage.container().getBoundingClientRect();
 
 			// Create tooltip element
-			const tooltip = document.createElement('div');
-			tooltip.setAttribute('data-warning-tooltip', 'true');
-			tooltip.style.position = 'absolute';
+			const tooltip = document.createElement("div");
+			tooltip.setAttribute("data-warning-tooltip", "true");
+			tooltip.style.position = "absolute";
 			tooltip.style.top = `${stageBox.top + badgeScreenY + 20}px`;
 			tooltip.style.left = `${stageBox.left + badgeScreenX - 140}px`;
-			tooltip.style.backgroundColor = '#fee2e2';
-			tooltip.style.border = '1px solid #ef4444';
-			tooltip.style.borderRadius = '4px';
-			tooltip.style.padding = '8px 12px';
-			tooltip.style.zIndex = '1000';
-			tooltip.style.maxWidth = '300px';
-			tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-			tooltip.style.fontSize = '12px';
-			tooltip.style.color = '#991b1b';
-			tooltip.style.pointerEvents = 'none'; // Don't interfere with canvas
+			tooltip.style.backgroundColor = "#fee2e2";
+			tooltip.style.border = "1px solid #ef4444";
+			tooltip.style.borderRadius = "4px";
+			tooltip.style.padding = "8px 12px";
+			tooltip.style.zIndex = "1000";
+			tooltip.style.maxWidth = "300px";
+			tooltip.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+			tooltip.style.fontSize = "12px";
+			tooltip.style.color = "#991b1b";
+			tooltip.style.pointerEvents = "none"; // Don't interfere with canvas
 			const currentWarnings = warnings || [];
-			tooltip.innerHTML = `<strong>Validation Warnings:</strong><ul style="margin: 4px 0 0 0; padding-left: 20px;">${currentWarnings.map(w => `<li>${w}</li>`).join('') || ''}</ul>`;
-			
+			tooltip.innerHTML = `<strong>Validation Warnings:</strong><ul style="margin: 4px 0 0 0; padding-left: 20px;">${currentWarnings.map((w) => `<li>${w}</li>`).join("") || ""}</ul>`;
+
 			document.body.appendChild(tooltip);
 			warningTooltipRef.current = tooltip;
 		});
@@ -143,7 +149,16 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				warningTooltipRef.current = null;
 			}
 		};
-	}, [hasWarning, showWarningTooltip, viewport.scale, viewport.position.x, viewport.position.y, size.width, size.height, warnings]);
+	}, [
+		hasWarning,
+		showWarningTooltip,
+		viewport.scale,
+		viewport.position.x,
+		viewport.position.y,
+		size.width,
+		size.height,
+		warnings,
+	]);
 
 	// Diamond dimensions
 	const width = size.width;
@@ -201,7 +216,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 
 	const drawingConnection = useEditorStore((state) => state.drawingConnection);
 	const setDrawingConnection = useEditorStore(
-		(state) => state.setDrawingConnection
+		(state) => state.setDrawingConnection,
 	);
 	const addConnection = useEditorStore((state) => state.addConnection);
 
@@ -254,7 +269,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 				// Start connection - use relationship-relative position to determine edge
 				const edge = getClosestEdge(
 					relationshipRelativePos,
-					tempElement
+					tempElement,
 				) as ConnectionPoint;
 				// Calculate the actual connection point position in stage coordinates
 				const centerX = relationship.position.x + relationship.size.width / 2;
@@ -290,10 +305,42 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 					const fromElement =
 						diagram.entities.find((e) => e.id === drawingConnection.fromId) ||
 						diagram.relationships.find(
-							(r) => r.id === drawingConnection.fromId
+							(r) => r.id === drawingConnection.fromId,
 						);
 
 					if (fromElement) {
+						// Don't create duplicate connection between same relationship and entity
+						if (connectionExists(diagram, drawingConnection.fromId, id)) {
+							showToast(
+								"A connection already exists between these elements.",
+								"warning",
+							);
+							setDrawingConnection(false, null, null, null, []);
+							return;
+						}
+
+						// Don't allow a second relationship between the same two entities (Connect tool)
+						if (fromElement.type === "entity") {
+							const entityIdBeingAdded = drawingConnection.fromId;
+							const wouldDuplicatePair = relationship.entityIds.some(
+								(existingId) =>
+									anotherRelationshipConnectsPair(
+										diagram,
+										id,
+										existingId,
+										entityIdBeingAdded,
+									),
+							);
+							if (wouldDuplicatePair) {
+								showToast(
+									"These two entities are already connected by another relationship.",
+									"warning",
+								);
+								setDrawingConnection(false, null, null, null, []);
+								return;
+							}
+						}
+
 						// Calculate the center of the fromElement
 						const fromCenter = {
 							x: fromElement.position.x + fromElement.size.width / 2,
@@ -312,14 +359,14 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 							id,
 							diagram.connections,
 							fromCenter,
-							relationship
+							relationship,
 						) as ConnectionPoint;
 
 						// For entities connecting to relationship, use closest edge
 						// For relationships connecting to entities, use closest edge
 						const fromEdge = getClosestEdge(
 							toCenter,
-							fromElement
+							fromElement,
 						) as ConnectionPoint;
 
 						addConnection(
@@ -328,13 +375,21 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 							fromEdge,
 							toEdge,
 							drawingConnection.waypoints,
-							"orthogonal"
+							"orthogonal",
 						);
 					} else {
 						// Fallback to old behavior if fromElement not found
+						if (connectionExists(diagram, drawingConnection.fromId, id)) {
+							showToast(
+								"A connection already exists between these elements.",
+								"warning",
+							);
+							setDrawingConnection(false, null, null, null, []);
+							return;
+						}
 						const toEdge = getClosestEdge(
 							relationshipRelativePos,
-							tempElement
+							tempElement,
 						) as ConnectionPoint;
 						addConnection(
 							drawingConnection.fromId,
@@ -342,7 +397,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 							drawingConnection.fromPoint || "right",
 							toEdge,
 							drawingConnection.waypoints,
-							"orthogonal"
+							"orthogonal",
 						);
 					}
 					setDrawingConnection(false, null, null, null, []);
@@ -368,7 +423,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		e.cancelBubble = true;
 		setIsEditing(true);
-		
+
 		// Create HTML input for editing
 		const textNode = textRef.current;
 		const stage = textNode?.getStage();
@@ -377,24 +432,24 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		// Get absolute position of text
 		const textPosition = textNode.getAbsolutePosition();
 		const stageBox = stage.container().getBoundingClientRect();
-		
+
 		// Create input element
-		const input = document.createElement('input');
+		const input = document.createElement("input");
 		input.value = name;
-		input.style.position = 'absolute';
+		input.style.position = "absolute";
 		input.style.top = `${stageBox.top + textPosition.y + height / 2 - 15}px`;
 		input.style.left = `${stageBox.left + textPosition.x}px`;
 		input.style.width = `${width}px`;
-		input.style.height = '30px';
-		input.style.fontSize = '14px';
-		input.style.fontWeight = 'bold';
-		input.style.textAlign = 'center';
-		input.style.border = '2px solid #3b82f6';
-		input.style.borderRadius = '4px';
-		input.style.padding = '4px';
-		input.style.zIndex = '1000';
-		input.style.backgroundColor = 'white';
-		
+		input.style.height = "30px";
+		input.style.fontSize = "14px";
+		input.style.fontWeight = "bold";
+		input.style.textAlign = "center";
+		input.style.border = "2px solid #3b82f6";
+		input.style.borderRadius = "4px";
+		input.style.padding = "4px";
+		input.style.zIndex = "1000";
+		input.style.backgroundColor = "white";
+
 		document.body.appendChild(input);
 		input.focus();
 		input.select();
@@ -408,14 +463,14 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 
 		let isRemoved = false;
 
-		input.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
 				updateRelationship(id, { name: input.value });
 				if (!isRemoved) {
 					isRemoved = true;
 					removeInput();
 				}
-			} else if (e.key === 'Escape') {
+			} else if (e.key === "Escape") {
 				if (!isRemoved) {
 					isRemoved = true;
 					removeInput();
@@ -423,7 +478,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			}
 		});
 
-		input.addEventListener('blur', () => {
+		input.addEventListener("blur", () => {
 			if (!isRemoved) {
 				updateRelationship(id, { name: input.value });
 				isRemoved = true;
@@ -534,12 +589,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 						setShowWarningTooltip(false);
 					}}
 				>
-					<Circle
-						radius={8}
-						fill="#ef4444"
-						stroke="#991b1b"
-						strokeWidth={1}
-					/>
+					<Circle radius={8} fill="#ef4444" stroke="#991b1b" strokeWidth={1} />
 					<Text
 						text="!"
 						x={-4}

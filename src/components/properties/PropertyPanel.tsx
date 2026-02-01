@@ -23,6 +23,7 @@ import {
 	checkUniqueRelationshipName,
 	checkUniqueAttributeName,
 } from "../../lib/validation";
+import { showToast } from "../ui/toast";
 
 export const PropertyPanel: React.FC = () => {
 	const selectedIds = useEditorStore((state) => state.selectedIds);
@@ -513,8 +514,21 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 						id="weak-relationship"
 						checked={relationship.isWeak || false}
 						onChange={(e) => {
+							const checked = e.target.checked;
+							if (checked) {
+								const hasWeakEntity = connectedEntities.some(
+									(ent) => ent.isWeak,
+								);
+								if (!hasWeakEntity) {
+									showToast(
+										"Identifying relationship must connect at least one weak entity. Mark one of the entities as weak first.",
+										"warning",
+									);
+									return;
+								}
+							}
 							updateRelationship(relationship.id, {
-								isWeak: e.target.checked,
+								isWeak: checked,
 							});
 						}}
 						className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"

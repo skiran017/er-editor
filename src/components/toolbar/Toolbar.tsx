@@ -126,24 +126,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			type: "react-icon" as const,
 		},
 		{
-			id: "relationship",
-			icon: Diamond,
-			label: "Relationship (R)",
-			size: 18,
-			type: "lucide" as const,
-		},
-		{
-			id: "connect",
-			icon: Link,
-			label: "Connect (C)",
-			size: 18,
-			type: "lucide" as const,
-		},
-	] as const;
-
-	// Overflow tools (shown in dropdown)
-	const moreTools = [
-		{
 			id: "relationship-1-1",
 			icon: TbRelationOneToOne,
 			label: "Relationship 1:1",
@@ -163,6 +145,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			label: "Relationship N:N",
 			size: 20,
 			type: "react-icon" as const,
+		},
+	] as const;
+
+	// Overflow tools (shown in dropdown)
+	const moreTools = [
+		{
+			id: "relationship",
+			icon: Diamond,
+			label: "Relationship (R)",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
+			id: "connect",
+			icon: Link,
+			label: "Connect (C)",
+			size: 18,
+			type: "lucide" as const,
 		},
 		{
 			id: "line",

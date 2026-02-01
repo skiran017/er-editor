@@ -53,11 +53,11 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const updateEntity = useEditorStore((state) => state.updateEntity);
 	const addRelationship = useEditorStore((state) => state.addRelationship);
 	const updateRelationship = useEditorStore(
-		(state) => state.updateRelationship
+		(state) => state.updateRelationship,
 	);
 	const setZoom = useEditorStore((state) => state.setZoom);
 	const setViewportPosition = useEditorStore(
-		(state) => state.setViewportPosition
+		(state) => state.setViewportPosition,
 	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 	const selectMultiple = useEditorStore((state) => state.selectMultiple);
@@ -65,23 +65,26 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const addArrow = useEditorStore((state) => state.addArrow);
 	const addAttribute = useEditorStore((state) => state.addAttribute);
 	const addRelationshipAttribute = useEditorStore(
-		(state) => state.addRelationshipAttribute
+		(state) => state.addRelationshipAttribute,
 	);
 	const updateAttributePosition = useEditorStore(
-		(state) => state.updateAttributePosition
+		(state) => state.updateAttributePosition,
 	);
 
 	const drawingLine = useEditorStore((state) => state.drawingLine);
 	const setDrawingLine = useEditorStore((state) => state.setDrawingLine);
 	const drawingConnection = useEditorStore((state) => state.drawingConnection);
 	const setDrawingConnection = useEditorStore(
-		(state) => state.setDrawingConnection
+		(state) => state.setDrawingConnection,
+	);
+	const setPendingQuickRelationship = useEditorStore(
+		(state) => state.setPendingQuickRelationship,
 	);
 	// const setMode = useEditorStore((state) => state.setMode);
 
 	// Track previous positions for multi-select dragging
 	const prevNodePositionsRef = useRef<Map<string, { x: number; y: number }>>(
-		new Map()
+		new Map(),
 	);
 
 	// Update transformer when selection changes
@@ -103,7 +106,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				}
 			})
 			.filter(
-				(node): node is Konva.Node => node !== null && node !== undefined
+				(node): node is Konva.Node => node !== null && node !== undefined,
 			);
 
 		// Only update if we have valid nodes
@@ -210,7 +213,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					};
 
 					const handleNodeDragStart = (
-						e: Konva.KonvaEventObject<DragEvent>
+						e: Konva.KonvaEventObject<DragEvent>,
 					) => {
 						draggedNode = e.target as Konva.Node;
 						initialDragNodePos = {
@@ -462,7 +465,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 												? {
 														width: Math.max(50, initialSize.width * scaleX),
 														height: Math.max(30, initialSize.height * scaleY),
-												  }
+													}
 												: entity.size,
 										});
 										// Reset scale
@@ -473,7 +476,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 									// Update relationship
 									const relationship = relationships.find(
-										(r) => r.id === nodeId
+										(r) => r.id === nodeId,
 									);
 									if (relationship) {
 										const initialSize = initialSizes.get(nodeId);
@@ -483,7 +486,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 												? {
 														width: Math.max(60, initialSize.width * scaleX),
 														height: Math.max(40, initialSize.height * scaleY),
-												  }
+													}
 												: relationship.size,
 										});
 										// Reset scale
@@ -652,7 +655,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 	// Handle touch events (tap) - same logic as click
 	const handleStageTap = (
-		e: Konva.KonvaEventObject<PointerEvent | TouchEvent>
+		e: Konva.KonvaEventObject<PointerEvent | TouchEvent>,
 	) => {
 		// Convert to mouse event format for compatibility
 		const mouseEvent = {
@@ -817,7 +820,10 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 		// Check if click originated from a warning badge or popover
 		const target = e.evt.target as HTMLElement;
-		if (target?.closest('[data-warning-popover]') || target?.closest('button')) {
+		if (
+			target?.closest("[data-warning-popover]") ||
+			target?.closest("button")
+		) {
 			return;
 		}
 
@@ -839,7 +845,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					drawingConnection.fromId,
 					drawingConnection.fromPoint,
 					pos,
-					[...drawingConnection.waypoints, pos]
+					[...drawingConnection.waypoints, pos],
 				);
 			}
 			return;
@@ -849,7 +855,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		if (mode === "attribute") {
 			// First, check if clicking on an existing attribute - if so, don't create
 			const clickedNode = e.target;
-			
+
 			// Check if directly clicking on an attribute Group
 			if (clickedNode) {
 				const groupId = clickedNode.id ? clickedNode.id() : null;
@@ -860,7 +866,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						return;
 					}
 				}
-				
+
 				// Also check if clicking on a child of an attribute (Ellipse or Text)
 				const parent = clickedNode.getParent();
 				if (parent && parent.id) {
@@ -897,7 +903,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					const entityCenterY = entity.position.y + entity.size.height / 2;
 					const distance = Math.sqrt(
 						Math.pow(pos.x - entityCenterX, 2) +
-							Math.pow(pos.y - entityCenterY, 2)
+							Math.pow(pos.y - entityCenterY, 2),
 					);
 
 					if (distance < minDistance && distance < maxDistance) {
@@ -914,7 +920,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						const relCenterY =
 							relationship.position.y + relationship.size.height / 2;
 						const distance = Math.sqrt(
-							Math.pow(pos.x - relCenterX, 2) + Math.pow(pos.y - relCenterY, 2)
+							Math.pow(pos.x - relCenterX, 2) + Math.pow(pos.y - relCenterY, 2),
 						);
 
 						if (distance < minDistance && distance < maxDistance) {
@@ -928,181 +934,221 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			if (targetEntity) {
 				// Add attribute to the entity
 				// Count existing attributes for this entity
-				const attributeCount = attributes.filter(a => a.entityId === targetEntity.id).length;
-				
+				const attributeCount = attributes.filter(
+					(a) => a.entityId === targetEntity.id,
+				).length;
+
 				// Calculate position based on click location relative to entity
-				const entityCenterX = targetEntity.position.x + targetEntity.size.width / 2;
-				const entityCenterY = targetEntity.position.y + targetEntity.size.height / 2;
+				const entityCenterX =
+					targetEntity.position.x + targetEntity.size.width / 2;
+				const entityCenterY =
+					targetEntity.position.y + targetEntity.size.height / 2;
 				const dx = pos.x - entityCenterX;
 				const dy = pos.y - entityCenterY;
-				
+
 				// Determine which side was clicked based on angle
 				const angle = Math.atan2(dy, dx);
 				const offset = 60; // Distance from entity edge
 				const spacing = 40; // Vertical spacing between attributes on the same side
-				let side: 'right' | 'bottom' | 'left' | 'top';
+				let side: "right" | "bottom" | "left" | "top";
 				let basePosition: { x: number; y: number };
-				
+
 				// Top: -3π/4 to -π/4, Right: -π/4 to π/4, Bottom: π/4 to 3π/4, Left: 3π/4 to -3π/4
 				if (angle >= -Math.PI / 4 && angle < Math.PI / 4) {
 					// Right side
-					side = 'right';
+					side = "right";
 					basePosition = {
 						x: targetEntity.position.x + targetEntity.size.width + offset,
 						y: targetEntity.position.y + targetEntity.size.height / 2,
 					};
 				} else if (angle >= Math.PI / 4 && angle < (3 * Math.PI) / 4) {
 					// Bottom side
-					side = 'bottom';
+					side = "bottom";
 					basePosition = {
 						x: targetEntity.position.x + targetEntity.size.width / 2,
 						y: targetEntity.position.y + targetEntity.size.height + offset,
 					};
 				} else if (angle >= (3 * Math.PI) / 4 || angle < -(3 * Math.PI) / 4) {
 					// Left side
-					side = 'left';
+					side = "left";
 					basePosition = {
 						x: targetEntity.position.x - offset,
 						y: targetEntity.position.y + targetEntity.size.height / 2,
 					};
 				} else {
 					// Top side
-					side = 'top';
+					side = "top";
 					basePosition = {
 						x: targetEntity.position.x + targetEntity.size.width / 2,
 						y: targetEntity.position.y - offset,
 					};
 				}
-				
+
 				// Check for existing attributes on the same side and adjust position
-				const existingAttributesOnSide = attributes.filter(a => {
+				const existingAttributesOnSide = attributes.filter((a) => {
 					if (a.entityId !== targetEntity.id) return false;
-					
+
 					// Determine which side this attribute is on
 					const attrDx = a.position.x - entityCenterX;
 					const attrDy = a.position.y - entityCenterY;
 					const attrAngle = Math.atan2(attrDy, attrDx);
-					
-					let attrSide: 'right' | 'bottom' | 'left' | 'top';
+
+					let attrSide: "right" | "bottom" | "left" | "top";
 					if (attrAngle >= -Math.PI / 4 && attrAngle < Math.PI / 4) {
-						attrSide = 'right';
-					} else if (attrAngle >= Math.PI / 4 && attrAngle < (3 * Math.PI) / 4) {
-						attrSide = 'bottom';
-					} else if (attrAngle >= (3 * Math.PI) / 4 || attrAngle < -(3 * Math.PI) / 4) {
-						attrSide = 'left';
+						attrSide = "right";
+					} else if (
+						attrAngle >= Math.PI / 4 &&
+						attrAngle < (3 * Math.PI) / 4
+					) {
+						attrSide = "bottom";
+					} else if (
+						attrAngle >= (3 * Math.PI) / 4 ||
+						attrAngle < -(3 * Math.PI) / 4
+					) {
+						attrSide = "left";
 					} else {
-						attrSide = 'top';
+						attrSide = "top";
 					}
-					
+
 					return attrSide === side;
 				});
-				
-			// Offset the position based on number of existing attributes on this side
-			const attributePosition = { ...basePosition };
-			if (side === 'right' || side === 'left') {
-				// Stack vertically for left/right sides
-				attributePosition.y += existingAttributesOnSide.length * spacing;
-			} else {
-				// Stack horizontally for top/bottom sides
-				attributePosition.x += existingAttributesOnSide.length * spacing;
-			}
-				
-				addAttribute(targetEntity.id, {
-					name: `Attribute ${attributeCount + 1}`,
-					isKey: false,
-					isPartialKey: false,
-					isMultivalued: false,
-					isDerived: false,
-				}, attributePosition);
+
+				// Offset the position based on number of existing attributes on this side
+				const attributePosition = { ...basePosition };
+				if (side === "right" || side === "left") {
+					// Stack vertically for left/right sides
+					attributePosition.y += existingAttributesOnSide.length * spacing;
+				} else {
+					// Stack horizontally for top/bottom sides
+					attributePosition.x += existingAttributesOnSide.length * spacing;
+				}
+
+				addAttribute(
+					targetEntity.id,
+					{
+						name: `Attribute ${attributeCount + 1}`,
+						isKey: false,
+						isPartialKey: false,
+						isMultivalued: false,
+						isDerived: false,
+					},
+					attributePosition,
+				);
 			} else if (targetRelationship) {
 				// Add attribute to the relationship
 				// Count existing attributes for this relationship
-				const attributeCount = attributes.filter(a => a.relationshipId === targetRelationship.id).length;
-				
+				const attributeCount = attributes.filter(
+					(a) => a.relationshipId === targetRelationship.id,
+				).length;
+
 				// Calculate position based on click location relative to relationship
-				const relCenterX = targetRelationship.position.x + targetRelationship.size.width / 2;
-				const relCenterY = targetRelationship.position.y + targetRelationship.size.height / 2;
+				const relCenterX =
+					targetRelationship.position.x + targetRelationship.size.width / 2;
+				const relCenterY =
+					targetRelationship.position.y + targetRelationship.size.height / 2;
 				const dx = pos.x - relCenterX;
 				const dy = pos.y - relCenterY;
-				
+
 				// Determine which side was clicked based on angle
 				const angle = Math.atan2(dy, dx);
 				const offset = 60; // Distance from relationship edge
 				const spacing = 40; // Vertical spacing between attributes on the same side
-				let side: 'right' | 'bottom' | 'left' | 'top';
+				let side: "right" | "bottom" | "left" | "top";
 				let basePosition: { x: number; y: number };
-				
+
 				// Top: -3π/4 to -π/4, Right: -π/4 to π/4, Bottom: π/4 to 3π/4, Left: 3π/4 to -3π/4
 				if (angle >= -Math.PI / 4 && angle < Math.PI / 4) {
 					// Right side
-					side = 'right';
+					side = "right";
 					basePosition = {
-						x: targetRelationship.position.x + targetRelationship.size.width + offset,
-						y: targetRelationship.position.y + targetRelationship.size.height / 2,
+						x:
+							targetRelationship.position.x +
+							targetRelationship.size.width +
+							offset,
+						y:
+							targetRelationship.position.y +
+							targetRelationship.size.height / 2,
 					};
 				} else if (angle >= Math.PI / 4 && angle < (3 * Math.PI) / 4) {
 					// Bottom side
-					side = 'bottom';
+					side = "bottom";
 					basePosition = {
-						x: targetRelationship.position.x + targetRelationship.size.width / 2,
-						y: targetRelationship.position.y + targetRelationship.size.height + offset,
+						x:
+							targetRelationship.position.x + targetRelationship.size.width / 2,
+						y:
+							targetRelationship.position.y +
+							targetRelationship.size.height +
+							offset,
 					};
 				} else if (angle >= (3 * Math.PI) / 4 || angle < -(3 * Math.PI) / 4) {
 					// Left side
-					side = 'left';
+					side = "left";
 					basePosition = {
 						x: targetRelationship.position.x - offset,
-						y: targetRelationship.position.y + targetRelationship.size.height / 2,
+						y:
+							targetRelationship.position.y +
+							targetRelationship.size.height / 2,
 					};
 				} else {
 					// Top side
-					side = 'top';
+					side = "top";
 					basePosition = {
-						x: targetRelationship.position.x + targetRelationship.size.width / 2,
+						x:
+							targetRelationship.position.x + targetRelationship.size.width / 2,
 						y: targetRelationship.position.y - offset,
 					};
 				}
-				
+
 				// Check for existing attributes on the same side and adjust position
-				const existingAttributesOnSide = attributes.filter(a => {
+				const existingAttributesOnSide = attributes.filter((a) => {
 					if (a.relationshipId !== targetRelationship.id) return false;
-					
+
 					// Determine which side this attribute is on
 					const attrDx = a.position.x - relCenterX;
 					const attrDy = a.position.y - relCenterY;
 					const attrAngle = Math.atan2(attrDy, attrDx);
-					
-					let attrSide: 'right' | 'bottom' | 'left' | 'top';
+
+					let attrSide: "right" | "bottom" | "left" | "top";
 					if (attrAngle >= -Math.PI / 4 && attrAngle < Math.PI / 4) {
-						attrSide = 'right';
-					} else if (attrAngle >= Math.PI / 4 && attrAngle < (3 * Math.PI) / 4) {
-						attrSide = 'bottom';
-					} else if (attrAngle >= (3 * Math.PI) / 4 || attrAngle < -(3 * Math.PI) / 4) {
-						attrSide = 'left';
+						attrSide = "right";
+					} else if (
+						attrAngle >= Math.PI / 4 &&
+						attrAngle < (3 * Math.PI) / 4
+					) {
+						attrSide = "bottom";
+					} else if (
+						attrAngle >= (3 * Math.PI) / 4 ||
+						attrAngle < -(3 * Math.PI) / 4
+					) {
+						attrSide = "left";
 					} else {
-						attrSide = 'top';
+						attrSide = "top";
 					}
-					
+
 					return attrSide === side;
 				});
-				
-			// Offset the position based on number of existing attributes on this side
-			const attributePosition = { ...basePosition };
-			if (side === 'right' || side === 'left') {
-				// Stack vertically for left/right sides
-				attributePosition.y += existingAttributesOnSide.length * spacing;
-			} else {
-				// Stack horizontally for top/bottom sides
-				attributePosition.x += existingAttributesOnSide.length * spacing;
-			}
-				
-				addRelationshipAttribute(targetRelationship.id, {
-					name: `Attribute ${attributeCount + 1}`,
-					isKey: false,
-					isPartialKey: false,
-					isMultivalued: false,
-					isDerived: false,
-				}, attributePosition);
+
+				// Offset the position based on number of existing attributes on this side
+				const attributePosition = { ...basePosition };
+				if (side === "right" || side === "left") {
+					// Stack vertically for left/right sides
+					attributePosition.y += existingAttributesOnSide.length * spacing;
+				} else {
+					// Stack horizontally for top/bottom sides
+					attributePosition.x += existingAttributesOnSide.length * spacing;
+				}
+
+				addRelationshipAttribute(
+					targetRelationship.id,
+					{
+						name: `Attribute ${attributeCount + 1}`,
+						isKey: false,
+						isPartialKey: false,
+						isMultivalued: false,
+						isDerived: false,
+					},
+					attributePosition,
+				);
 			}
 			return;
 		}
@@ -1110,10 +1156,15 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		if (e.target === e.target.getStage()) {
 			if (mode === "entity") {
 				addEntity(pos);
-			} else if (mode === "relationship" || mode === "relationship-1-1" || mode === "relationship-1-n" || mode === "relationship-n-n") {
+			} else if (
+				mode === "relationship-1-1" ||
+				mode === "relationship-1-n" ||
+				mode === "relationship-n-n"
+			) {
+				// Quick relationship flow: click two entities; don't place diamond on stage click; cancel pending if any
+				setPendingQuickRelationship(null);
+			} else if (mode === "relationship") {
 				addRelationship(pos);
-				// Store the relationship type for later use when creating connections
-				// The cardinality will be set when connections are made
 			} else if (
 				mode === "line" ||
 				mode === "arrow-left" ||
@@ -1176,7 +1227,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				drawingConnection.fromId,
 				drawingConnection.fromPoint,
 				pos,
-				drawingConnection.waypoints
+				drawingConnection.waypoints,
 			);
 		}
 	};
@@ -1189,7 +1240,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 			const distance = Math.sqrt(
 				Math.pow(touch2.clientX - touch1.clientX, 2) +
-					Math.pow(touch2.clientY - touch1.clientY, 2)
+					Math.pow(touch2.clientY - touch1.clientY, 2),
 			);
 
 			const centerX = (touch1.clientX + touch2.clientX) / 2;
@@ -1209,7 +1260,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 			const distance = Math.sqrt(
 				Math.pow(touch2.clientX - touch1.clientX, 2) +
-					Math.pow(touch2.clientY - touch1.clientY, 2)
+					Math.pow(touch2.clientY - touch1.clientY, 2),
 			);
 
 			const stage = stageRef.current;
@@ -1381,7 +1432,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 									const fromElement =
 										entities.find((e) => e.id === drawingConnection.fromId) ||
 										relationships.find(
-											(r) => r.id === drawingConnection.fromId
+											(r) => r.id === drawingConnection.fromId,
 										);
 									if (!fromElement) return null;
 
@@ -1425,7 +1476,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 									});
 									previewPoints.push(
 										drawingConnection.currentPoint.x,
-										drawingConnection.currentPoint.y
+										drawingConnection.currentPoint.y,
 									);
 
 									return (
@@ -1488,10 +1539,10 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					onClick={() => {
 						// Reset zoom to 1 (100%)
 						setZoom(1);
-						
+
 						// Reset position to (0, 0)
 						setViewportPosition({ x: 0, y: 0 });
-						
+
 						// Update stage position immediately
 						if (stageRef.current) {
 							stageRef.current.position({ x: 0, y: 0 });
@@ -1504,7 +1555,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				>
 					<Maximize2 size={16} className="text-gray-700 dark:text-gray-300" />
 				</button>
-				
+
 				{/* Zoom indicator */}
 				<div className="bg-white dark:bg-gray-800 px-3 py-1 rounded shadow text-sm border border-gray-200 dark:border-gray-700">
 					{Math.round(viewport.scale * 100)}%

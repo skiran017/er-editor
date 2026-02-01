@@ -144,6 +144,8 @@ export interface EditorState {
   nextRelationshipNumber: number;
   examMode: boolean; // Whether exam mode is enabled (controlled via ?examMode=true query param)
   validationEnabled: boolean; // Whether validation is enabled (controlled via Menu toggle, default: false)
+  /** When set, user is in "quick relationship" flow: first entity chosen, waiting for second click */
+  pendingQuickRelationship: { firstEntityId: string; mode: 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' } | null;
 }
 
 export interface ValidationError {

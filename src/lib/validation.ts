@@ -82,6 +82,17 @@ export function validateRelationship(relationship: Relationship, diagram: Diagra
     }
   }
 
+  // Rule: Identifying (weak) relationship must connect at least one weak entity
+  if (relationship.isWeak && relationship.entityIds.length > 0) {
+    const connectedEntities = relationship.entityIds
+      .map((entityId) => diagram.entities.find((e) => e.id === entityId))
+      .filter(Boolean) as Entity[];
+    const hasWeakEntity = connectedEntities.some((e) => e.isWeak);
+    if (!hasWeakEntity) {
+      warnings.push('Identifying relationship must connect at least one weak entity');
+    }
+  }
+
   return warnings;
 }
 
