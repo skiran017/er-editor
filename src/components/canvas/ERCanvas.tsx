@@ -11,6 +11,8 @@ import { Maximize2 } from "lucide-react";
 import { useEditorStore } from "../../store/editorStore";
 import { EntityShape } from "./EntityShape";
 import { RelationshipShape } from "./RelationshipShape";
+import { GeneralizationShape } from "./GeneralizationShape";
+import { GeneralizationLines } from "./GeneralizationLines";
 import { LineShapeComponent } from "./LineShape";
 import { ArrowShapeComponent } from "./ArrowShape";
 import { AttributeShape } from "./AttributeShape";
@@ -42,6 +44,9 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
+	const generalizations = useEditorStore(
+		(state) => state.diagram.generalizations,
+	);
 	const lines = useEditorStore((state) => state.diagram.lines);
 	const arrows = useEditorStore((state) => state.diagram.arrows);
 	const attributes = useEditorStore((state) => state.diagram.attributes);
@@ -54,6 +59,9 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const addRelationship = useEditorStore((state) => state.addRelationship);
 	const updateRelationship = useEditorStore(
 		(state) => state.updateRelationship,
+	);
+	const updateGeneralization = useEditorStore(
+		(state) => state.updateGeneralization,
 	);
 	const setZoom = useEditorStore((state) => state.setZoom);
 	const setViewportPosition = useEditorStore(
@@ -79,6 +87,9 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	);
 	const setPendingQuickRelationship = useEditorStore(
 		(state) => state.setPendingQuickRelationship,
+	);
+	const setPendingGeneralizationConnect = useEditorStore(
+		(state) => state.setPendingGeneralizationConnect,
 	);
 	// const setMode = useEditorStore((state) => state.setMode);
 
@@ -168,6 +179,23 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 							if (relationship) {
 								const width = relationship.size.width;
 								const height = relationship.size.height;
+								minX = Math.min(minX, x);
+								minY = Math.min(minY, y);
+								maxX = Math.max(maxX, x + width);
+								maxY = Math.max(maxY, y + height);
+								initialSizes.set(nodeId, {
+									width: width,
+									height: height,
+								});
+								return;
+							}
+
+							const generalization = generalizations?.find(
+								(g) => g.id === nodeId,
+							);
+							if (generalization) {
+								const width = generalization.size.width;
+								const height = generalization.size.height;
 								minX = Math.min(minX, x);
 								minY = Math.min(minY, y);
 								maxX = Math.max(maxX, x + width);
@@ -276,6 +304,17 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 							const relationship = relationships.find((r) => r.id === nodeId);
 							if (relationship) {
 								updateRelationship(nodeId, {
+									position: { x: finalX, y: finalY },
+								});
+								return;
+							}
+
+							// Update generalization
+							const generalization = generalizations?.find(
+								(g) => g.id === nodeId,
+							);
+							if (generalization) {
+								updateGeneralization(nodeId, {
 									position: { x: finalX, y: finalY },
 								});
 								return;
@@ -495,6 +534,27 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 										return;
 									}
 
+									// Update generalization
+									const generalization = generalizations?.find(
+										(g) => g.id === nodeId,
+									);
+									if (generalization) {
+										const initialSize = initialSizes.get(nodeId);
+										updateGeneralization(nodeId, {
+											position: { x: finalX, y: finalY },
+											size: initialSize
+												? {
+														width: Math.max(40, initialSize.width * scaleX),
+														height: Math.max(30, initialSize.height * scaleY),
+													}
+												: generalization.size,
+										});
+										// Reset scale
+										node.scaleX(1);
+										node.scaleY(1);
+										return;
+									}
+
 									// Update attribute (only position, no size)
 									const attribute = attributes.find((a) => a.id === nodeId);
 									if (attribute) {
@@ -535,6 +595,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 									});
 									return;
 								}
+
+								// Generalizations typically don't rotate
+								const generalization = generalizations?.find(
+									(g) => g.id === nodeId,
+								);
+								if (generalization) return;
 							});
 						}
 
@@ -579,6 +645,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		attributes,
 		updateEntity,
 		updateRelationship,
+		updateGeneralization,
 		updateAttributePosition,
 	]);
 
@@ -784,6 +851,20 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					}
 				});
 
+				// Check generalizations (triangle center)
+				generalizations.forEach((gen) => {
+					const genCenterX = gen.position.x + gen.size.width / 2;
+					const genCenterY = gen.position.y + gen.size.height / 2;
+					if (
+						genCenterX >= boxX &&
+						genCenterX <= boxX + boxWidth &&
+						genCenterY >= boxY &&
+						genCenterY <= boxY + boxHeight
+					) {
+						selectedIds.push(gen.id);
+					}
+				});
+
 				// Check connections (check if any point is in the box)
 				connections.forEach((connection) => {
 					// Check if any point in the connection is within the box
@@ -834,11 +915,19 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		transform.invert();
 		const pos = transform.point(pointer);
 
+		// Empty canvas = Stage or Layer (in Konva, clicks on empty area hit the Layer)
+		const isEmptyCanvasClick =
+			e.target === e.target.getStage() || e.target.getType() === "Layer";
+
 		// Handle connection drawing mode - only for empty space clicks
 		// Entity/Relationship clicks are handled in their respective components
 		if (mode === "connect") {
+			// Clear pending generalization connect if clicking on empty stage
+			if (isEmptyCanvasClick) {
+				setPendingGeneralizationConnect(null);
+			}
 			// Only handle empty space clicks (for waypoints)
-			if (e.target === e.target.getStage() && drawingConnection.isDrawing) {
+			if (isEmptyCanvasClick && drawingConnection.isDrawing) {
 				// Clicked on empty space - add waypoint if in connect mode
 				setDrawingConnection(
 					true,
@@ -1153,7 +1242,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			return;
 		}
 
-		if (e.target === e.target.getStage()) {
+		if (isEmptyCanvasClick) {
 			if (mode === "entity") {
 				addEntity(pos);
 			} else if (
@@ -1382,6 +1471,14 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 							key={relationship.id}
 							relationship={relationship}
 						/>
+					))}
+
+					{/* Render generalizations (lines first, then triangle on top) */}
+					{generalizations.map((gen) => (
+						<GeneralizationLines key={`lines-${gen.id}`} generalization={gen} />
+					))}
+					{generalizations.map((gen) => (
+						<GeneralizationShape key={gen.id} generalization={gen} />
 					))}
 
 					{/* Render attributes with connection lines */}

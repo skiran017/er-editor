@@ -37,8 +37,27 @@ export function serializeDiagramToJavaXML(diagram: Diagram): string {
   });
   xmlParts.push('    </RelationshipSets>');
 
-  // Generalizations (empty for now)
-  xmlParts.push('    <Generalizations />');
+  // Generalizations - Java app uses Generalization (partial) and TotalGeneralization (total)
+  if (diagram.generalizations && diagram.generalizations.length > 0) {
+    xmlParts.push('    <Generalizations>');
+    diagram.generalizations.forEach((gen) => {
+      const tagName = gen.isTotal ? 'TotalGeneralization' : 'Generalization';
+      const parentJavaId = getJavaId(gen.parentId);
+      xmlParts.push(`      <${tagName} id="${getJavaId(gen.id)}" total="${gen.isTotal}">`);
+      xmlParts.push('        <Parent>');
+      xmlParts.push(`          <StrongEntitySet refid="${parentJavaId}" />`);
+      xmlParts.push('        </Parent>');
+      xmlParts.push('        <Children>');
+      gen.childIds.forEach((childId) => {
+        xmlParts.push(`          <StrongEntitySet refid="${getJavaId(childId)}" />`);
+      });
+      xmlParts.push('        </Children>');
+      xmlParts.push(`      </${tagName}>`);
+    });
+    xmlParts.push('    </Generalizations>');
+  } else {
+    xmlParts.push('    <Generalizations />');
+  }
 
   xmlParts.push('  </ERDatabaseSchema>');
 
@@ -65,6 +84,17 @@ export function serializeDiagramToJavaXML(diagram: Diagram): string {
     // Java app uses CENTER-based coordinates, convert from our top-left
     const centerX = relationship.position.x + relationship.size.width / 2;
     const centerY = relationship.position.y + relationship.size.height / 2;
+    xmlParts.push(`    <${tagName} refid="${javaId}">`);
+    xmlParts.push(`      <Position x="${Math.round(centerX)}" y="${Math.round(centerY)}" />`);
+    xmlParts.push(`    </${tagName}>`);
+  });
+
+  // Serialize generalization positions - Java uses Generalization/TotalGeneralization in diagram
+  (diagram.generalizations ?? []).forEach((gen) => {
+    const javaId = getJavaId(gen.id);
+    const tagName = gen.isTotal ? 'TotalGeneralization' : 'Generalization';
+    const centerX = gen.position.x + gen.size.width / 2;
+    const centerY = gen.position.y + gen.size.height / 2;
     xmlParts.push(`    <${tagName} refid="${javaId}">`);
     xmlParts.push(`      <Position x="${Math.round(centerX)}" y="${Math.round(centerY)}" />`);
     xmlParts.push(`    </${tagName}>`);

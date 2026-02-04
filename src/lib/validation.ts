@@ -1,4 +1,4 @@
-import type { Entity, Relationship, Attribute, Connection, Diagram, ValidationError } from '../types';
+import type { Entity, Relationship, Attribute, Connection, Diagram, ValidationError, Generalization } from '../types';
 
 /**
  * Validation library for ER diagram elements
@@ -170,6 +170,35 @@ export function validateConnection(connection: Connection, diagram: Diagram): st
 }
 
 /**
+ * Validate a generalization and return warning messages
+ */
+export function validateGeneralization(gen: Generalization, diagram: Diagram): string[] {
+  const warnings: string[] = [];
+
+  const parent = diagram.entities.find(e => e.id === gen.parentId);
+  if (!parent) {
+    warnings.push('Generalization parent entity does not exist');
+  }
+
+  if (gen.childIds.length === 0) {
+    warnings.push('Generalization must have at least one child');
+  }
+
+  if (gen.childIds.includes(gen.parentId)) {
+    warnings.push('Parent cannot be a child of its own generalization');
+  }
+
+  for (const childId of gen.childIds) {
+    const child = diagram.entities.find(e => e.id === childId);
+    if (!child) {
+      warnings.push(`Child entity ${childId} does not exist`);
+    }
+  }
+
+  return warnings;
+}
+
+/**
  * Validate entire diagram and return all validation errors
  */
 export function validateDiagram(diagram: Diagram): ValidationError[] {
@@ -211,6 +240,18 @@ export function validateDiagram(diagram: Diagram): ValidationError[] {
     }
   }
 
+  // Validate all generalizations
+  for (const gen of diagram.generalizations ?? []) {
+    const warnings = validateGeneralization(gen, diagram);
+    if (warnings.length > 0) {
+      errors.push({
+        elementId: gen.id,
+        message: warnings.join('; '),
+        severity: 'warning'
+      });
+    }
+  }
+
   // Validate all connections
   for (const connection of diagram.connections) {
     const warnings = validateConnection(connection, diagram);
@@ -224,6 +265,13 @@ export function validateDiagram(diagram: Diagram): ValidationError[] {
   }
 
   return errors;
+}
+
+/**
+ * Check if an entity name is valid (non-empty after trim)
+ */
+export function isValidEntityName(name: string): boolean {
+  return name.trim().length > 0;
 }
 
 /**

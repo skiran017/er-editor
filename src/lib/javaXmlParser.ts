@@ -1,4 +1,4 @@
-import type { Diagram, Entity, Relationship, Attribute, EntityAttribute, Cardinality, Participation, ConnectionPoint } from '../types';
+import type { Diagram, Entity, Relationship, Attribute, EntityAttribute, Cardinality, Participation, ConnectionPoint, Generalization } from '../types';
 import { getClosestEdge } from './utils';
 
 /**
@@ -23,6 +23,7 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
     entities: [],
     relationships: [],
     connections: [],
+    generalizations: [],
     lines: [],
     arrows: [],
     attributes: [],
@@ -109,6 +110,21 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
     });
   }
 
+  // Parse generalizations from Generalizations
+  // Java app uses <Generalization> and <TotalGeneralization> (not GeneralizationSet)
+  const generalizationsSection = schema.querySelector('Generalizations');
+  if (generalizationsSection) {
+    const genElems = generalizationsSection.querySelectorAll('Generalization, TotalGeneralization');
+    genElems.forEach((elem) => {
+      try {
+        const gen = parseJavaGeneralization(elem, idMap);
+        if (gen) diagram.generalizations.push(gen);
+      } catch (error) {
+        console.error('Error parsing generalization:', error, elem);
+      }
+    });
+  }
+
   // Parse positions from ERDatabaseDiagram
   if (diagramSection) {
     // Update entity positions
@@ -185,6 +201,25 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
             // Convert to top-left for our system
             relationship.position.x = x - relationship.size.width / 2;
             relationship.position.y = y - relationship.size.height / 2;
+          }
+        }
+      }
+    });
+
+    // Update generalization positions
+    // Java app uses <Generalization refid="..."> and <TotalGeneralization refid="..."> in diagram
+    diagram.generalizations.forEach((gen) => {
+      const javaId = Array.from(idMap.entries()).find(([, ourId]) => ourId === gen.id)?.[0];
+      if (javaId) {
+        const posElem = diagramSection.querySelector(`Generalization[refid="${javaId}"], TotalGeneralization[refid="${javaId}"]`);
+        if (posElem) {
+          const pos = posElem.querySelector('Position');
+          if (pos) {
+            const x = parseFloat(pos.getAttribute('x') || '0');
+            const y = parseFloat(pos.getAttribute('y') || '0');
+            // Java uses center coordinates
+            gen.position.x = x - gen.size.width / 2;
+            gen.position.y = y - gen.size.height / 2;
           }
         }
       }
@@ -421,6 +456,48 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
   });
 
   return diagram;
+}
+
+function parseJavaGeneralization(elem: Element, idMap: Map<string, string>): Generalization | null {
+  const javaId = elem.getAttribute('id') || '';
+  // total="true" for TotalGeneralization, total="false" for Generalization
+  const total = elem.getAttribute('total') === 'true';
+
+  // Java format: <Parent><StrongEntitySet refid="1" /></Parent>
+  const parentElem = elem.querySelector('Parent StrongEntitySet[refid], Parent WeakEntitySet[refid]');
+  const parentRefId = parentElem?.getAttribute('refid') || '';
+  const parentOurId = idMap.get(parentRefId);
+  if (!parentOurId) return null;
+
+  // Java format: <Children><StrongEntitySet refid="2" />...</Children>
+  const childIds: string[] = [];
+  const childElems = elem.querySelectorAll('Children StrongEntitySet[refid], Children WeakEntitySet[refid]');
+  childElems.forEach((child) => {
+    const refId = child.getAttribute('refid');
+    if (refId) {
+      const childOurId = idMap.get(refId);
+      if (childOurId) childIds.push(childOurId);
+    }
+  });
+
+  if (childIds.length === 0) return null;
+
+  const ourId = generateId();
+  idMap.set(javaId, ourId);
+
+  const genWidth = 60;
+  const genHeight = 40;
+
+  return {
+    id: ourId,
+    type: 'generalization',
+    position: { x: 0, y: 0 }, // Will be updated from ERDatabaseDiagram
+    selected: false,
+    parentId: parentOurId,
+    childIds,
+    isTotal: total,
+    size: { width: genWidth, height: genHeight },
+  };
 }
 
 function parseJavaEntity(elem: Element, isWeak: boolean, idMap: Map<string, string>): Entity {

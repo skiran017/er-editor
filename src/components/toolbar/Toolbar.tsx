@@ -10,7 +10,6 @@ import {
 	ArrowLeft,
 	ArrowRight,
 	Trash2,
-	Link,
 	MoreVertical,
 	Square,
 	Diamond,
@@ -21,6 +20,11 @@ import {
 	TbRelationManyToMany,
 	TbOvalVertical,
 } from "react-icons/tb";
+import {
+	GeneralizationIcon,
+	GeneralizationTotalIcon,
+	ConnectIcon,
+} from "../../assets/icons";
 import { Menu } from "../menu/Menu";
 import {
 	DropdownMenu,
@@ -82,6 +86,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 		(state) => state.deleteAttributeById,
 	);
 	const deleteConnection = useEditorStore((state) => state.deleteConnection);
+	const deleteGeneralization = useEditorStore(
+		(state) => state.deleteGeneralization,
+	);
 	const diagram = useEditorStore((state) => state.diagram);
 	const loadDiagram = useEditorStore((state) => state.loadDiagram);
 
@@ -146,6 +153,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			size: 20,
 			type: "react-icon" as const,
 		},
+		{
+			id: "generalization",
+			icon: GeneralizationIcon,
+			label: "Generalization (ISA)",
+			size: 20,
+			type: "custom-svg" as const,
+		},
+		{
+			id: "generalization-total",
+			icon: GeneralizationTotalIcon,
+			label: "Generalization Total",
+			size: 20,
+			type: "custom-svg" as const,
+		},
+		{
+			id: "connect",
+			icon: ConnectIcon,
+			label: "Connect (C)",
+			size: 18,
+			type: "custom-svg" as const,
+		},
 	] as const;
 
 	// Overflow tools (shown in dropdown)
@@ -154,13 +182,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			id: "relationship",
 			icon: Diamond,
 			label: "Relationship (R)",
-			size: 18,
-			type: "lucide" as const,
-		},
-		{
-			id: "connect",
-			icon: Link,
-			label: "Connect (C)",
 			size: 18,
 			type: "lucide" as const,
 		},
@@ -331,6 +352,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 					}
 				} else if (element.type === "connection") {
 					deleteConnection(id);
+				} else if (element.type === "generalization") {
+					deleteGeneralization(id);
 				}
 			}
 		});
@@ -346,6 +369,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 				entities: [],
 				relationships: [],
 				connections: [],
+				generalizations: [],
 				lines: [],
 				arrows: [],
 				attributes: [],

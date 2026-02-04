@@ -85,9 +85,11 @@ function App() {
 					e.preventDefault();
 					setMode("pan");
 					break;
-				case "escape":
+				case "escape": {
 					setMode("select");
+					useEditorStore.getState().clearSelection();
 					break;
+				}
 				case "delete":
 				case "backspace": {
 					e.preventDefault();

@@ -17,8 +17,10 @@ import type {
 	Participation,
 	ConnectionPoint,
 	ConnectionStyle,
+	Diagram,
 } from "../../types";
 import {
+	isValidEntityName,
 	checkUniqueEntityName,
 	checkUniqueRelationshipName,
 	checkUniqueAttributeName,
@@ -30,6 +32,9 @@ export const PropertyPanel: React.FC = () => {
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
 	const connections = useEditorStore((state) => state.diagram.connections);
+	const generalizations = useEditorStore(
+		(state) => state.diagram.generalizations,
+	);
 	const attributes = useEditorStore((state) => state.diagram.attributes);
 
 	// Get the first selected element (for now, we only support single selection in property panel)
@@ -40,10 +45,11 @@ export const PropertyPanel: React.FC = () => {
 		return null;
 	}
 
-	// Find entity, relationship, connection, or attribute directly from store (reactive)
+	// Find entity, relationship, connection, generalization, or attribute directly from store (reactive)
 	const entity = entities.find((e) => e.id === selectedId);
 	const relationship = relationships.find((r) => r.id === selectedId);
 	const connection = connections.find((c) => c.id === selectedId);
+	const generalization = generalizations?.find((g) => g.id === selectedId);
 	const attribute = attributes.find((a) => a.id === selectedId);
 
 	// Handle entity properties
@@ -59,6 +65,11 @@ export const PropertyPanel: React.FC = () => {
 	// Handle connection properties
 	if (connection) {
 		return <ConnectionPropertyPanel connectionId={connection.id} />;
+	}
+
+	// Handle generalization properties
+	if (generalization) {
+		return <GeneralizationPropertyPanel generalizationId={generalization.id} />;
 	}
 
 	// Handle attribute properties
@@ -103,18 +114,24 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 		return null;
 	}
 
-	// Check for unique name
+	// Check for valid and unique name
+	const isNameValid = isValidEntityName(localName);
 	const isNameUnique = checkUniqueEntityName(entity.id, localName, diagram);
-	const nameError = !isNameUnique
-		? "An entity with this name already exists"
-		: null;
+	const nameError = !isNameValid
+		? "Entity name is required"
+		: !isNameUnique
+			? "An entity with this name already exists"
+			: null;
 
 	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const newName = e.target.value;
 		setLocalName(newName);
 
-		// Only update store if name is unique
-		if (checkUniqueEntityName(entity.id, newName, diagram)) {
+		// Only update store if name is valid and unique
+		if (
+			isValidEntityName(newName) &&
+			checkUniqueEntityName(entity.id, newName, diagram)
+		) {
 			updateEntity(entity.id, { name: newName });
 		}
 	};
@@ -183,6 +200,7 @@ const EntityPropertyPanel: React.FC<EntityPropertyPanelProps> = ({
 								: "border-gray-300 dark:border-gray-600 focus:ring-blue-500"
 						} dark:bg-gray-800 dark:text-gray-200`}
 						placeholder="Enter entity name"
+						required
 					/>
 					{nameError && (
 						<p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
@@ -883,6 +901,182 @@ const RelationshipPropertyPanel: React.FC<RelationshipPropertyPanelProps> = ({
 						</div>
 					</div>
 				)}
+			</div>
+		</div>
+	);
+};
+
+interface EditableChildEntityRowProps {
+	child: Entity;
+	diagram: Diagram;
+	onNameChange: (newName: string) => void;
+}
+
+const EditableChildEntityRow: React.FC<EditableChildEntityRowProps> = ({
+	child,
+	diagram,
+	onNameChange,
+}) => {
+	const [localName, setLocalName] = useState(child.name);
+
+	useEffect(() => {
+		setLocalName(child.name);
+	}, [child.id, child.name]);
+
+	const isNameValid = isValidEntityName(localName);
+	const isNameUnique = checkUniqueEntityName(child.id, localName, diagram);
+
+	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const newName = e.target.value;
+		setLocalName(newName);
+		if (
+			isValidEntityName(newName) &&
+			checkUniqueEntityName(child.id, newName, diagram)
+		) {
+			onNameChange(newName);
+		}
+	};
+
+	const hasError = !isNameValid || !isNameUnique;
+
+	return (
+		<>
+			<input
+				type="text"
+				value={localName}
+				onChange={handleChange}
+				className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
+					hasError
+						? "border-red-500 focus:ring-red-500 dark:border-red-500"
+						: "border-gray-300 dark:border-gray-600 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-gray-200"
+				}`}
+				placeholder="Entity name"
+				required
+			/>
+			{!isNameValid && (
+				<p className="mt-0.5 text-xs text-red-600 dark:text-red-400">
+					Entity name is required
+				</p>
+			)}
+			{isNameValid && !isNameUnique && (
+				<p className="mt-0.5 text-xs text-red-600 dark:text-red-400">
+					Duplicate name
+				</p>
+			)}
+		</>
+	);
+};
+
+interface GeneralizationPropertyPanelProps {
+	generalizationId: string;
+}
+
+const GeneralizationPropertyPanel: React.FC<
+	GeneralizationPropertyPanelProps
+> = ({ generalizationId }) => {
+	const generalization = useEditorStore((state) =>
+		state.diagram.generalizations?.find((g) => g.id === generalizationId),
+	);
+	const diagram = useEditorStore((state) => state.diagram);
+	const entities = useEditorStore((state) => state.diagram.entities);
+	const updateEntity = useEditorStore((state) => state.updateEntity);
+	const updateGeneralization = useEditorStore(
+		(state) => state.updateGeneralization,
+	);
+	const deleteGeneralization = useEditorStore(
+		(state) => state.deleteGeneralization,
+	);
+	const clearSelection = useEditorStore((state) => state.clearSelection);
+
+	if (!generalization) return null;
+
+	const parentEntity = entities.find((e) => e.id === generalization.parentId);
+	const childEntities = generalization.childIds
+		.map((cid) => entities.find((e) => e.id === cid))
+		.filter((e): e is Entity => !!e);
+
+	return (
+		<div className="absolute right-0 top-0 h-full w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-lg z-40 flex flex-col">
+			<div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+				<h2 className="text-lg font-semibold dark:text-gray-200">
+					Generalization (ISA)
+				</h2>
+				<button
+					onClick={clearSelection}
+					className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+					title="Close"
+				>
+					<X className="w-5 h-5" />
+				</button>
+			</div>
+			<div className="flex-1 overflow-y-auto p-4 space-y-4">
+				<div>
+					<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						Parent (Superclass)
+					</label>
+					{parentEntity ? (
+						<EditableChildEntityRow
+							child={parentEntity}
+							diagram={diagram}
+							onNameChange={(newName) =>
+								updateEntity(parentEntity.id, { name: newName })
+							}
+						/>
+					) : (
+						<div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded-md text-sm text-gray-500">
+							—
+						</div>
+					)}
+				</div>
+				<div>
+					<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+						Children (Subclasses)
+					</label>
+					<ul className="space-y-1">
+						{childEntities.map((child) => (
+							<li key={child.id}>
+								<EditableChildEntityRow
+									child={child}
+									diagram={diagram}
+									onNameChange={(newName) =>
+										updateEntity(child.id, { name: newName })
+									}
+								/>
+							</li>
+						))}
+					</ul>
+				</div>
+				<div className="flex items-center justify-between">
+					<label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+						Total participation
+					</label>
+					<label className="relative inline-flex items-center cursor-pointer">
+						<input
+							type="checkbox"
+							checked={generalization.isTotal}
+							onChange={(e) =>
+								updateGeneralization(generalizationId, {
+									isTotal: e.target.checked,
+								})
+							}
+							className="sr-only peer"
+						/>
+						<div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+						<span className="ms-3 text-sm text-gray-700 dark:text-gray-300">
+							{generalization.isTotal ? "Yes" : "No"}
+						</span>
+					</label>
+				</div>
+				<button
+					onClick={() => {
+						deleteGeneralization(generalizationId);
+						clearSelection();
+					}}
+					className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+				>
+					<Trash2 className="w-4 h-4" />
+					Delete Generalization
+				</button>
 			</div>
 		</div>
 	);

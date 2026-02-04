@@ -48,6 +48,10 @@ export function getDiagramBounds(diagram: Diagram): {
 		extend(r.position.x, r.position.y);
 		extend(r.position.x + (r.size?.width ?? 120), r.position.y + (r.size?.height ?? 80));
 	}
+	for (const g of diagram.generalizations ?? []) {
+		extend(g.position.x, g.position.y);
+		extend(g.position.x + (g.size?.width ?? 60), g.position.y + (g.size?.height ?? 40));
+	}
 	for (const a of diagram.attributes) {
 		extend(a.position.x, a.position.y);
 	}
@@ -84,6 +88,7 @@ export function remapDiagramIds(diagram: Diagram): Diagram {
 	const relationshipIdMap = new Map<string, string>();
 	const attributeIdMap = new Map<string, string>();
 	const connectionIdMap = new Map<string, string>();
+	const generalizationIdMap = new Map<string, string>();
 	const lineIdMap = new Map<string, string>();
 	const arrowIdMap = new Map<string, string>();
 
@@ -154,6 +159,17 @@ export function remapDiagramIds(diagram: Diagram): Diagram {
 		};
 	});
 
+	const generalizations = (diagram.generalizations ?? []).map((g) => {
+		const id = newId();
+		generalizationIdMap.set(g.id, id);
+		return {
+			...g,
+			id,
+			parentId: entityIdMap.get(g.parentId) ?? g.parentId,
+			childIds: g.childIds.map((cid) => entityIdMap.get(cid) ?? cid),
+		};
+	});
+
 	const lines: LineShape[] = diagram.lines.map((l) => {
 		const id = newId();
 		lineIdMap.set(l.id, id);
@@ -170,6 +186,7 @@ export function remapDiagramIds(diagram: Diagram): Diagram {
 		entities,
 		relationships,
 		connections,
+		generalizations,
 		lines,
 		arrows,
 		attributes,
@@ -207,6 +224,10 @@ export function applyOffsetToDiagram(
 			labelPosition: c.labelPosition
 				? offsetPos(c.labelPosition)
 				: undefined,
+		})),
+		generalizations: (diagram.generalizations ?? []).map((g) => ({
+			...g,
+			position: offsetPos(g.position),
 		})),
 		lines: diagram.lines.map((l) => ({
 			...l,

@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
-import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram, ValidationError } from '../types';
+import type { Entity, Relationship, Connection, Generalization, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram, ValidationError } from '../types';
 import { getClosestEdge, getBestAvailableEdge, areEntitiesConnected, connectionExists } from '../lib/utils';
-import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram, checkUniqueEntityName, checkUniqueRelationshipName, checkUniqueAttributeName } from '../lib/validation';
+import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram, isValidEntityName, checkUniqueEntityName, checkUniqueRelationshipName, checkUniqueAttributeName } from '../lib/validation';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -74,8 +74,17 @@ interface EditorStore extends EditorState {
   setPendingQuickRelationship: (payload: { firstEntityId: string; mode: 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' } | null) => void;
   addRelationshipBetweenEntities: (entityId1: string, entityId2: string, type: '1-1' | '1-n' | 'n-n') => void;
 
+  // Generalization (ISA) actions
+  addGeneralization: (parentId: string, childId: string, isTotal: boolean) => void;
+  updateGeneralization: (id: string, updates: Partial<Generalization>) => void;
+  deleteGeneralization: (id: string) => void;
+  addChildToGeneralization: (generalizationId: string, childEntityId: string) => void;
+  setPendingQuickGeneralization: (payload: { firstEntityId: string; mode: 'generalization' | 'generalization-total' } | null) => void;
+  addGeneralizationBetweenEntities: (childEntityId: string, parentEntityId: string, isTotal: boolean) => void;
+  setPendingGeneralizationConnect: (generalizationId: string | null) => void;
+
   // Utility
-  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | undefined;
+  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | Generalization | undefined;
   getConnectionPoints: (elementId: string) => Position[]; // Get connection points for an element
 }
 
@@ -272,6 +281,7 @@ export const useEditorStore = create<EditorStore>()(
         entities: [],
         relationships: [],
         connections: [],
+        generalizations: [],
         lines: [],
         arrows: [],
         attributes: [],
@@ -303,6 +313,8 @@ export const useEditorStore = create<EditorStore>()(
       examMode: false, // Default: false, enabled via ?examMode=true
       validationEnabled: false, // Default: false, controlled via Menu toggle
       pendingQuickRelationship: null,
+      pendingQuickGeneralization: null,
+      pendingGeneralizationConnect: null,
 
       // Entity actions
       addEntity: (position) => {
@@ -334,8 +346,11 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const entity = state.diagram.entities.find((e) => e.id === id);
           if (entity) {
-            // Prevent duplicate names
+            // Prevent empty or duplicate names
             if (updates.name !== undefined && updates.name !== entity.name) {
+              if (!isValidEntityName(updates.name)) {
+                return; // Don't update if name is empty
+              }
               if (!checkUniqueEntityName(id, updates.name, state.diagram)) {
                 return; // Don't update if name is duplicate
               }
@@ -386,6 +401,11 @@ export const useEditorStore = create<EditorStore>()(
           // Remove associated connections
           state.diagram.connections = state.diagram.connections.filter(
             (c) => c.fromId !== id && c.toId !== id
+          );
+
+          // Remove generalizations where this entity is parent or child
+          state.diagram.generalizations = state.diagram.generalizations.filter(
+            (g) => g.parentId !== id && !g.childIds.includes(id)
           );
 
           // Remove from selection
@@ -1169,6 +1189,9 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.connections.forEach((c) => {
             c.selected = state.selectedIds.includes(c.id);
           });
+          state.diagram.generalizations?.forEach((g) => {
+            g.selected = state.selectedIds.includes(g.id);
+          });
         });
       },
 
@@ -1181,6 +1204,7 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.arrows.forEach((a) => (a.selected = false));
           state.diagram.attributes.forEach((a) => (a.selected = false));
           state.diagram.connections.forEach((c) => (c.selected = false));
+          state.diagram.generalizations?.forEach((g) => (g.selected = false));
         });
       },
 
@@ -1204,6 +1228,9 @@ export const useEditorStore = create<EditorStore>()(
           });
           state.diagram.connections.forEach((c) => {
             c.selected = ids.includes(c.id);
+          });
+          state.diagram.generalizations?.forEach((g) => {
+            g.selected = ids.includes(g.id);
           });
         });
       },
@@ -1404,6 +1431,7 @@ export const useEditorStore = create<EditorStore>()(
               entities: [...diagram.entities],
               relationships: [...diagram.relationships],
               connections: [...diagram.connections],
+              generalizations: [...(diagram.generalizations ?? [])],
               lines: [...diagram.lines],
               arrows: [...diagram.arrows],
               attributes: [...diagram.attributes],
@@ -1433,6 +1461,7 @@ export const useEditorStore = create<EditorStore>()(
             state.diagram.entities.push(...diagram.entities);
             state.diagram.relationships.push(...diagram.relationships);
             state.diagram.connections.push(...diagram.connections);
+            state.diagram.generalizations.push(...(diagram.generalizations ?? []));
             state.diagram.lines.push(...diagram.lines);
             state.diagram.arrows.push(...diagram.arrows);
             state.diagram.attributes.push(...diagram.attributes);
@@ -1593,8 +1622,108 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      // Generalization actions
+      addGeneralization: (parentId, childId, isTotal) => {
+        set((state) => {
+          const parent = state.diagram.entities.find((e) => e.id === parentId);
+          const child = state.diagram.entities.find((e) => e.id === childId);
+          if (!parent || !child || parentId === childId) return;
+
+          const genWidth = 60;
+          const genHeight = 40;
+          const parentBottomY = parent.position.y + parent.size.height;
+          const childTopY = child.position.y;
+          const midX = (parent.position.x + parent.size.width / 2 + child.position.x + child.size.width / 2) / 2;
+          const midY = (parentBottomY + childTopY) / 2;
+          const genPosition: Position = {
+            x: midX - genWidth / 2,
+            y: midY - genHeight / 2,
+          };
+
+          const genId = generateId();
+          const newGen: Generalization = {
+            id: genId,
+            type: 'generalization',
+            position: genPosition,
+            selected: false,
+            parentId,
+            childIds: [childId],
+            isTotal,
+            size: { width: genWidth, height: genHeight },
+          };
+          state.diagram.generalizations.push(newGen);
+        });
+      },
+
+      updateGeneralization: (id, updates) => {
+        set((state) => {
+          const gen = state.diagram.generalizations.find((g) => g.id === id);
+          if (gen) Object.assign(gen, updates);
+        });
+      },
+
+      deleteGeneralization: (id) => {
+        set((state) => {
+          state.diagram.generalizations = state.diagram.generalizations.filter((g) => g.id !== id);
+          state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
+        });
+      },
+
+      addChildToGeneralization: (generalizationId, childEntityId) => {
+        set((state) => {
+          const gen = state.diagram.generalizations.find((g) => g.id === generalizationId);
+          if (!gen || gen.childIds.includes(childEntityId)) return;
+          gen.childIds.push(childEntityId);
+        });
+      },
+
+      setPendingQuickGeneralization: (payload) => {
+        set((state) => {
+          state.pendingQuickGeneralization = payload;
+        });
+      },
+
+      addGeneralizationBetweenEntities: (childEntityId, parentEntityId, isTotal) => {
+        set((state) => {
+          if (childEntityId === parentEntityId) return;
+          const parent = state.diagram.entities.find((e) => e.id === parentEntityId);
+          const child = state.diagram.entities.find((e) => e.id === childEntityId);
+          if (!parent || !child) return;
+
+          const genWidth = 60;
+          const genHeight = 40;
+          const parentBottomY = parent.position.y + parent.size.height;
+          const childTopY = child.position.y;
+          const midX = (parent.position.x + parent.size.width / 2 + child.position.x + child.size.width / 2) / 2;
+          const midY = (parentBottomY + childTopY) / 2;
+          const genPosition: Position = {
+            x: midX - genWidth / 2,
+            y: midY - genHeight / 2,
+          };
+
+          const genId = generateId();
+          const newGen: Generalization = {
+            id: genId,
+            type: 'generalization',
+            position: genPosition,
+            selected: false,
+            parentId: parentEntityId,
+            childIds: [childEntityId],
+            isTotal,
+            size: { width: genWidth, height: genHeight },
+          };
+          state.diagram.generalizations.push(newGen);
+        });
+      },
+
+      setPendingGeneralizationConnect: (generalizationId) => {
+        set((state) => {
+          state.pendingGeneralizationConnect = generalizationId;
+        });
+      },
+
       // Utility
-      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | undefined => {
+      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | Generalization | undefined => {
         const state = get();
         return (
           state.diagram.entities.find((e) => e.id === id) ||
@@ -1603,6 +1732,7 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.arrows.find((a) => a.id === id) ||
           state.diagram.attributes.find((a) => a.id === id) ||
           state.diagram.connections.find((c) => c.id === id) ||
+          state.diagram.generalizations.find((g) => g.id === id) ||
           undefined
         );
       },

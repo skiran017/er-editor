@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Group, Rect, Text, Circle } from "react-konva";
 import type { Entity, ConnectionPoint } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
+import { isValidEntityName } from "../../lib/validation";
 import {
 	getClosestEdge,
 	getBestAvailableEdge,
@@ -220,6 +221,24 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 	const addRelationshipBetweenEntities = useEditorStore(
 		(state) => state.addRelationshipBetweenEntities,
 	);
+	const pendingQuickGeneralization = useEditorStore(
+		(state) => state.pendingQuickGeneralization,
+	);
+	const setPendingQuickGeneralization = useEditorStore(
+		(state) => state.setPendingQuickGeneralization,
+	);
+	const addGeneralizationBetweenEntities = useEditorStore(
+		(state) => state.addGeneralizationBetweenEntities,
+	);
+	const pendingGeneralizationConnect = useEditorStore(
+		(state) => state.pendingGeneralizationConnect,
+	);
+	const setPendingGeneralizationConnect = useEditorStore(
+		(state) => state.setPendingGeneralizationConnect,
+	);
+	const addChildToGeneralization = useEditorStore(
+		(state) => state.addChildToGeneralization,
+	);
 
 	// Handle touch tap events
 	const handleTap = (e: Konva.KonvaEventObject<PointerEvent | TouchEvent>) => {
@@ -283,8 +302,65 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 			return;
 		}
 
+		// Quick generalization (ISA) – click parent first, then child
+		const isQuickGeneralizationMode =
+			mode === "generalization" || mode === "generalization-total";
+		if (isQuickGeneralizationMode) {
+			e.cancelBubble = true;
+			if (!pendingQuickGeneralization) {
+				setPendingQuickGeneralization({ firstEntityId: id, mode });
+				showToast("Now click the child entity (subclass)", "info", 2000);
+				return;
+			}
+			if (pendingQuickGeneralization.firstEntityId === id) {
+				setPendingQuickGeneralization(null);
+				return;
+			}
+			const isTotal = mode === "generalization-total";
+			// firstEntityId = parent, id = child
+			addGeneralizationBetweenEntities(
+				id,
+				pendingQuickGeneralization.firstEntityId,
+				isTotal,
+			);
+			setPendingQuickGeneralization(null);
+			showToast(
+				isTotal ? "Total generalization created" : "Generalization created",
+				"success",
+			);
+			return;
+		}
+
 		if (mode === "connect") {
 			e.cancelBubble = true;
+
+			// Connect tool: add entity as child to generalization
+			if (pendingGeneralizationConnect) {
+				const gen = diagram.generalizations?.find(
+					(g) => g.id === pendingGeneralizationConnect,
+				);
+				if (gen) {
+					if (gen.childIds.includes(id)) {
+						showToast(
+							"Entity is already a child of this generalization",
+							"warning",
+						);
+					} else if (gen.parentId === id) {
+						showToast(
+							"Cannot add parent as child of its own generalization",
+							"warning",
+						);
+					} else {
+						addChildToGeneralization(pendingGeneralizationConnect, id);
+						setPendingGeneralizationConnect(null);
+						showToast("Entity added as subclass", "success");
+					}
+				} else {
+					setPendingGeneralizationConnect(null);
+				}
+				return;
+			}
+
 			const stage = e.target.getStage();
 			if (!stage) return;
 
@@ -529,9 +605,16 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 
 		let isRemoved = false;
 
+		const saveName = () => {
+			const newName = input.value.trim();
+			if (isValidEntityName(newName)) {
+				updateEntity(id, { name: newName });
+			}
+		};
+
 		input.addEventListener("keydown", (e) => {
 			if (e.key === "Enter") {
-				updateEntity(id, { name: input.value });
+				saveName();
 				if (!isRemoved) {
 					isRemoved = true;
 					removeInput();
@@ -546,7 +629,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 
 		input.addEventListener("blur", () => {
 			if (!isRemoved) {
-				updateEntity(id, { name: input.value });
+				saveName();
 				isRemoved = true;
 				removeInput();
 			}
