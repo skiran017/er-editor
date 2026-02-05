@@ -22,10 +22,10 @@ export const GeneralizationIcon: React.FC<IconProps> = ({
 			strokeLinejoin="round"
 			className={className}
 		>
-			{/* Inverted triangle (ISA shape) */}
-			<path d="M12 4 L20 20 L4 20 Z" />
-			{/* Single horizontal line at top (parent connection) */}
-			<line x1="6" y1="8" x2="18" y2="8" />
+			{/* Single vertical line going up from base midpoint */}
+			<line x1="12" y1="2" x2="12" y2="8" />
+			{/* Inverted triangle: base at top, apex at bottom */}
+			<path d="M5 8 L19 8 L12 20 Z" />
 		</svg>
 	);
 };
