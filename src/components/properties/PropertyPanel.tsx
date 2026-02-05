@@ -109,7 +109,7 @@ export const PropertyPanel: React.FC = () => {
 				side={isMobile ? "bottom" : "right"}
 				className={isMobile ? "h-[70vh] rounded-t-xl" : "w-80 sm:max-w-80"}
 				showCloseButton={true}
-				onOpenAutoFocus={isMobile ? (e) => e.preventDefault() : undefined}
+				onOpenAutoFocus={(e) => e.preventDefault()}
 			>
 				<SheetHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
 					<SheetTitle className="flex items-center gap-2">

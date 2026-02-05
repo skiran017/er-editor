@@ -30,6 +30,14 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const lastPinchDistanceRef = useRef<number | null>(null);
 	const lastPinchCenterRef = useRef<{ x: number; y: number } | null>(null);
 	const lastTapTimeRef = useRef<number>(0); // Track last tap to prevent double-firing with click
+
+	// Long press selection refs for mobile
+	const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const isLongPressActiveRef = useRef<boolean>(false);
+	const longPressEndTimeRef = useRef<number>(0); // Track when long press selection ended
+	const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+	const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
 	const [selectionBox, setSelectionBox] = useState<{
 		startX: number;
 		startY: number;
@@ -728,6 +736,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		const stage = stageRef.current;
 		if (!stage) return;
 
+		// Skip if long press selection just ended (don't clear selection immediately after selecting)
+		const timeSinceLongPressEnd = Date.now() - longPressEndTimeRef.current;
+		if (timeSinceLongPressEnd < 300) {
+			return;
+		}
+
 		// Mark this tap to prevent duplicate handling from click event
 		lastTapTimeRef.current = Date.now();
 
@@ -776,6 +790,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		// Handle relationship creation mode
 		if (mode === "relationship" && isEmptyCanvasClick) {
 			addRelationship(pos);
+			return;
+		}
+
+		// Handle select mode - clear selection when tapping on empty canvas
+		if (mode === "select" && isEmptyCanvasClick) {
+			clearSelection();
 			return;
 		}
 
@@ -850,7 +870,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const handleStageMouseUp = () => {
 		if (isSelecting && selectionBox) {
 			const stage = stageRef.current;
-			if (!stage) return;
+			if (!stage) {
+				// Reset even if stage not found
+				setIsSelecting(false);
+				setSelectionBox(null);
+				return;
+			}
 
 			const boxX = Math.min(selectionBox.startX, selectionBox.endX);
 			const boxY = Math.min(selectionBox.startY, selectionBox.endY);
@@ -942,11 +967,11 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					selectMultiple(selectedIds);
 				}
 			}
-
-			// Reset selection box
-			setIsSelecting(false);
-			setSelectionBox(null);
 		}
+
+		// Always reset selection box state (even for small/no drag clicks)
+		setIsSelecting(false);
+		setSelectionBox(null);
 	};
 
 	// Handle canvas click
@@ -1382,9 +1407,16 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		}
 	};
 
-	// Handle pinch-to-zoom gesture
+	// Handle pinch-to-zoom gesture and long-press selection
 	const handleTouchStart = (e: Konva.KonvaEventObject<TouchEvent>) => {
+		// Clear any existing long press timer
+		if (longPressTimerRef.current) {
+			clearTimeout(longPressTimerRef.current);
+			longPressTimerRef.current = null;
+		}
+
 		if (e.evt.touches.length === 2) {
+			// Two finger touch - pinch to zoom
 			const touch1 = e.evt.touches[0];
 			const touch2 = e.evt.touches[1];
 
@@ -1398,11 +1430,62 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 			lastPinchDistanceRef.current = distance;
 			lastPinchCenterRef.current = { x: centerX, y: centerY };
+		} else if (e.evt.touches.length === 1 && mode === "select") {
+			// Single finger touch in select mode - check for long press on empty canvas
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			// Check if touching empty canvas (Stage or Layer)
+			const target = e.target;
+			const isEmptyCanvas = target === stage || target.getType() === "Layer";
+
+			if (isEmptyCanvas) {
+				// Store touch start position for movement detection
+				const touch = e.evt.touches[0];
+				const container = stage.container();
+				const rect = container.getBoundingClientRect();
+				const stageX = touch.clientX - rect.left;
+				const stageY = touch.clientY - rect.top;
+
+				// Transform to canvas coordinates
+				const transform = stage.getAbsoluteTransform().copy();
+				transform.invert();
+				const pos = transform.point({ x: stageX, y: stageY });
+
+				touchStartPosRef.current = pos;
+
+				// Start long press timer (500ms)
+				longPressTimerRef.current = setTimeout(() => {
+					// Long press detected - start selection mode
+					isLongPressActiveRef.current = true;
+					longPressStartPosRef.current = pos;
+
+					// Start selection box
+					setIsSelecting(true);
+					setSelectionBox({
+						startX: pos.x,
+						startY: pos.y,
+						endX: pos.x,
+						endY: pos.y,
+					});
+
+					// Haptic feedback if available
+					if (navigator.vibrate) {
+						navigator.vibrate(50);
+					}
+				}, 500);
+			}
 		}
 	};
 
 	const handleTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
 		if (e.evt.touches.length === 2 && lastPinchDistanceRef.current !== null) {
+			// Cancel long press if pinching
+			if (longPressTimerRef.current) {
+				clearTimeout(longPressTimerRef.current);
+				longPressTimerRef.current = null;
+			}
+
 			e.evt.preventDefault(); // Prevent scrolling while pinching
 
 			const touch1 = e.evt.touches[0];
@@ -1446,15 +1529,163 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			stage.batchDraw();
 
 			lastPinchDistanceRef.current = distance;
-		} else {
-			// Single touch - update preview
-			handlePointerMove();
+		} else if (e.evt.touches.length === 1) {
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			const touch = e.evt.touches[0];
+			const container = stage.container();
+			const rect = container.getBoundingClientRect();
+			const stageX = touch.clientX - rect.left;
+			const stageY = touch.clientY - rect.top;
+
+			// Transform to canvas coordinates
+			const transform = stage.getAbsoluteTransform().copy();
+			transform.invert();
+			const pos = transform.point({ x: stageX, y: stageY });
+
+			// Check if user moved too much before long press triggered - cancel timer
+			if (longPressTimerRef.current && touchStartPosRef.current) {
+				const dx = pos.x - touchStartPosRef.current.x;
+				const dy = pos.y - touchStartPosRef.current.y;
+				const distance = Math.sqrt(dx * dx + dy * dy);
+
+				// If moved more than 10 pixels, cancel long press
+				if (distance > 10) {
+					clearTimeout(longPressTimerRef.current);
+					longPressTimerRef.current = null;
+				}
+			}
+
+			// If long press is active, update selection box
+			if (isLongPressActiveRef.current && isSelecting && selectionBox) {
+				e.evt.preventDefault(); // Prevent scrolling while selecting
+
+				setSelectionBox({
+					...selectionBox,
+					endX: pos.x,
+					endY: pos.y,
+				});
+			} else {
+				// Single touch - update preview for drawing modes
+				handlePointerMove();
+			}
 		}
 	};
 
 	const handleTouchEnd = () => {
 		lastPinchDistanceRef.current = null;
 		lastPinchCenterRef.current = null;
+
+		// Clear long press timer
+		if (longPressTimerRef.current) {
+			clearTimeout(longPressTimerRef.current);
+			longPressTimerRef.current = null;
+		}
+
+		// Complete selection if long press was active
+		if (isLongPressActiveRef.current && isSelecting && selectionBox) {
+			const boxX = Math.min(selectionBox.startX, selectionBox.endX);
+			const boxY = Math.min(selectionBox.startY, selectionBox.endY);
+			const boxWidth = Math.abs(selectionBox.endX - selectionBox.startX);
+			const boxHeight = Math.abs(selectionBox.endY - selectionBox.startY);
+
+			// Only select if box is large enough
+			if (boxWidth > 5 && boxHeight > 5) {
+				const selectedElementIds: string[] = [];
+
+				// Check entities
+				entities.forEach((entity) => {
+					const entityCenterX = entity.position.x + entity.size.width / 2;
+					const entityCenterY = entity.position.y + entity.size.height / 2;
+					if (
+						entityCenterX >= boxX &&
+						entityCenterX <= boxX + boxWidth &&
+						entityCenterY >= boxY &&
+						entityCenterY <= boxY + boxHeight
+					) {
+						selectedElementIds.push(entity.id);
+					}
+				});
+
+				// Check relationships
+				relationships.forEach((relationship) => {
+					const relCenterX =
+						relationship.position.x + relationship.size.width / 2;
+					const relCenterY =
+						relationship.position.y + relationship.size.height / 2;
+					if (
+						relCenterX >= boxX &&
+						relCenterX <= boxX + boxWidth &&
+						relCenterY >= boxY &&
+						relCenterY <= boxY + boxHeight
+					) {
+						selectedElementIds.push(relationship.id);
+					}
+				});
+
+				// Check attributes
+				attributes.forEach((attribute) => {
+					const attrCenterX = attribute.position.x;
+					const attrCenterY = attribute.position.y;
+					if (
+						attrCenterX >= boxX &&
+						attrCenterX <= boxX + boxWidth &&
+						attrCenterY >= boxY &&
+						attrCenterY <= boxY + boxHeight
+					) {
+						selectedElementIds.push(attribute.id);
+					}
+				});
+
+				// Check generalizations
+				generalizations.forEach((gen) => {
+					const genCenterX = gen.position.x + gen.size.width / 2;
+					const genCenterY = gen.position.y + gen.size.height / 2;
+					if (
+						genCenterX >= boxX &&
+						genCenterX <= boxX + boxWidth &&
+						genCenterY >= boxY &&
+						genCenterY <= boxY + boxHeight
+					) {
+						selectedElementIds.push(gen.id);
+					}
+				});
+
+				// Check connections
+				connections.forEach((connection) => {
+					for (let i = 0; i < connection.points.length; i += 2) {
+						const x = connection.points[i];
+						const y = connection.points[i + 1];
+						if (
+							x >= boxX &&
+							x <= boxX + boxWidth &&
+							y >= boxY &&
+							y <= boxY + boxHeight
+						) {
+							selectedElementIds.push(connection.id);
+							break;
+						}
+					}
+				});
+
+				if (selectedElementIds.length > 0) {
+					selectMultiple(selectedElementIds);
+				}
+			}
+
+			// Reset selection state
+			setIsSelecting(false);
+			setSelectionBox(null);
+
+			// Mark the time when long press selection ended (to prevent tap from clearing it)
+			longPressEndTimeRef.current = Date.now();
+		}
+
+		// Reset long press state
+		isLongPressActiveRef.current = false;
+		longPressStartPosRef.current = null;
+		touchStartPosRef.current = null;
 	};
 
 	// Expose stageRef via ref
