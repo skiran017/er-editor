@@ -1,4 +1,4 @@
-import type { Entity, Relationship, Attribute, Connection, Diagram, ValidationError } from '../types';
+import type { Entity, Relationship, Attribute, Connection, Diagram, ValidationError, Generalization } from '../types';
 
 /**
  * Validation library for ER diagram elements
@@ -82,6 +82,17 @@ export function validateRelationship(relationship: Relationship, diagram: Diagra
     }
   }
 
+  // Rule: Identifying (weak) relationship must connect at least one weak entity
+  if (relationship.isWeak && relationship.entityIds.length > 0) {
+    const connectedEntities = relationship.entityIds
+      .map((entityId) => diagram.entities.find((e) => e.id === entityId))
+      .filter(Boolean) as Entity[];
+    const hasWeakEntity = connectedEntities.some((e) => e.isWeak);
+    if (!hasWeakEntity) {
+      warnings.push('Identifying relationship must connect at least one weak entity');
+    }
+  }
+
   return warnings;
 }
 
@@ -159,6 +170,35 @@ export function validateConnection(connection: Connection, diagram: Diagram): st
 }
 
 /**
+ * Validate a generalization and return warning messages
+ */
+export function validateGeneralization(gen: Generalization, diagram: Diagram): string[] {
+  const warnings: string[] = [];
+
+  const parent = diagram.entities.find(e => e.id === gen.parentId);
+  if (!parent) {
+    warnings.push('Generalization parent entity does not exist');
+  }
+
+  if (gen.childIds.length === 0) {
+    warnings.push('Generalization must have at least one child');
+  }
+
+  if (gen.childIds.includes(gen.parentId)) {
+    warnings.push('Parent cannot be a child of its own generalization');
+  }
+
+  for (const childId of gen.childIds) {
+    const child = diagram.entities.find(e => e.id === childId);
+    if (!child) {
+      warnings.push(`Child entity ${childId} does not exist`);
+    }
+  }
+
+  return warnings;
+}
+
+/**
  * Validate entire diagram and return all validation errors
  */
 export function validateDiagram(diagram: Diagram): ValidationError[] {
@@ -200,6 +240,18 @@ export function validateDiagram(diagram: Diagram): ValidationError[] {
     }
   }
 
+  // Validate all generalizations
+  for (const gen of diagram.generalizations ?? []) {
+    const warnings = validateGeneralization(gen, diagram);
+    if (warnings.length > 0) {
+      errors.push({
+        elementId: gen.id,
+        message: warnings.join('; '),
+        severity: 'warning'
+      });
+    }
+  }
+
   // Validate all connections
   for (const connection of diagram.connections) {
     const warnings = validateConnection(connection, diagram);
@@ -215,3 +267,79 @@ export function validateDiagram(diagram: Diagram): ValidationError[] {
   return errors;
 }
 
+/**
+ * Check if an entity name is valid (non-empty after trim)
+ */
+export function isValidEntityName(name: string): boolean {
+  return name.trim().length > 0;
+}
+
+/**
+ * Check if an entity name is unique (excluding the current entity)
+ */
+export function checkUniqueEntityName(
+  currentEntityId: string,
+  name: string,
+  diagram: Diagram
+): boolean {
+  const trimmedName = name.trim();
+  if (!trimmedName) return true; // Empty names are handled elsewhere
+
+  return !diagram.entities.some(
+    (entity) => entity.id !== currentEntityId && entity.name.trim().toLowerCase() === trimmedName.toLowerCase()
+  );
+}
+
+/**
+ * Check if a relationship name is unique (excluding the current relationship)
+ */
+export function checkUniqueRelationshipName(
+  currentRelationshipId: string,
+  name: string,
+  diagram: Diagram
+): boolean {
+  const trimmedName = name.trim();
+  if (!trimmedName) return true; // Empty names are handled elsewhere
+
+  return !diagram.relationships.some(
+    (relationship) =>
+      relationship.id !== currentRelationshipId &&
+      relationship.name.trim().toLowerCase() === trimmedName.toLowerCase()
+  );
+}
+
+/**
+ * Check if an attribute name is unique within its parent (entity or relationship)
+ * Attributes can have the same name if they belong to different parents
+ */
+export function checkUniqueAttributeName(
+  currentAttributeId: string,
+  name: string,
+  parentEntityId: string | undefined,
+  parentRelationshipId: string | undefined,
+  diagram: Diagram
+): boolean {
+  const trimmedName = name.trim();
+  if (!trimmedName) return true; // Empty names are handled elsewhere
+
+  // Check attributes of the same parent
+  if (parentEntityId) {
+    return !diagram.attributes.some(
+      (attr) =>
+        attr.id !== currentAttributeId &&
+        attr.entityId === parentEntityId &&
+        attr.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+  }
+
+  if (parentRelationshipId) {
+    return !diagram.attributes.some(
+      (attr) =>
+        attr.id !== currentAttributeId &&
+        attr.relationshipId === parentRelationshipId &&
+        attr.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+  }
+
+  return true; // No parent, can't check uniqueness
+}

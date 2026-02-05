@@ -1,5 +1,46 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { Diagram } from '../types';
+
+/** True if some relationship connects both entities (each entity can have only one relation with the other). */
+export function areEntitiesConnected(
+  diagram: Diagram,
+  entityIdA: string,
+  entityIdB: string
+): boolean {
+  return diagram.relationships.some(
+    (r) =>
+      r.entityIds.includes(entityIdA) && r.entityIds.includes(entityIdB)
+  );
+}
+
+/** True if some relationship other than excludeRelationshipId connects both entities. */
+export function anotherRelationshipConnectsPair(
+  diagram: Diagram,
+  excludeRelationshipId: string,
+  entityIdA: string,
+  entityIdB: string
+): boolean {
+  return diagram.relationships.some(
+    (r) =>
+      r.id !== excludeRelationshipId &&
+      r.entityIds.includes(entityIdA) &&
+      r.entityIds.includes(entityIdB)
+  );
+}
+
+/** True if a connection already exists between the two elements (order does not matter). */
+export function connectionExists(
+  diagram: Diagram,
+  fromId: string,
+  toId: string
+): boolean {
+  return diagram.connections.some(
+    (c) =>
+      (c.fromId === fromId && c.toId === toId) ||
+      (c.fromId === toId && c.toId === fromId)
+  );
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

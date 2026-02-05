@@ -1,4 +1,4 @@
-import type { Diagram, Entity, Relationship, Attribute, Connection, LineShape, ArrowShape, EntityAttribute, Position, Cardinality, Participation, ConnectionPoint, ConnectionStyle } from '../types';
+import type { Diagram, Entity, Relationship, Attribute, Connection, LineShape, ArrowShape, EntityAttribute, Position, Cardinality, Participation, ConnectionPoint, ConnectionStyle, Generalization } from '../types';
 import { parseJavaXMLToDiagram } from './javaXmlParser';
 
 /**
@@ -8,13 +8,13 @@ export function detectXMLFormat(xmlString: string): 'java' | 'standard' {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
   const root = xmlDoc.documentElement;
-  
+
   if (root.tagName === 'ERDatabaseModel') {
     return 'java';
   } else if (root.tagName === 'ERDiagram') {
     return 'standard';
   }
-  
+
   // Default to standard format for backward compatibility
   return 'standard';
 }
@@ -25,11 +25,11 @@ export function detectXMLFormat(xmlString: string): 'java' | 'standard' {
  */
 export function parseXMLToDiagram(xmlString: string): Diagram {
   const format = detectXMLFormat(xmlString);
-  
+
   if (format === 'java') {
     return parseJavaXMLToDiagram(xmlString);
   }
-  
+
   // Standard format parsing
   return parseStandardXMLToDiagram(xmlString);
 }
@@ -51,6 +51,7 @@ function parseStandardXMLToDiagram(xmlString: string): Diagram {
     entities: [],
     relationships: [],
     connections: [],
+    generalizations: [],
     lines: [],
     arrows: [],
     attributes: [],
@@ -87,6 +88,13 @@ function parseStandardXMLToDiagram(xmlString: string): Diagram {
   connectionElements.forEach((elem) => {
     const connection = parseConnection(elem);
     diagram.connections.push(connection);
+  });
+
+  // Parse generalizations
+  const generalizationElements = root.querySelectorAll('generalization');
+  generalizationElements.forEach((elem) => {
+    const generalization = parseGeneralization(elem);
+    diagram.generalizations.push(generalization);
   });
 
   // Parse lines
@@ -232,6 +240,34 @@ function parseEntityAttribute(elem: Element): EntityAttribute {
     isPartialKey,
     isMultivalued,
     isDerived,
+  };
+}
+
+function parseGeneralization(elem: Element): Generalization {
+  const id = elem.getAttribute('id') || generateId();
+  const parentId = elem.getAttribute('parentId') || '';
+  const x = parseFloat(elem.getAttribute('x') || '0');
+  const y = parseFloat(elem.getAttribute('y') || '0');
+  const width = parseFloat(elem.getAttribute('width') || '60');
+  const height = parseFloat(elem.getAttribute('height') || '40');
+  const isTotal = elem.getAttribute('isTotal') === 'true';
+
+  const childIds: string[] = [];
+  const childIdElements = elem.querySelectorAll('childId');
+  childIdElements.forEach((c) => {
+    const childId = c.textContent?.trim();
+    if (childId) childIds.push(childId);
+  });
+
+  return {
+    id,
+    type: 'generalization',
+    position: { x, y },
+    selected: false,
+    parentId,
+    childIds,
+    isTotal,
+    size: { width, height },
   };
 }
 

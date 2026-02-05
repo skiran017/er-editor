@@ -86,6 +86,14 @@ export interface Connection extends BaseElement {
   labelPosition?: Position; // Position of the cardinality/participation label
 }
 
+export interface Generalization extends BaseElement {
+  type: 'generalization';
+  parentId: string; // Entity ID (superclass)
+  childIds: string[]; // Entity IDs (subclasses)
+  isTotal: boolean; // Total participation (double line) vs partial (single line)
+  size: Size; // For the ISA triangle shape
+}
+
 export interface LineShape extends BaseElement {
   type: 'line';
   points: number[];
@@ -104,13 +112,14 @@ export type Cardinality = '1' | 'N' | 'M';
 export type Participation = 'total' | 'partial';
 
 export interface DiagramElement extends BaseElement {
-  type: 'entity' | 'relationship' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connection';
+  type: 'entity' | 'relationship' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connection' | 'generalization';
 }
 
 export interface Diagram {
   entities: Entity[];
   relationships: Relationship[];
   connections: Connection[];
+  generalizations: Generalization[];
   lines: LineShape[];
   arrows: ArrowShape[];
   attributes: Attribute[]; // Attributes as separate canvas elements
@@ -127,7 +136,7 @@ export interface EditorState {
     scale: number;
     position: Position;
   };
-  mode: 'select' | 'pan' | 'entity' | 'relationship' | 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connect';
+  mode: 'select' | 'pan' | 'entity' | 'relationship' | 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' | 'generalization' | 'generalization-total' | 'attribute' | 'line' | 'arrow-left' | 'arrow-right' | 'connect';
   drawingLine: {
     isDrawing: boolean;
     startPoint: Position | null;
@@ -142,7 +151,14 @@ export interface EditorState {
   };
   nextEntityNumber: number;
   nextRelationshipNumber: number;
-  validationEnabled: boolean; // Whether validation is enabled (controlled via query param)
+  examMode: boolean; // Whether exam mode is enabled (controlled via ?examMode=true query param)
+  validationEnabled: boolean; // Whether validation is enabled (controlled via Menu toggle, default: false)
+  /** When set, user is in "quick relationship" flow: first entity chosen, waiting for second click */
+  pendingQuickRelationship: { firstEntityId: string; mode: 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' } | null;
+  /** When set, user is in "quick generalization" flow: first entity (parent) chosen, waiting for second click (child) */
+  pendingQuickGeneralization: { firstEntityId: string; mode: 'generalization' | 'generalization-total' } | null;
+  /** When set, user is in "connect to generalization" flow: generalization chosen, waiting for entity to add as child */
+  pendingGeneralizationConnect: string | null; // generalizationId
 }
 
 export interface ValidationError {

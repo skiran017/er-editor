@@ -17,13 +17,13 @@ function App() {
 		useThemeStore.getState().setTheme(theme);
 	}, []);
 
-	// Initialize validation from query parameter
+	// Initialize exam mode from query parameter
 	useEffect(() => {
 		const urlParams = new URLSearchParams(window.location.search);
-		const validationParam = urlParams.get("validation");
-		// Default: enabled (true), only disabled if ?validation=false
-		const validationEnabled = validationParam !== "false";
-		useEditorStore.getState().setValidationEnabled(validationEnabled);
+		const examModeParam = urlParams.get("examMode");
+		// Default: false, only enabled if ?examMode=true
+		const examMode = examModeParam === "true";
+		useEditorStore.getState().setExamMode(examMode);
 	}, []);
 
 	// Keyboard shortcuts
@@ -85,9 +85,11 @@ function App() {
 					e.preventDefault();
 					setMode("pan");
 					break;
-				case "escape":
+				case "escape": {
 					setMode("select");
+					useEditorStore.getState().clearSelection();
 					break;
+				}
 				case "delete":
 				case "backspace": {
 					e.preventDefault();

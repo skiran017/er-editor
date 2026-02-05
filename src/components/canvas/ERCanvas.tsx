@@ -7,9 +7,12 @@ import React, {
 } from "react";
 import { Stage, Layer, Transformer, Line, Rect } from "react-konva";
 import Konva from "konva";
+import { Maximize2 } from "lucide-react";
 import { useEditorStore } from "../../store/editorStore";
 import { EntityShape } from "./EntityShape";
 import { RelationshipShape } from "./RelationshipShape";
+import { GeneralizationShape } from "./GeneralizationShape";
+import { GeneralizationLines } from "./GeneralizationLines";
 import { LineShapeComponent } from "./LineShape";
 import { ArrowShapeComponent } from "./ArrowShape";
 import { AttributeShape } from "./AttributeShape";
@@ -26,6 +29,15 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const lastPinchDistanceRef = useRef<number | null>(null);
 	const lastPinchCenterRef = useRef<{ x: number; y: number } | null>(null);
+	const lastTapTimeRef = useRef<number>(0); // Track last tap to prevent double-firing with click
+
+	// Long press selection refs for mobile
+	const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const isLongPressActiveRef = useRef<boolean>(false);
+	const longPressEndTimeRef = useRef<number>(0); // Track when long press selection ended
+	const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+	const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
 	const [selectionBox, setSelectionBox] = useState<{
 		startX: number;
 		startY: number;
@@ -41,6 +53,9 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
+	const generalizations = useEditorStore(
+		(state) => state.diagram.generalizations,
+	);
 	const lines = useEditorStore((state) => state.diagram.lines);
 	const arrows = useEditorStore((state) => state.diagram.arrows);
 	const attributes = useEditorStore((state) => state.diagram.attributes);
@@ -52,11 +67,14 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const updateEntity = useEditorStore((state) => state.updateEntity);
 	const addRelationship = useEditorStore((state) => state.addRelationship);
 	const updateRelationship = useEditorStore(
-		(state) => state.updateRelationship
+		(state) => state.updateRelationship,
+	);
+	const updateGeneralization = useEditorStore(
+		(state) => state.updateGeneralization,
 	);
 	const setZoom = useEditorStore((state) => state.setZoom);
 	const setViewportPosition = useEditorStore(
-		(state) => state.setViewportPosition
+		(state) => state.setViewportPosition,
 	);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
 	const selectMultiple = useEditorStore((state) => state.selectMultiple);
@@ -64,23 +82,29 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const addArrow = useEditorStore((state) => state.addArrow);
 	const addAttribute = useEditorStore((state) => state.addAttribute);
 	const addRelationshipAttribute = useEditorStore(
-		(state) => state.addRelationshipAttribute
+		(state) => state.addRelationshipAttribute,
 	);
 	const updateAttributePosition = useEditorStore(
-		(state) => state.updateAttributePosition
+		(state) => state.updateAttributePosition,
 	);
 
 	const drawingLine = useEditorStore((state) => state.drawingLine);
 	const setDrawingLine = useEditorStore((state) => state.setDrawingLine);
 	const drawingConnection = useEditorStore((state) => state.drawingConnection);
 	const setDrawingConnection = useEditorStore(
-		(state) => state.setDrawingConnection
+		(state) => state.setDrawingConnection,
+	);
+	const setPendingQuickRelationship = useEditorStore(
+		(state) => state.setPendingQuickRelationship,
+	);
+	const setPendingGeneralizationConnect = useEditorStore(
+		(state) => state.setPendingGeneralizationConnect,
 	);
 	// const setMode = useEditorStore((state) => state.setMode);
 
 	// Track previous positions for multi-select dragging
 	const prevNodePositionsRef = useRef<Map<string, { x: number; y: number }>>(
-		new Map()
+		new Map(),
 	);
 
 	// Update transformer when selection changes
@@ -102,7 +126,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				}
 			})
 			.filter(
-				(node): node is Konva.Node => node !== null && node !== undefined
+				(node): node is Konva.Node => node !== null && node !== undefined,
 			);
 
 		// Only update if we have valid nodes
@@ -175,6 +199,23 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 								return;
 							}
 
+							const generalization = generalizations?.find(
+								(g) => g.id === nodeId,
+							);
+							if (generalization) {
+								const width = generalization.size.width;
+								const height = generalization.size.height;
+								minX = Math.min(minX, x);
+								minY = Math.min(minY, y);
+								maxX = Math.max(maxX, x + width);
+								maxY = Math.max(maxY, y + height);
+								initialSizes.set(nodeId, {
+									width: width,
+									height: height,
+								});
+								return;
+							}
+
 							const attribute = attributes.find((a) => a.id === nodeId);
 							if (attribute) {
 								// Attributes are points, use a small bounding box
@@ -209,7 +250,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					};
 
 					const handleNodeDragStart = (
-						e: Konva.KonvaEventObject<DragEvent>
+						e: Konva.KonvaEventObject<DragEvent>,
 					) => {
 						draggedNode = e.target as Konva.Node;
 						initialDragNodePos = {
@@ -272,6 +313,17 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 							const relationship = relationships.find((r) => r.id === nodeId);
 							if (relationship) {
 								updateRelationship(nodeId, {
+									position: { x: finalX, y: finalY },
+								});
+								return;
+							}
+
+							// Update generalization
+							const generalization = generalizations?.find(
+								(g) => g.id === nodeId,
+							);
+							if (generalization) {
+								updateGeneralization(nodeId, {
 									position: { x: finalX, y: finalY },
 								});
 								return;
@@ -461,7 +513,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 												? {
 														width: Math.max(50, initialSize.width * scaleX),
 														height: Math.max(30, initialSize.height * scaleY),
-												  }
+													}
 												: entity.size,
 										});
 										// Reset scale
@@ -472,7 +524,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 									// Update relationship
 									const relationship = relationships.find(
-										(r) => r.id === nodeId
+										(r) => r.id === nodeId,
 									);
 									if (relationship) {
 										const initialSize = initialSizes.get(nodeId);
@@ -482,8 +534,29 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 												? {
 														width: Math.max(60, initialSize.width * scaleX),
 														height: Math.max(40, initialSize.height * scaleY),
-												  }
+													}
 												: relationship.size,
+										});
+										// Reset scale
+										node.scaleX(1);
+										node.scaleY(1);
+										return;
+									}
+
+									// Update generalization
+									const generalization = generalizations?.find(
+										(g) => g.id === nodeId,
+									);
+									if (generalization) {
+										const initialSize = initialSizes.get(nodeId);
+										updateGeneralization(nodeId, {
+											position: { x: finalX, y: finalY },
+											size: initialSize
+												? {
+														width: Math.max(40, initialSize.width * scaleX),
+														height: Math.max(30, initialSize.height * scaleY),
+													}
+												: generalization.size,
 										});
 										// Reset scale
 										node.scaleX(1);
@@ -531,6 +604,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 									});
 									return;
 								}
+
+								// Generalizations typically don't rotate
+								const generalization = generalizations?.find(
+									(g) => g.id === nodeId,
+								);
+								if (generalization) return;
 							});
 						}
 
@@ -575,6 +654,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		attributes,
 		updateEntity,
 		updateRelationship,
+		updateGeneralization,
 		updateAttributePosition,
 	]);
 
@@ -649,16 +729,82 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		stage.batchDraw();
 	};
 
-	// Handle touch events (tap) - same logic as click
+	// Handle touch events (tap) - same logic as click but with touch-specific position handling
 	const handleStageTap = (
-		e: Konva.KonvaEventObject<PointerEvent | TouchEvent>
+		e: Konva.KonvaEventObject<PointerEvent | TouchEvent>,
 	) => {
-		// Convert to mouse event format for compatibility
+		const stage = stageRef.current;
+		if (!stage) return;
+
+		// Skip if long press selection just ended (don't clear selection immediately after selecting)
+		const timeSinceLongPressEnd = Date.now() - longPressEndTimeRef.current;
+		if (timeSinceLongPressEnd < 300) {
+			return;
+		}
+
+		// Mark this tap to prevent duplicate handling from click event
+		lastTapTimeRef.current = Date.now();
+
+		// Get touch position from the event itself (more reliable on mobile)
+		let clientX: number;
+		let clientY: number;
+
+		const evt = e.evt as TouchEvent | PointerEvent;
+		if ("changedTouches" in evt && evt.changedTouches.length > 0) {
+			// TouchEvent - use changedTouches for tap end position
+			clientX = evt.changedTouches[0].clientX;
+			clientY = evt.changedTouches[0].clientY;
+		} else if ("clientX" in evt) {
+			// PointerEvent
+			clientX = evt.clientX;
+			clientY = evt.clientY;
+		} else {
+			// Fallback to getPointerPosition
+			const pointer = stage.getPointerPosition();
+			if (!pointer) return;
+			clientX = pointer.x;
+			clientY = pointer.y;
+		}
+
+		// Convert client coordinates to stage coordinates
+		const container = stage.container();
+		const rect = container.getBoundingClientRect();
+		const stageX = clientX - rect.left;
+		const stageY = clientY - rect.top;
+
+		// Apply inverse transform to get canvas coordinates
+		const transform = stage.getAbsoluteTransform().copy();
+		transform.invert();
+		const pos = transform.point({ x: stageX, y: stageY });
+
+		// Empty canvas = Stage or Layer
+		const isEmptyCanvasClick =
+			e.target === e.target.getStage() || e.target.getType() === "Layer";
+
+		// Handle entity creation mode
+		if (mode === "entity" && isEmptyCanvasClick) {
+			addEntity(pos);
+			return;
+		}
+
+		// Handle relationship creation mode
+		if (mode === "relationship" && isEmptyCanvasClick) {
+			addRelationship(pos);
+			return;
+		}
+
+		// Handle select mode - clear selection when tapping on empty canvas
+		if (mode === "select" && isEmptyCanvasClick) {
+			clearSelection();
+			return;
+		}
+
+		// For other modes, delegate to the regular click handler (but it will skip due to tap guard)
 		const mouseEvent = {
 			...e,
 			evt: {
 				...e.evt,
-				shiftKey: false, // Touch events don't have shift key
+				shiftKey: false,
 			},
 		} as Konva.KonvaEventObject<MouseEvent>;
 		handleStageClick(mouseEvent);
@@ -724,7 +870,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const handleStageMouseUp = () => {
 		if (isSelecting && selectionBox) {
 			const stage = stageRef.current;
-			if (!stage) return;
+			if (!stage) {
+				// Reset even if stage not found
+				setIsSelecting(false);
+				setSelectionBox(null);
+				return;
+			}
 
 			const boxX = Math.min(selectionBox.startX, selectionBox.endX);
 			const boxY = Math.min(selectionBox.startY, selectionBox.endY);
@@ -780,6 +931,20 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					}
 				});
 
+				// Check generalizations (triangle center)
+				generalizations.forEach((gen) => {
+					const genCenterX = gen.position.x + gen.size.width / 2;
+					const genCenterY = gen.position.y + gen.size.height / 2;
+					if (
+						genCenterX >= boxX &&
+						genCenterX <= boxX + boxWidth &&
+						genCenterY >= boxY &&
+						genCenterY <= boxY + boxHeight
+					) {
+						selectedIds.push(gen.id);
+					}
+				});
+
 				// Check connections (check if any point is in the box)
 				connections.forEach((connection) => {
 					// Check if any point in the connection is within the box
@@ -802,11 +967,11 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					selectMultiple(selectedIds);
 				}
 			}
-
-			// Reset selection box
-			setIsSelecting(false);
-			setSelectionBox(null);
 		}
+
+		// Always reset selection box state (even for small/no drag clicks)
+		setIsSelecting(false);
+		setSelectionBox(null);
 	};
 
 	// Handle canvas click
@@ -814,9 +979,18 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		const stage = stageRef.current;
 		if (!stage) return;
 
+		// Skip if a tap just happened (prevents double-firing on touch devices)
+		const timeSinceLastTap = Date.now() - lastTapTimeRef.current;
+		if (timeSinceLastTap < 100) {
+			return;
+		}
+
 		// Check if click originated from a warning badge or popover
 		const target = e.evt.target as HTMLElement;
-		if (target?.closest('[data-warning-popover]') || target?.closest('button')) {
+		if (
+			target?.closest("[data-warning-popover]") ||
+			target?.closest("button")
+		) {
 			return;
 		}
 
@@ -827,18 +1001,26 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		transform.invert();
 		const pos = transform.point(pointer);
 
+		// Empty canvas = Stage or Layer (in Konva, clicks on empty area hit the Layer)
+		const isEmptyCanvasClick =
+			e.target === e.target.getStage() || e.target.getType() === "Layer";
+
 		// Handle connection drawing mode - only for empty space clicks
 		// Entity/Relationship clicks are handled in their respective components
 		if (mode === "connect") {
+			// Clear pending generalization connect if clicking on empty stage
+			if (isEmptyCanvasClick) {
+				setPendingGeneralizationConnect(null);
+			}
 			// Only handle empty space clicks (for waypoints)
-			if (e.target === e.target.getStage() && drawingConnection.isDrawing) {
+			if (isEmptyCanvasClick && drawingConnection.isDrawing) {
 				// Clicked on empty space - add waypoint if in connect mode
 				setDrawingConnection(
 					true,
 					drawingConnection.fromId,
 					drawingConnection.fromPoint,
 					pos,
-					[...drawingConnection.waypoints, pos]
+					[...drawingConnection.waypoints, pos],
 				);
 			}
 			return;
@@ -848,7 +1030,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		if (mode === "attribute") {
 			// First, check if clicking on an existing attribute - if so, don't create
 			const clickedNode = e.target;
-			
+
 			// Check if directly clicking on an attribute Group
 			if (clickedNode) {
 				const groupId = clickedNode.id ? clickedNode.id() : null;
@@ -859,7 +1041,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						return;
 					}
 				}
-				
+
 				// Also check if clicking on a child of an attribute (Ellipse or Text)
 				const parent = clickedNode.getParent();
 				if (parent && parent.id) {
@@ -896,7 +1078,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					const entityCenterY = entity.position.y + entity.size.height / 2;
 					const distance = Math.sqrt(
 						Math.pow(pos.x - entityCenterX, 2) +
-							Math.pow(pos.y - entityCenterY, 2)
+							Math.pow(pos.y - entityCenterY, 2),
 					);
 
 					if (distance < minDistance && distance < maxDistance) {
@@ -913,7 +1095,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						const relCenterY =
 							relationship.position.y + relationship.size.height / 2;
 						const distance = Math.sqrt(
-							Math.pow(pos.x - relCenterX, 2) + Math.pow(pos.y - relCenterY, 2)
+							Math.pow(pos.x - relCenterX, 2) + Math.pow(pos.y - relCenterY, 2),
 						);
 
 						if (distance < minDistance && distance < maxDistance) {
@@ -927,192 +1109,237 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			if (targetEntity) {
 				// Add attribute to the entity
 				// Count existing attributes for this entity
-				const attributeCount = attributes.filter(a => a.entityId === targetEntity.id).length;
-				
+				const attributeCount = attributes.filter(
+					(a) => a.entityId === targetEntity.id,
+				).length;
+
 				// Calculate position based on click location relative to entity
-				const entityCenterX = targetEntity.position.x + targetEntity.size.width / 2;
-				const entityCenterY = targetEntity.position.y + targetEntity.size.height / 2;
+				const entityCenterX =
+					targetEntity.position.x + targetEntity.size.width / 2;
+				const entityCenterY =
+					targetEntity.position.y + targetEntity.size.height / 2;
 				const dx = pos.x - entityCenterX;
 				const dy = pos.y - entityCenterY;
-				
+
 				// Determine which side was clicked based on angle
 				const angle = Math.atan2(dy, dx);
 				const offset = 60; // Distance from entity edge
 				const spacing = 40; // Vertical spacing between attributes on the same side
-				let side: 'right' | 'bottom' | 'left' | 'top';
+				let side: "right" | "bottom" | "left" | "top";
 				let basePosition: { x: number; y: number };
-				
+
 				// Top: -3π/4 to -π/4, Right: -π/4 to π/4, Bottom: π/4 to 3π/4, Left: 3π/4 to -3π/4
 				if (angle >= -Math.PI / 4 && angle < Math.PI / 4) {
 					// Right side
-					side = 'right';
+					side = "right";
 					basePosition = {
 						x: targetEntity.position.x + targetEntity.size.width + offset,
 						y: targetEntity.position.y + targetEntity.size.height / 2,
 					};
 				} else if (angle >= Math.PI / 4 && angle < (3 * Math.PI) / 4) {
 					// Bottom side
-					side = 'bottom';
+					side = "bottom";
 					basePosition = {
 						x: targetEntity.position.x + targetEntity.size.width / 2,
 						y: targetEntity.position.y + targetEntity.size.height + offset,
 					};
 				} else if (angle >= (3 * Math.PI) / 4 || angle < -(3 * Math.PI) / 4) {
 					// Left side
-					side = 'left';
+					side = "left";
 					basePosition = {
 						x: targetEntity.position.x - offset,
 						y: targetEntity.position.y + targetEntity.size.height / 2,
 					};
 				} else {
 					// Top side
-					side = 'top';
+					side = "top";
 					basePosition = {
 						x: targetEntity.position.x + targetEntity.size.width / 2,
 						y: targetEntity.position.y - offset,
 					};
 				}
-				
+
 				// Check for existing attributes on the same side and adjust position
-				const existingAttributesOnSide = attributes.filter(a => {
+				const existingAttributesOnSide = attributes.filter((a) => {
 					if (a.entityId !== targetEntity.id) return false;
-					
+
 					// Determine which side this attribute is on
 					const attrDx = a.position.x - entityCenterX;
 					const attrDy = a.position.y - entityCenterY;
 					const attrAngle = Math.atan2(attrDy, attrDx);
-					
-					let attrSide: 'right' | 'bottom' | 'left' | 'top';
+
+					let attrSide: "right" | "bottom" | "left" | "top";
 					if (attrAngle >= -Math.PI / 4 && attrAngle < Math.PI / 4) {
-						attrSide = 'right';
-					} else if (attrAngle >= Math.PI / 4 && attrAngle < (3 * Math.PI) / 4) {
-						attrSide = 'bottom';
-					} else if (attrAngle >= (3 * Math.PI) / 4 || attrAngle < -(3 * Math.PI) / 4) {
-						attrSide = 'left';
+						attrSide = "right";
+					} else if (
+						attrAngle >= Math.PI / 4 &&
+						attrAngle < (3 * Math.PI) / 4
+					) {
+						attrSide = "bottom";
+					} else if (
+						attrAngle >= (3 * Math.PI) / 4 ||
+						attrAngle < -(3 * Math.PI) / 4
+					) {
+						attrSide = "left";
 					} else {
-						attrSide = 'top';
+						attrSide = "top";
 					}
-					
+
 					return attrSide === side;
 				});
-				
-			// Offset the position based on number of existing attributes on this side
-			const attributePosition = { ...basePosition };
-			if (side === 'right' || side === 'left') {
-				// Stack vertically for left/right sides
-				attributePosition.y += existingAttributesOnSide.length * spacing;
-			} else {
-				// Stack horizontally for top/bottom sides
-				attributePosition.x += existingAttributesOnSide.length * spacing;
-			}
-				
-				addAttribute(targetEntity.id, {
-					name: `Attribute ${attributeCount + 1}`,
-					isKey: false,
-					isPartialKey: false,
-					isMultivalued: false,
-					isDerived: false,
-				}, attributePosition);
+
+				// Offset the position based on number of existing attributes on this side
+				const attributePosition = { ...basePosition };
+				if (side === "right" || side === "left") {
+					// Stack vertically for left/right sides
+					attributePosition.y += existingAttributesOnSide.length * spacing;
+				} else {
+					// Stack horizontally for top/bottom sides
+					attributePosition.x += existingAttributesOnSide.length * spacing;
+				}
+
+				addAttribute(
+					targetEntity.id,
+					{
+						name: `Attribute ${attributeCount + 1}`,
+						isKey: false,
+						isPartialKey: false,
+						isMultivalued: false,
+						isDerived: false,
+					},
+					attributePosition,
+				);
 			} else if (targetRelationship) {
 				// Add attribute to the relationship
 				// Count existing attributes for this relationship
-				const attributeCount = attributes.filter(a => a.relationshipId === targetRelationship.id).length;
-				
+				const attributeCount = attributes.filter(
+					(a) => a.relationshipId === targetRelationship.id,
+				).length;
+
 				// Calculate position based on click location relative to relationship
-				const relCenterX = targetRelationship.position.x + targetRelationship.size.width / 2;
-				const relCenterY = targetRelationship.position.y + targetRelationship.size.height / 2;
+				const relCenterX =
+					targetRelationship.position.x + targetRelationship.size.width / 2;
+				const relCenterY =
+					targetRelationship.position.y + targetRelationship.size.height / 2;
 				const dx = pos.x - relCenterX;
 				const dy = pos.y - relCenterY;
-				
+
 				// Determine which side was clicked based on angle
 				const angle = Math.atan2(dy, dx);
 				const offset = 60; // Distance from relationship edge
 				const spacing = 40; // Vertical spacing between attributes on the same side
-				let side: 'right' | 'bottom' | 'left' | 'top';
+				let side: "right" | "bottom" | "left" | "top";
 				let basePosition: { x: number; y: number };
-				
+
 				// Top: -3π/4 to -π/4, Right: -π/4 to π/4, Bottom: π/4 to 3π/4, Left: 3π/4 to -3π/4
 				if (angle >= -Math.PI / 4 && angle < Math.PI / 4) {
 					// Right side
-					side = 'right';
+					side = "right";
 					basePosition = {
-						x: targetRelationship.position.x + targetRelationship.size.width + offset,
-						y: targetRelationship.position.y + targetRelationship.size.height / 2,
+						x:
+							targetRelationship.position.x +
+							targetRelationship.size.width +
+							offset,
+						y:
+							targetRelationship.position.y +
+							targetRelationship.size.height / 2,
 					};
 				} else if (angle >= Math.PI / 4 && angle < (3 * Math.PI) / 4) {
 					// Bottom side
-					side = 'bottom';
+					side = "bottom";
 					basePosition = {
-						x: targetRelationship.position.x + targetRelationship.size.width / 2,
-						y: targetRelationship.position.y + targetRelationship.size.height + offset,
+						x:
+							targetRelationship.position.x + targetRelationship.size.width / 2,
+						y:
+							targetRelationship.position.y +
+							targetRelationship.size.height +
+							offset,
 					};
 				} else if (angle >= (3 * Math.PI) / 4 || angle < -(3 * Math.PI) / 4) {
 					// Left side
-					side = 'left';
+					side = "left";
 					basePosition = {
 						x: targetRelationship.position.x - offset,
-						y: targetRelationship.position.y + targetRelationship.size.height / 2,
+						y:
+							targetRelationship.position.y +
+							targetRelationship.size.height / 2,
 					};
 				} else {
 					// Top side
-					side = 'top';
+					side = "top";
 					basePosition = {
-						x: targetRelationship.position.x + targetRelationship.size.width / 2,
+						x:
+							targetRelationship.position.x + targetRelationship.size.width / 2,
 						y: targetRelationship.position.y - offset,
 					};
 				}
-				
+
 				// Check for existing attributes on the same side and adjust position
-				const existingAttributesOnSide = attributes.filter(a => {
+				const existingAttributesOnSide = attributes.filter((a) => {
 					if (a.relationshipId !== targetRelationship.id) return false;
-					
+
 					// Determine which side this attribute is on
 					const attrDx = a.position.x - relCenterX;
 					const attrDy = a.position.y - relCenterY;
 					const attrAngle = Math.atan2(attrDy, attrDx);
-					
-					let attrSide: 'right' | 'bottom' | 'left' | 'top';
+
+					let attrSide: "right" | "bottom" | "left" | "top";
 					if (attrAngle >= -Math.PI / 4 && attrAngle < Math.PI / 4) {
-						attrSide = 'right';
-					} else if (attrAngle >= Math.PI / 4 && attrAngle < (3 * Math.PI) / 4) {
-						attrSide = 'bottom';
-					} else if (attrAngle >= (3 * Math.PI) / 4 || attrAngle < -(3 * Math.PI) / 4) {
-						attrSide = 'left';
+						attrSide = "right";
+					} else if (
+						attrAngle >= Math.PI / 4 &&
+						attrAngle < (3 * Math.PI) / 4
+					) {
+						attrSide = "bottom";
+					} else if (
+						attrAngle >= (3 * Math.PI) / 4 ||
+						attrAngle < -(3 * Math.PI) / 4
+					) {
+						attrSide = "left";
 					} else {
-						attrSide = 'top';
+						attrSide = "top";
 					}
-					
+
 					return attrSide === side;
 				});
-				
-			// Offset the position based on number of existing attributes on this side
-			const attributePosition = { ...basePosition };
-			if (side === 'right' || side === 'left') {
-				// Stack vertically for left/right sides
-				attributePosition.y += existingAttributesOnSide.length * spacing;
-			} else {
-				// Stack horizontally for top/bottom sides
-				attributePosition.x += existingAttributesOnSide.length * spacing;
-			}
-				
-				addRelationshipAttribute(targetRelationship.id, {
-					name: `Attribute ${attributeCount + 1}`,
-					isKey: false,
-					isPartialKey: false,
-					isMultivalued: false,
-					isDerived: false,
-				}, attributePosition);
+
+				// Offset the position based on number of existing attributes on this side
+				const attributePosition = { ...basePosition };
+				if (side === "right" || side === "left") {
+					// Stack vertically for left/right sides
+					attributePosition.y += existingAttributesOnSide.length * spacing;
+				} else {
+					// Stack horizontally for top/bottom sides
+					attributePosition.x += existingAttributesOnSide.length * spacing;
+				}
+
+				addRelationshipAttribute(
+					targetRelationship.id,
+					{
+						name: `Attribute ${attributeCount + 1}`,
+						isKey: false,
+						isPartialKey: false,
+						isMultivalued: false,
+						isDerived: false,
+					},
+					attributePosition,
+				);
 			}
 			return;
 		}
 
-		if (e.target === e.target.getStage()) {
+		if (isEmptyCanvasClick) {
 			if (mode === "entity") {
 				addEntity(pos);
-			} else if (mode === "relationship" || mode === "relationship-1-1" || mode === "relationship-1-n" || mode === "relationship-n-n") {
+			} else if (
+				mode === "relationship-1-1" ||
+				mode === "relationship-1-n" ||
+				mode === "relationship-n-n"
+			) {
+				// Quick relationship flow: click two entities; don't place diamond on stage click; cancel pending if any
+				setPendingQuickRelationship(null);
+			} else if (mode === "relationship") {
 				addRelationship(pos);
-				// Store the relationship type for later use when creating connections
-				// The cardinality will be set when connections are made
 			} else if (
 				mode === "line" ||
 				mode === "arrow-left" ||
@@ -1175,20 +1402,27 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				drawingConnection.fromId,
 				drawingConnection.fromPoint,
 				pos,
-				drawingConnection.waypoints
+				drawingConnection.waypoints,
 			);
 		}
 	};
 
-	// Handle pinch-to-zoom gesture
+	// Handle pinch-to-zoom gesture and long-press selection
 	const handleTouchStart = (e: Konva.KonvaEventObject<TouchEvent>) => {
+		// Clear any existing long press timer
+		if (longPressTimerRef.current) {
+			clearTimeout(longPressTimerRef.current);
+			longPressTimerRef.current = null;
+		}
+
 		if (e.evt.touches.length === 2) {
+			// Two finger touch - pinch to zoom
 			const touch1 = e.evt.touches[0];
 			const touch2 = e.evt.touches[1];
 
 			const distance = Math.sqrt(
 				Math.pow(touch2.clientX - touch1.clientX, 2) +
-					Math.pow(touch2.clientY - touch1.clientY, 2)
+					Math.pow(touch2.clientY - touch1.clientY, 2),
 			);
 
 			const centerX = (touch1.clientX + touch2.clientX) / 2;
@@ -1196,11 +1430,62 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 			lastPinchDistanceRef.current = distance;
 			lastPinchCenterRef.current = { x: centerX, y: centerY };
+		} else if (e.evt.touches.length === 1 && mode === "select") {
+			// Single finger touch in select mode - check for long press on empty canvas
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			// Check if touching empty canvas (Stage or Layer)
+			const target = e.target;
+			const isEmptyCanvas = target === stage || target.getType() === "Layer";
+
+			if (isEmptyCanvas) {
+				// Store touch start position for movement detection
+				const touch = e.evt.touches[0];
+				const container = stage.container();
+				const rect = container.getBoundingClientRect();
+				const stageX = touch.clientX - rect.left;
+				const stageY = touch.clientY - rect.top;
+
+				// Transform to canvas coordinates
+				const transform = stage.getAbsoluteTransform().copy();
+				transform.invert();
+				const pos = transform.point({ x: stageX, y: stageY });
+
+				touchStartPosRef.current = pos;
+
+				// Start long press timer (500ms)
+				longPressTimerRef.current = setTimeout(() => {
+					// Long press detected - start selection mode
+					isLongPressActiveRef.current = true;
+					longPressStartPosRef.current = pos;
+
+					// Start selection box
+					setIsSelecting(true);
+					setSelectionBox({
+						startX: pos.x,
+						startY: pos.y,
+						endX: pos.x,
+						endY: pos.y,
+					});
+
+					// Haptic feedback if available
+					if (navigator.vibrate) {
+						navigator.vibrate(50);
+					}
+				}, 500);
+			}
 		}
 	};
 
 	const handleTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
 		if (e.evt.touches.length === 2 && lastPinchDistanceRef.current !== null) {
+			// Cancel long press if pinching
+			if (longPressTimerRef.current) {
+				clearTimeout(longPressTimerRef.current);
+				longPressTimerRef.current = null;
+			}
+
 			e.evt.preventDefault(); // Prevent scrolling while pinching
 
 			const touch1 = e.evt.touches[0];
@@ -1208,7 +1493,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 			const distance = Math.sqrt(
 				Math.pow(touch2.clientX - touch1.clientX, 2) +
-					Math.pow(touch2.clientY - touch1.clientY, 2)
+					Math.pow(touch2.clientY - touch1.clientY, 2),
 			);
 
 			const stage = stageRef.current;
@@ -1244,15 +1529,163 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			stage.batchDraw();
 
 			lastPinchDistanceRef.current = distance;
-		} else {
-			// Single touch - update preview
-			handlePointerMove();
+		} else if (e.evt.touches.length === 1) {
+			const stage = stageRef.current;
+			if (!stage) return;
+
+			const touch = e.evt.touches[0];
+			const container = stage.container();
+			const rect = container.getBoundingClientRect();
+			const stageX = touch.clientX - rect.left;
+			const stageY = touch.clientY - rect.top;
+
+			// Transform to canvas coordinates
+			const transform = stage.getAbsoluteTransform().copy();
+			transform.invert();
+			const pos = transform.point({ x: stageX, y: stageY });
+
+			// Check if user moved too much before long press triggered - cancel timer
+			if (longPressTimerRef.current && touchStartPosRef.current) {
+				const dx = pos.x - touchStartPosRef.current.x;
+				const dy = pos.y - touchStartPosRef.current.y;
+				const distance = Math.sqrt(dx * dx + dy * dy);
+
+				// If moved more than 10 pixels, cancel long press
+				if (distance > 10) {
+					clearTimeout(longPressTimerRef.current);
+					longPressTimerRef.current = null;
+				}
+			}
+
+			// If long press is active, update selection box
+			if (isLongPressActiveRef.current && isSelecting && selectionBox) {
+				e.evt.preventDefault(); // Prevent scrolling while selecting
+
+				setSelectionBox({
+					...selectionBox,
+					endX: pos.x,
+					endY: pos.y,
+				});
+			} else {
+				// Single touch - update preview for drawing modes
+				handlePointerMove();
+			}
 		}
 	};
 
 	const handleTouchEnd = () => {
 		lastPinchDistanceRef.current = null;
 		lastPinchCenterRef.current = null;
+
+		// Clear long press timer
+		if (longPressTimerRef.current) {
+			clearTimeout(longPressTimerRef.current);
+			longPressTimerRef.current = null;
+		}
+
+		// Complete selection if long press was active
+		if (isLongPressActiveRef.current && isSelecting && selectionBox) {
+			const boxX = Math.min(selectionBox.startX, selectionBox.endX);
+			const boxY = Math.min(selectionBox.startY, selectionBox.endY);
+			const boxWidth = Math.abs(selectionBox.endX - selectionBox.startX);
+			const boxHeight = Math.abs(selectionBox.endY - selectionBox.startY);
+
+			// Only select if box is large enough
+			if (boxWidth > 5 && boxHeight > 5) {
+				const selectedElementIds: string[] = [];
+
+				// Check entities
+				entities.forEach((entity) => {
+					const entityCenterX = entity.position.x + entity.size.width / 2;
+					const entityCenterY = entity.position.y + entity.size.height / 2;
+					if (
+						entityCenterX >= boxX &&
+						entityCenterX <= boxX + boxWidth &&
+						entityCenterY >= boxY &&
+						entityCenterY <= boxY + boxHeight
+					) {
+						selectedElementIds.push(entity.id);
+					}
+				});
+
+				// Check relationships
+				relationships.forEach((relationship) => {
+					const relCenterX =
+						relationship.position.x + relationship.size.width / 2;
+					const relCenterY =
+						relationship.position.y + relationship.size.height / 2;
+					if (
+						relCenterX >= boxX &&
+						relCenterX <= boxX + boxWidth &&
+						relCenterY >= boxY &&
+						relCenterY <= boxY + boxHeight
+					) {
+						selectedElementIds.push(relationship.id);
+					}
+				});
+
+				// Check attributes
+				attributes.forEach((attribute) => {
+					const attrCenterX = attribute.position.x;
+					const attrCenterY = attribute.position.y;
+					if (
+						attrCenterX >= boxX &&
+						attrCenterX <= boxX + boxWidth &&
+						attrCenterY >= boxY &&
+						attrCenterY <= boxY + boxHeight
+					) {
+						selectedElementIds.push(attribute.id);
+					}
+				});
+
+				// Check generalizations
+				generalizations.forEach((gen) => {
+					const genCenterX = gen.position.x + gen.size.width / 2;
+					const genCenterY = gen.position.y + gen.size.height / 2;
+					if (
+						genCenterX >= boxX &&
+						genCenterX <= boxX + boxWidth &&
+						genCenterY >= boxY &&
+						genCenterY <= boxY + boxHeight
+					) {
+						selectedElementIds.push(gen.id);
+					}
+				});
+
+				// Check connections
+				connections.forEach((connection) => {
+					for (let i = 0; i < connection.points.length; i += 2) {
+						const x = connection.points[i];
+						const y = connection.points[i + 1];
+						if (
+							x >= boxX &&
+							x <= boxX + boxWidth &&
+							y >= boxY &&
+							y <= boxY + boxHeight
+						) {
+							selectedElementIds.push(connection.id);
+							break;
+						}
+					}
+				});
+
+				if (selectedElementIds.length > 0) {
+					selectMultiple(selectedElementIds);
+				}
+			}
+
+			// Reset selection state
+			setIsSelecting(false);
+			setSelectionBox(null);
+
+			// Mark the time when long press selection ended (to prevent tap from clearing it)
+			longPressEndTimeRef.current = Date.now();
+		}
+
+		// Reset long press state
+		isLongPressActiveRef.current = false;
+		longPressStartPosRef.current = null;
+		touchStartPosRef.current = null;
 	};
 
 	// Expose stageRef via ref
@@ -1332,6 +1765,14 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						/>
 					))}
 
+					{/* Render generalizations (lines first, then triangle on top) */}
+					{generalizations.map((gen) => (
+						<GeneralizationLines key={`lines-${gen.id}`} generalization={gen} />
+					))}
+					{generalizations.map((gen) => (
+						<GeneralizationShape key={gen.id} generalization={gen} />
+					))}
+
 					{/* Render attributes with connection lines */}
 					{attributes.map((attribute) => (
 						<AttributeShape key={attribute.id} attribute={attribute} />
@@ -1380,7 +1821,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 									const fromElement =
 										entities.find((e) => e.id === drawingConnection.fromId) ||
 										relationships.find(
-											(r) => r.id === drawingConnection.fromId
+											(r) => r.id === drawingConnection.fromId,
 										);
 									if (!fromElement) return null;
 
@@ -1424,7 +1865,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 									});
 									previewPoints.push(
 										drawingConnection.currentPoint.x,
-										drawingConnection.currentPoint.y
+										drawingConnection.currentPoint.y,
 									);
 
 									return (
@@ -1480,9 +1921,34 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				</Layer>
 			</Stage>
 
-			{/* Zoom indicator */}
-			<div className="absolute bottom-4 right-4 bg-white px-3 py-1 rounded shadow text-sm">
-				{Math.round(viewport.scale * 100)}%
+			{/* Zoom indicator and Recenter button */}
+			<div className="absolute bottom-4 right-4 flex items-center gap-2">
+				{/* Recenter button */}
+				<button
+					onClick={() => {
+						// Reset zoom to 1 (100%)
+						setZoom(1);
+
+						// Reset position to (0, 0)
+						setViewportPosition({ x: 0, y: 0 });
+
+						// Update stage position immediately
+						if (stageRef.current) {
+							stageRef.current.position({ x: 0, y: 0 });
+							stageRef.current.scale({ x: 1, y: 1 });
+							stageRef.current.batchDraw();
+						}
+					}}
+					className="p-2 bg-white dark:bg-gray-800 rounded shadow hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
+					title="Recenter diagram (Reset zoom and position)"
+				>
+					<Maximize2 size={16} className="text-gray-700 dark:text-gray-300" />
+				</button>
+
+				{/* Zoom indicator */}
+				<div className="bg-white dark:bg-gray-800 px-3 py-1 rounded shadow text-sm border border-gray-200 dark:border-gray-700">
+					{Math.round(viewport.scale * 100)}%
+				</div>
 			</div>
 		</div>
 	);

@@ -37,8 +37,27 @@ export function serializeDiagramToJavaXML(diagram: Diagram): string {
   });
   xmlParts.push('    </RelationshipSets>');
 
-  // Generalizations (empty for now)
-  xmlParts.push('    <Generalizations />');
+  // Generalizations - Java app uses Generalization (partial) and TotalGeneralization (total)
+  if (diagram.generalizations && diagram.generalizations.length > 0) {
+    xmlParts.push('    <Generalizations>');
+    diagram.generalizations.forEach((gen) => {
+      const tagName = gen.isTotal ? 'TotalGeneralization' : 'Generalization';
+      const parentJavaId = getJavaId(gen.parentId);
+      xmlParts.push(`      <${tagName} id="${getJavaId(gen.id)}" total="${gen.isTotal}">`);
+      xmlParts.push('        <Parent>');
+      xmlParts.push(`          <StrongEntitySet refid="${parentJavaId}" />`);
+      xmlParts.push('        </Parent>');
+      xmlParts.push('        <Children>');
+      gen.childIds.forEach((childId) => {
+        xmlParts.push(`          <StrongEntitySet refid="${getJavaId(childId)}" />`);
+      });
+      xmlParts.push('        </Children>');
+      xmlParts.push(`      </${tagName}>`);
+    });
+    xmlParts.push('    </Generalizations>');
+  } else {
+    xmlParts.push('    <Generalizations />');
+  }
 
   xmlParts.push('  </ERDatabaseSchema>');
 
@@ -60,14 +79,25 @@ export function serializeDiagramToJavaXML(diagram: Diagram): string {
   // Serialize relationship positions
   diagram.relationships.forEach((relationship) => {
     const javaId = getJavaId(relationship.id);
-    // Determine relationship type from cardinalities
     const relType = determineRelationshipType(relationship);
+    const tagName = getRelationshipTagName(relType);
     // Java app uses CENTER-based coordinates, convert from our top-left
     const centerX = relationship.position.x + relationship.size.width / 2;
     const centerY = relationship.position.y + relationship.size.height / 2;
-    xmlParts.push(`    <RelationshipSet${relType} refid="${javaId}">`);
+    xmlParts.push(`    <${tagName} refid="${javaId}">`);
     xmlParts.push(`      <Position x="${Math.round(centerX)}" y="${Math.round(centerY)}" />`);
-    xmlParts.push(`    </RelationshipSet${relType}>`);
+    xmlParts.push(`    </${tagName}>`);
+  });
+
+  // Serialize generalization positions - Java uses Generalization/TotalGeneralization in diagram
+  (diagram.generalizations ?? []).forEach((gen) => {
+    const javaId = getJavaId(gen.id);
+    const tagName = gen.isTotal ? 'TotalGeneralization' : 'Generalization';
+    const centerX = gen.position.x + gen.size.width / 2;
+    const centerY = gen.position.y + gen.size.height / 2;
+    xmlParts.push(`    <${tagName} refid="${javaId}">`);
+    xmlParts.push(`      <Position x="${Math.round(centerX)}" y="${Math.round(centerY)}" />`);
+    xmlParts.push(`    </${tagName}>`);
   });
 
   // Serialize standalone attribute positions
@@ -144,8 +174,9 @@ function serializeJavaRelationship(
   const parts: string[] = [];
   const javaId = getJavaId(relationship.id);
   const relType = determineRelationshipType(relationship);
+  const tagName = getRelationshipTagName(relType);
 
-  parts.push(`      <RelationshipSet${relType} id="${javaId}" name="${escapeXML(relationship.name)}">`);
+  parts.push(`      <${tagName} id="${javaId}" name="${escapeXML(relationship.name)}">`);
 
   // Serialize attributes
   if (relationship.attributes.length > 0) {
@@ -181,37 +212,54 @@ function serializeJavaRelationship(
   });
   parts.push('        </Branches>');
 
-  parts.push(`      </RelationshipSet${relType}>`);
+  parts.push(`      </${tagName}>`);
   return parts.join('\n');
 }
 
 /**
- * Determine Java relationship type from our relationship format
- * Based on cardinalities: OneToOne (1-1), OneToN (1-N), NToN (N-N or M-M or multiple entities)
+ * Determine Java relationship type from our relationship format.
+ * Based on cardinalities: OneToOne (1-1), OneToN (1-N), NToN (N-N or M-M or multiple entities).
+ * When any branch has total participation, use IdentifyingRelationshipSet* (Java format).
  */
-function determineRelationshipType(relationship: Relationship): 'OneToOne' | 'OneToN' | 'NToN' {
+function determineRelationshipType(
+  relationship: Relationship
+): 'OneToOne' | 'OneToN' | 'NToN' | 'IdentifyingOneToOne' | 'IdentifyingOneToN' {
   const entityIds = relationship.entityIds;
   if (entityIds.length === 0) {
     return 'OneToOne'; // Default
   }
 
   // Count cardinalities
-  const cardinalities = entityIds.map(id => relationship.cardinalities[id] || '1');
-  const oneCount = cardinalities.filter(c => c === '1').length;
-  const nCount = cardinalities.filter(c => c === 'N' || c === 'M').length;
+  const cardinalities = entityIds.map((id) => relationship.cardinalities[id] || '1');
+  const oneCount = cardinalities.filter((c) => c === '1').length;
+  const nCount = cardinalities.filter((c) => c === 'N' || c === 'M').length;
+
+  // Check if any branch has total participation
+  const hasTotalParticipation = entityIds.some(
+    (id) => relationship.participations[id] === 'total'
+  );
 
   // OneToOne: exactly 2 entities, both with cardinality 1
   if (entityIds.length === 2 && oneCount === 2) {
-    return 'OneToOne';
+    return hasTotalParticipation ? 'IdentifyingOneToOne' : 'OneToOne';
   }
 
   // OneToN: exactly 2 entities, one with 1, one with N
   if (entityIds.length === 2 && oneCount === 1 && nCount === 1) {
-    return 'OneToN';
+    return hasTotalParticipation ? 'IdentifyingOneToN' : 'OneToN';
   }
 
-  // NToN: everything else (multiple entities, or N-N relationships)
+  // NToN: no Identifying variant in Java XML
   return 'NToN';
+}
+
+/** Java XML tag name for relationship (RelationshipSet* or IdentifyingRelationshipSet*) */
+function getRelationshipTagName(
+  relType: 'OneToOne' | 'OneToN' | 'NToN' | 'IdentifyingOneToOne' | 'IdentifyingOneToN'
+): string {
+  if (relType === 'IdentifyingOneToOne') return 'IdentifyingRelationshipSetOneToOne';
+  if (relType === 'IdentifyingOneToN') return 'IdentifyingRelationshipSetOneToN';
+  return `RelationshipSet${relType}`;
 }
 
 function escapeXML(str: string): string {

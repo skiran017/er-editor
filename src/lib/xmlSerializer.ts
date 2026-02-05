@@ -1,4 +1,4 @@
-import type { Diagram, Entity, Relationship, Attribute, Connection, LineShape, ArrowShape } from '../types';
+import type { Diagram, Entity, Relationship, Attribute, Connection, LineShape, ArrowShape, Generalization } from '../types';
 
 /**
  * Serialize Diagram object to XML string
@@ -27,6 +27,11 @@ export function serializeDiagramToXML(diagram: Diagram): string {
   // Serialize connections
   diagram.connections.forEach((connection) => {
     xmlParts.push(serializeConnection(connection));
+  });
+
+  // Serialize generalizations
+  (diagram.generalizations ?? []).forEach((gen) => {
+    xmlParts.push(serializeGeneralization(gen));
   });
 
   // Serialize lines
@@ -150,6 +155,20 @@ function serializeConnection(connection: Connection): string {
   });
 
   parts.push('  </connection>');
+  return parts.join('\n');
+}
+
+function serializeGeneralization(gen: Generalization): string {
+  const parts: string[] = [];
+  parts.push(`  <generalization id="${escapeXML(gen.id)}" parentId="${escapeXML(gen.parentId)}"`);
+  parts.push(`    x="${gen.position.x}" y="${gen.position.y}"`);
+  parts.push(`    width="${gen.size.width}" height="${gen.size.height}"`);
+  parts.push(`    isTotal="${gen.isTotal}"`);
+  parts.push('>');
+  gen.childIds.forEach((childId) => {
+    parts.push(`    <childId>${escapeXML(childId)}</childId>`);
+  });
+  parts.push('  </generalization>');
   return parts.join('\n');
 }
 

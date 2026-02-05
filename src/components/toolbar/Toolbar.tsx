@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
 	MousePointer2,
 	Hand,
@@ -10,7 +10,6 @@ import {
 	ArrowLeft,
 	ArrowRight,
 	Trash2,
-	Link,
 	MoreVertical,
 	Square,
 	Diamond,
@@ -21,6 +20,11 @@ import {
 	TbRelationManyToMany,
 	TbOvalVertical,
 } from "react-icons/tb";
+import {
+	GeneralizationIcon,
+	GeneralizationTotalIcon,
+	ConnectIcon,
+} from "../../assets/icons";
 import { Menu } from "../menu/Menu";
 import {
 	DropdownMenu,
@@ -39,15 +43,26 @@ import { cn } from "../../lib/utils";
 import { serializeDiagramToXML } from "../../lib/xmlSerializer";
 import { serializeDiagramToJavaXML } from "../../lib/javaXmlSerializer";
 import { parseXMLToDiagram } from "../../lib/xmlParser";
+import { downloadFile, pickFile, readFileAsText } from "../../lib/fileUtils";
 import {
-	downloadFile,
-	pickFile,
-	readFileAsText,
-	showConfirmDialog,
-} from "../../lib/fileUtils";
+	getDiagramBounds,
+	remapDiagramIds,
+	applyOffsetToDiagram,
+} from "../../lib/diagramUtils";
 import { exportCanvasAsImage } from "../../lib/imageExport";
 import { showToast } from "../ui/toast";
+import {
+	AlertDialog,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { Button } from "../ui/button";
 import Konva from "konva";
+import type { Diagram } from "../../types";
 
 interface ToolbarProps {
 	stageRef?: React.RefObject<Konva.Stage | null>;
@@ -62,17 +77,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 	const getElementById = useEditorStore((state) => state.getElementById);
 	const deleteEntity = useEditorStore((state) => state.deleteEntity);
 	const deleteRelationship = useEditorStore(
-		(state) => state.deleteRelationship
+		(state) => state.deleteRelationship,
 	);
 	const deleteLine = useEditorStore((state) => state.deleteLine);
 	const deleteArrow = useEditorStore((state) => state.deleteArrow);
 	const deleteAttribute = useEditorStore((state) => state.deleteAttribute);
 	const deleteAttributeById = useEditorStore(
-		(state) => state.deleteAttributeById
+		(state) => state.deleteAttributeById,
 	);
 	const deleteConnection = useEditorStore((state) => state.deleteConnection);
+	const deleteGeneralization = useEditorStore(
+		(state) => state.deleteGeneralization,
+	);
 	const diagram = useEditorStore((state) => state.diagram);
 	const loadDiagram = useEditorStore((state) => state.loadDiagram);
+
+	const [importDialogOpen, setImportDialogOpen] = useState(false);
+	const [pendingImportedDiagram, setPendingImportedDiagram] =
+		useState<Diagram | null>(null);
+	const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
 	const undo = useUndo();
 	const redo = useRedo();
@@ -110,24 +133,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			type: "react-icon" as const,
 		},
 		{
-			id: "relationship",
-			icon: Diamond,
-			label: "Relationship (R)",
-			size: 18,
-			type: "lucide" as const,
-		},
-		{
-			id: "connect",
-			icon: Link,
-			label: "Connect (C)",
-			size: 18,
-			type: "lucide" as const,
-		},
-	] as const;
-
-	// Overflow tools (shown in dropdown)
-	const moreTools = [
-		{
 			id: "relationship-1-1",
 			icon: TbRelationOneToOne,
 			label: "Relationship 1:1",
@@ -147,6 +152,38 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			label: "Relationship N:N",
 			size: 20,
 			type: "react-icon" as const,
+		},
+		{
+			id: "generalization",
+			icon: GeneralizationIcon,
+			label: "Generalization (ISA)",
+			size: 20,
+			type: "custom-svg" as const,
+		},
+		{
+			id: "generalization-total",
+			icon: GeneralizationTotalIcon,
+			label: "Generalization Total",
+			size: 20,
+			type: "custom-svg" as const,
+		},
+		{
+			id: "connect",
+			icon: ConnectIcon,
+			label: "Connect (C)",
+			size: 18,
+			type: "custom-svg" as const,
+		},
+	] as const;
+
+	// Overflow tools (shown in dropdown)
+	const moreTools = [
+		{
+			id: "relationship",
+			icon: Diamond,
+			label: "Relationship (R)",
+			size: 18,
+			type: "lucide" as const,
 		},
 		{
 			id: "line",
@@ -192,14 +229,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 				`Diagram exported successfully (${
 					format === "java" ? "Java" : "Standard"
 				} format)`,
-				"success"
+				"success",
 			);
 		} catch (error) {
 			console.error("Export error:", error);
 			showToast(
 				"Failed to export diagram: " +
 					(error instanceof Error ? error.message : "Unknown error"),
-				"error"
+				"error",
 			);
 		}
 	};
@@ -221,20 +258,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 				diagram.lines.length > 0 ||
 				diagram.arrows.length > 0;
 
-			let replace = true;
 			if (hasContent) {
-				const shouldReplace = await showConfirmDialog(
-					"Current diagram has content. Do you want to replace it, or merge with existing?"
-				);
-				replace = shouldReplace;
+				setPendingImportedDiagram(importedDiagram);
+				setImportDialogOpen(true);
+				return;
 			}
 
-			// Load diagram
-			loadDiagram(importedDiagram, replace);
-			showToast(
-				`Diagram ${replace ? "replaced" : "merged"} successfully`,
-				"success"
-			);
+			// No existing content: load directly
+			loadDiagram(importedDiagram, true);
+			showToast("Diagram imported successfully", "success");
 		} catch (error) {
 			if (
 				error instanceof Error &&
@@ -247,9 +279,31 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			showToast(
 				"Failed to import diagram: " +
 					(error instanceof Error ? error.message : "Unknown error"),
-				"error"
+				"error",
 			);
 		}
+	};
+
+	const handleImportMerge = () => {
+		if (!pendingImportedDiagram) return;
+		const bounds = getDiagramBounds(diagram);
+		const width = bounds.maxX - bounds.minX;
+		const GAP = 80;
+		const offsetX = width + GAP;
+		const remapped = remapDiagramIds(pendingImportedDiagram);
+		const offsetDiagram = applyOffsetToDiagram(remapped, offsetX, 0);
+		loadDiagram(offsetDiagram, false);
+		setImportDialogOpen(false);
+		setPendingImportedDiagram(null);
+		showToast("Diagrams merged side by side", "success");
+	};
+
+	const handleImportResetAndOpen = () => {
+		if (!pendingImportedDiagram) return;
+		loadDiagram(pendingImportedDiagram, true);
+		setImportDialogOpen(false);
+		setPendingImportedDiagram(null);
+		showToast("Diagram replaced with imported file", "success");
 	};
 
 	const handleExportImage = async () => {
@@ -266,7 +320,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			showToast(
 				"Failed to export image: " +
 					(error instanceof Error ? error.message : "Unknown error"),
-				"error"
+				"error",
 			);
 		}
 	};
@@ -298,29 +352,32 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 					}
 				} else if (element.type === "connection") {
 					deleteConnection(id);
+				} else if (element.type === "generalization") {
+					deleteGeneralization(id);
 				}
 			}
 		});
 	};
 
-	const handleResetCanvas = async () => {
-		const confirmed = await showConfirmDialog(
-			"Are you sure you want to reset the canvas? This will delete all elements."
+	const handleResetCanvas = () => {
+		setResetDialogOpen(true);
+	};
+
+	const handleResetCanvasConfirm = () => {
+		loadDiagram(
+			{
+				entities: [],
+				relationships: [],
+				connections: [],
+				generalizations: [],
+				lines: [],
+				arrows: [],
+				attributes: [],
+			},
+			true,
 		);
-		if (confirmed) {
-			loadDiagram(
-				{
-					entities: [],
-					relationships: [],
-					connections: [],
-					lines: [],
-					arrows: [],
-					attributes: [],
-				},
-				true
-			);
-			showToast("Canvas reset", "success");
-		}
+		setResetDialogOpen(false);
+		showToast("Canvas reset", "success");
 	};
 
 	const handleShowShortcuts = () => {
@@ -328,12 +385,68 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 		showToast(
 			"Keyboard shortcuts: V=Select, E=Entity, R=Relationship, A=Attribute, C=Connect, L=Line, Space=Pan",
 			"info",
-			5000
+			5000,
 		);
 	};
 
 	return (
 		<>
+			{/* Import options dialog when canvas has content */}
+			<AlertDialog
+				open={importDialogOpen}
+				onOpenChange={(open) => {
+					setImportDialogOpen(open);
+					if (!open) setPendingImportedDiagram(null);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Import diagram</AlertDialogTitle>
+						<AlertDialogDescription>
+							The canvas already has content. How do you want to proceed?
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+						<Button
+							variant="default"
+							onClick={handleImportMerge}
+							className="w-full sm:w-auto"
+						>
+							Merge
+						</Button>
+						<Button
+							variant="secondary"
+							onClick={handleImportResetAndOpen}
+							className="w-full sm:w-auto"
+						>
+							Reset and Open
+						</Button>
+						<AlertDialogCancel className="w-full sm:w-auto">
+							Cancel
+						</AlertDialogCancel>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Reset canvas confirmation dialog */}
+			<AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Reset canvas</AlertDialogTitle>
+						<AlertDialogDescription>
+							Are you sure you want to reset the canvas? This will delete all
+							elements.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<Button variant="destructive" onClick={handleResetCanvasConfirm}>
+							Reset
+						</Button>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
 			{/* Hamburger Menu - Separate, fixed at top-left */}
 			<div className="fixed top-4 left-4 z-50">
 				<Menu
@@ -362,7 +475,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 									className={cn(
 										"p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors",
 										isActive &&
-											"bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+											"bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
 									)}
 									title={tool.label}
 								>
@@ -399,7 +512,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 											className={cn(
 												"flex items-center gap-2 cursor-pointer",
 												isActive &&
-													"bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+													"bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
 											)}
 										>
 											<Icon size={tool.size} />
@@ -418,7 +531,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 							disabled={!canUndo}
 							className={cn(
 								"p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors",
-								!canUndo && "opacity-50 cursor-not-allowed"
+								!canUndo && "opacity-50 cursor-not-allowed",
 							)}
 							title="Undo (Ctrl+Z)"
 						>
@@ -429,7 +542,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 							disabled={!canRedo}
 							className={cn(
 								"p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors",
-								!canRedo && "opacity-50 cursor-not-allowed"
+								!canRedo && "opacity-50 cursor-not-allowed",
 							)}
 							title="Redo (Ctrl+Y)"
 						>

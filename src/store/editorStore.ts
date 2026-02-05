@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
-import type { Entity, Relationship, Connection, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram, ValidationError } from '../types';
-import { getClosestEdge, getBestAvailableEdge } from '../lib/utils';
-import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram } from '../lib/validation';
+import type { Entity, Relationship, Connection, Generalization, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram, ValidationError } from '../types';
+import { getClosestEdge, getBestAvailableEdge, areEntitiesConnected, connectionExists } from '../lib/utils';
+import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram, isValidEntityName, checkUniqueEntityName, checkUniqueRelationshipName, checkUniqueAttributeName } from '../lib/validation';
 
 interface EditorStore extends EditorState {
   // Entity actions
@@ -55,7 +55,8 @@ interface EditorStore extends EditorState {
   // Mode actions
   setMode: (mode: EditorState['mode']) => void;
 
-  // Validation actions
+  // Exam mode and validation actions
+  setExamMode: (enabled: boolean) => void;
   setValidationEnabled: (enabled: boolean) => void;
   validateElement: (id: string) => void;
   validateAll: () => void;
@@ -69,8 +70,21 @@ interface EditorStore extends EditorState {
   // Import/Export actions
   loadDiagram: (diagram: Diagram, replace: boolean) => void;
 
+  // Quick relationship (1:1, 1:N, N:N) – two-click flow
+  setPendingQuickRelationship: (payload: { firstEntityId: string; mode: 'relationship-1-1' | 'relationship-1-n' | 'relationship-n-n' } | null) => void;
+  addRelationshipBetweenEntities: (entityId1: string, entityId2: string, type: '1-1' | '1-n' | 'n-n') => void;
+
+  // Generalization (ISA) actions
+  addGeneralization: (parentId: string, childId: string, isTotal: boolean) => void;
+  updateGeneralization: (id: string, updates: Partial<Generalization>) => void;
+  deleteGeneralization: (id: string) => void;
+  addChildToGeneralization: (generalizationId: string, childEntityId: string) => void;
+  setPendingQuickGeneralization: (payload: { firstEntityId: string; mode: 'generalization' | 'generalization-total' } | null) => void;
+  addGeneralizationBetweenEntities: (childEntityId: string, parentEntityId: string, isTotal: boolean) => void;
+  setPendingGeneralizationConnect: (generalizationId: string | null) => void;
+
   // Utility
-  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | undefined;
+  getElementById: (id: string) => Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | Generalization | undefined;
   getConnectionPoints: (elementId: string) => Position[]; // Get connection points for an element
 }
 
@@ -267,6 +281,7 @@ export const useEditorStore = create<EditorStore>()(
         entities: [],
         relationships: [],
         connections: [],
+        generalizations: [],
         lines: [],
         arrows: [],
         attributes: [],
@@ -295,7 +310,11 @@ export const useEditorStore = create<EditorStore>()(
       },
       nextEntityNumber: 1,
       nextRelationshipNumber: 1,
-      validationEnabled: true, // Default: enabled, can be disabled via ?validation=false
+      examMode: false, // Default: false, enabled via ?examMode=true
+      validationEnabled: false, // Default: false, controlled via Menu toggle
+      pendingQuickRelationship: null,
+      pendingQuickGeneralization: null,
+      pendingGeneralizationConnect: null,
 
       // Entity actions
       addEntity: (position) => {
@@ -327,6 +346,16 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const entity = state.diagram.entities.find((e) => e.id === id);
           if (entity) {
+            // Prevent empty or duplicate names
+            if (updates.name !== undefined && updates.name !== entity.name) {
+              if (!isValidEntityName(updates.name)) {
+                return; // Don't update if name is empty
+              }
+              if (!checkUniqueEntityName(id, updates.name, state.diagram)) {
+                return; // Don't update if name is duplicate
+              }
+            }
+
             const positionChanged = updates.position && (
               updates.position.x !== entity.position.x ||
               updates.position.y !== entity.position.y
@@ -372,6 +401,11 @@ export const useEditorStore = create<EditorStore>()(
           // Remove associated connections
           state.diagram.connections = state.diagram.connections.filter(
             (c) => c.fromId !== id && c.toId !== id
+          );
+
+          // Remove generalizations where this entity is parent or child
+          state.diagram.generalizations = state.diagram.generalizations.filter(
+            (g) => g.parentId !== id && !g.childIds.includes(id)
           );
 
           // Remove from selection
@@ -543,6 +577,19 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const canvasAttribute = state.diagram.attributes.find((a) => a.id === attributeId);
           if (canvasAttribute) {
+            // Prevent duplicate names within the same parent
+            if (updates.name !== undefined && updates.name !== canvasAttribute.name) {
+              if (!checkUniqueAttributeName(
+                attributeId,
+                updates.name,
+                canvasAttribute.entityId,
+                canvasAttribute.relationshipId,
+                state.diagram
+              )) {
+                return; // Don't update if name is duplicate
+              }
+            }
+
             Object.assign(canvasAttribute, updates);
             // Also update in parent entity or relationship
             if (canvasAttribute.entityId) {
@@ -677,6 +724,13 @@ export const useEditorStore = create<EditorStore>()(
         set((state) => {
           const relationship = state.diagram.relationships.find((r) => r.id === id);
           if (relationship) {
+            // Prevent duplicate names
+            if (updates.name !== undefined && updates.name !== relationship.name) {
+              if (!checkUniqueRelationshipName(id, updates.name, state.diagram)) {
+                return; // Don't update if name is duplicate
+              }
+            }
+
             const positionChanged = updates.position && (
               updates.position.x !== relationship.position.x ||
               updates.position.y !== relationship.position.y
@@ -733,6 +787,8 @@ export const useEditorStore = create<EditorStore>()(
       // Connection actions
       addConnection: (fromId, toId, fromPoint = 'right' as ConnectionPoint, toPoint = 'left' as ConnectionPoint, waypoints = [] as Position[], style = 'orthogonal' as ConnectionStyle) => {
         set((state) => {
+          if (connectionExists(state.diagram, fromId, toId)) return;
+
           const fromElement = state.diagram.entities.find(e => e.id === fromId) ||
             state.diagram.relationships.find(r => r.id === fromId);
           const toElement = state.diagram.entities.find(e => e.id === toId) ||
@@ -813,6 +869,24 @@ export const useEditorStore = create<EditorStore>()(
           const connection = state.diagram.connections.find((c) => c.id === id);
           if (connection) {
             Object.assign(connection, updates);
+
+            // Sync cardinality/participation to the relationship (for export and Relationship panel)
+            if (updates.cardinality !== undefined || updates.participation !== undefined) {
+              const rel = state.diagram.relationships.find(
+                (r) => r.id === connection.fromId || r.id === connection.toId
+              );
+              const entityId =
+                rel?.id === connection.fromId ? connection.toId : connection.fromId;
+              if (rel && entityId) {
+                if (updates.cardinality !== undefined) {
+                  rel.cardinalities[entityId] = updates.cardinality;
+                }
+                if (updates.participation !== undefined) {
+                  rel.participations[entityId] = updates.participation;
+                }
+              }
+            }
+
             // Recalculate points if from/to elements or waypoints changed
             if (updates.fromPoint || updates.toPoint || updates.waypoints) {
               const fromElement = state.diagram.entities.find(e => e.id === connection.fromId) ||
@@ -1115,6 +1189,9 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.connections.forEach((c) => {
             c.selected = state.selectedIds.includes(c.id);
           });
+          state.diagram.generalizations?.forEach((g) => {
+            g.selected = state.selectedIds.includes(g.id);
+          });
         });
       },
 
@@ -1127,6 +1204,7 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.arrows.forEach((a) => (a.selected = false));
           state.diagram.attributes.forEach((a) => (a.selected = false));
           state.diagram.connections.forEach((c) => (c.selected = false));
+          state.diagram.generalizations?.forEach((g) => (g.selected = false));
         });
       },
 
@@ -1150,6 +1228,9 @@ export const useEditorStore = create<EditorStore>()(
           });
           state.diagram.connections.forEach((c) => {
             c.selected = ids.includes(c.id);
+          });
+          state.diagram.generalizations?.forEach((g) => {
+            g.selected = ids.includes(g.id);
           });
         });
       },
@@ -1177,13 +1258,65 @@ export const useEditorStore = create<EditorStore>()(
             startPoint: null,
             currentPoint: null,
           };
+          state.pendingQuickRelationship = null;
         });
       },
 
-      // Validation actions
+      // Exam mode and validation actions
+      setExamMode: (enabled) => {
+        set((state) => {
+          state.examMode = enabled;
+          // When exam mode is enabled, disable validation toggle (it will be disabled in UI)
+          // Validation should remain as user set it, but toggle will be disabled
+        });
+      },
+
       setValidationEnabled: (enabled) => {
         set((state) => {
           state.validationEnabled = enabled;
+
+          // If validation is being enabled, validate all existing elements
+          if (enabled) {
+            // Validate all entities
+            for (const entity of state.diagram.entities) {
+              const warnings = validateEntity(entity, state.diagram);
+              entity.hasWarning = warnings.length > 0;
+              entity.warnings = warnings;
+            }
+
+            // Validate all relationships
+            for (const relationship of state.diagram.relationships) {
+              const warnings = validateRelationship(relationship, state.diagram);
+              relationship.hasWarning = warnings.length > 0;
+              relationship.warnings = warnings;
+            }
+
+            // Validate all attributes
+            for (const attribute of state.diagram.attributes) {
+              const warnings = validateAttribute(attribute, state.diagram);
+              attribute.hasWarning = warnings.length > 0;
+              attribute.warnings = warnings;
+            }
+
+            // Validate all connections
+            for (const connection of state.diagram.connections) {
+              validateConnection(connection, state.diagram);
+            }
+          } else {
+            // If validation is being disabled, clear all warnings
+            for (const entity of state.diagram.entities) {
+              entity.hasWarning = false;
+              entity.warnings = [];
+            }
+            for (const relationship of state.diagram.relationships) {
+              relationship.hasWarning = false;
+              relationship.warnings = [];
+            }
+            for (const attribute of state.diagram.attributes) {
+              attribute.hasWarning = false;
+              attribute.warnings = [];
+            }
+          }
         });
       },
 
@@ -1298,6 +1431,7 @@ export const useEditorStore = create<EditorStore>()(
               entities: [...diagram.entities],
               relationships: [...diagram.relationships],
               connections: [...diagram.connections],
+              generalizations: [...(diagram.generalizations ?? [])],
               lines: [...diagram.lines],
               arrows: [...diagram.arrows],
               attributes: [...diagram.attributes],
@@ -1327,6 +1461,7 @@ export const useEditorStore = create<EditorStore>()(
             state.diagram.entities.push(...diagram.entities);
             state.diagram.relationships.push(...diagram.relationships);
             state.diagram.connections.push(...diagram.connections);
+            state.diagram.generalizations.push(...(diagram.generalizations ?? []));
             state.diagram.lines.push(...diagram.lines);
             state.diagram.arrows.push(...diagram.arrows);
             state.diagram.attributes.push(...diagram.attributes);
@@ -1380,8 +1515,215 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      setPendingQuickRelationship: (payload) => {
+        set((state) => {
+          state.pendingQuickRelationship = payload;
+        });
+      },
+
+      addRelationshipBetweenEntities: (entityId1, entityId2, type) => {
+        set((state) => {
+          if (entityId1 === entityId2) return;
+          const entity1 = state.diagram.entities.find((e) => e.id === entityId1);
+          const entity2 = state.diagram.entities.find((e) => e.id === entityId2);
+          if (!entity1 || !entity2) return;
+          if (areEntitiesConnected(state.diagram, entityId1, entityId2)) return;
+
+          const card1: Cardinality = type === 'n-n' ? 'N' : '1';
+          const card2: Cardinality = type === '1-1' ? '1' : 'N';
+
+          const relWidth = 120;
+          const relHeight = 80;
+          const center1 = {
+            x: entity1.position.x + entity1.size.width / 2,
+            y: entity1.position.y + entity1.size.height / 2,
+          };
+          const center2 = {
+            x: entity2.position.x + entity2.size.width / 2,
+            y: entity2.position.y + entity2.size.height / 2,
+          };
+          const midX = (center1.x + center2.x) / 2;
+          const midY = (center1.y + center2.y) / 2;
+          const relPosition: Position = {
+            x: midX - relWidth / 2,
+            y: midY - relHeight / 2,
+          };
+
+          const relId = generateId();
+          const newRel: Relationship = {
+            id: relId,
+            type: 'relationship',
+            name: `Relationship ${state.nextRelationshipNumber}`,
+            position: relPosition,
+            selected: false,
+            entityIds: [entityId1, entityId2],
+            attributes: [],
+            cardinalities: { [entityId1]: card1, [entityId2]: card2 },
+            participations: { [entityId1]: 'partial' as Participation, [entityId2]: 'partial' as Participation },
+            isWeak: false,
+            size: { width: relWidth, height: relHeight },
+            rotation: 0,
+          };
+          state.diagram.relationships.push(newRel);
+          state.nextRelationshipNumber += 1;
+
+          const relAsElement = { ...newRel, position: relPosition, size: { width: relWidth, height: relHeight } };
+          const relCenter = { x: midX, y: midY };
+
+          const relEdge1 = getClosestEdge(center1, relAsElement) as ConnectionPoint;
+          const relEdge2 = getClosestEdge(center2, relAsElement) as ConnectionPoint;
+          const entity1Edge = getClosestEdge(relCenter, entity1) as ConnectionPoint;
+          const entity2Edge = getClosestEdge(relCenter, entity2) as ConnectionPoint;
+
+          const fromPos1 = getConnectionPointPosition(relAsElement, relEdge1);
+          const toPos1 = getConnectionPointPosition(entity1, entity1Edge);
+          const fromPos2 = getConnectionPointPosition(relAsElement, relEdge2);
+          const toPos2 = getConnectionPointPosition(entity2, entity2Edge);
+
+          const conn1: Connection = {
+            id: generateId(),
+            type: 'connection',
+            fromId: relId,
+            toId: entityId1,
+            fromPoint: relEdge1,
+            toPoint: entity1Edge,
+            points: [fromPos1.x, fromPos1.y, toPos1.x, toPos1.y],
+            waypoints: [],
+            style: 'orthogonal',
+            cardinality: card1,
+            participation: 'partial',
+            position: { x: Math.min(fromPos1.x, toPos1.x), y: Math.min(fromPos1.y, toPos1.y) },
+            selected: false,
+          };
+          const conn2: Connection = {
+            id: generateId(),
+            type: 'connection',
+            fromId: relId,
+            toId: entityId2,
+            fromPoint: relEdge2,
+            toPoint: entity2Edge,
+            points: [fromPos2.x, fromPos2.y, toPos2.x, toPos2.y],
+            waypoints: [],
+            style: 'orthogonal',
+            cardinality: card2,
+            participation: 'partial',
+            position: { x: Math.min(fromPos2.x, toPos2.x), y: Math.min(fromPos2.y, toPos2.y) },
+            selected: false,
+          };
+          state.diagram.connections.push(conn1, conn2);
+
+          if (state.validationEnabled) {
+            const warningsRel = validateRelationship(newRel, state.diagram);
+            newRel.hasWarning = warningsRel.length > 0;
+            newRel.warnings = warningsRel;
+            validateConnection(conn1, state.diagram);
+            validateConnection(conn2, state.diagram);
+          }
+        });
+      },
+
+      // Generalization actions
+      addGeneralization: (parentId, childId, isTotal) => {
+        set((state) => {
+          const parent = state.diagram.entities.find((e) => e.id === parentId);
+          const child = state.diagram.entities.find((e) => e.id === childId);
+          if (!parent || !child || parentId === childId) return;
+
+          const genWidth = 60;
+          const genHeight = 40;
+          const parentBottomY = parent.position.y + parent.size.height;
+          const childTopY = child.position.y;
+          const midX = (parent.position.x + parent.size.width / 2 + child.position.x + child.size.width / 2) / 2;
+          const midY = (parentBottomY + childTopY) / 2;
+          const genPosition: Position = {
+            x: midX - genWidth / 2,
+            y: midY - genHeight / 2,
+          };
+
+          const genId = generateId();
+          const newGen: Generalization = {
+            id: genId,
+            type: 'generalization',
+            position: genPosition,
+            selected: false,
+            parentId,
+            childIds: [childId],
+            isTotal,
+            size: { width: genWidth, height: genHeight },
+          };
+          state.diagram.generalizations.push(newGen);
+        });
+      },
+
+      updateGeneralization: (id, updates) => {
+        set((state) => {
+          const gen = state.diagram.generalizations.find((g) => g.id === id);
+          if (gen) Object.assign(gen, updates);
+        });
+      },
+
+      deleteGeneralization: (id) => {
+        set((state) => {
+          state.diagram.generalizations = state.diagram.generalizations.filter((g) => g.id !== id);
+          state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
+        });
+      },
+
+      addChildToGeneralization: (generalizationId, childEntityId) => {
+        set((state) => {
+          const gen = state.diagram.generalizations.find((g) => g.id === generalizationId);
+          if (!gen || gen.childIds.includes(childEntityId)) return;
+          gen.childIds.push(childEntityId);
+        });
+      },
+
+      setPendingQuickGeneralization: (payload) => {
+        set((state) => {
+          state.pendingQuickGeneralization = payload;
+        });
+      },
+
+      addGeneralizationBetweenEntities: (childEntityId, parentEntityId, isTotal) => {
+        set((state) => {
+          if (childEntityId === parentEntityId) return;
+          const parent = state.diagram.entities.find((e) => e.id === parentEntityId);
+          const child = state.diagram.entities.find((e) => e.id === childEntityId);
+          if (!parent || !child) return;
+
+          const genWidth = 60;
+          const genHeight = 40;
+          const parentBottomY = parent.position.y + parent.size.height;
+          const childTopY = child.position.y;
+          const midX = (parent.position.x + parent.size.width / 2 + child.position.x + child.size.width / 2) / 2;
+          const midY = (parentBottomY + childTopY) / 2;
+          const genPosition: Position = {
+            x: midX - genWidth / 2,
+            y: midY - genHeight / 2,
+          };
+
+          const genId = generateId();
+          const newGen: Generalization = {
+            id: genId,
+            type: 'generalization',
+            position: genPosition,
+            selected: false,
+            parentId: parentEntityId,
+            childIds: [childEntityId],
+            isTotal,
+            size: { width: genWidth, height: genHeight },
+          };
+          state.diagram.generalizations.push(newGen);
+        });
+      },
+
+      setPendingGeneralizationConnect: (generalizationId) => {
+        set((state) => {
+          state.pendingGeneralizationConnect = generalizationId;
+        });
+      },
+
       // Utility
-      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | undefined => {
+      getElementById: (id: string): Entity | Relationship | LineShape | ArrowShape | Attribute | Connection | Generalization | undefined => {
         const state = get();
         return (
           state.diagram.entities.find((e) => e.id === id) ||
@@ -1390,6 +1732,7 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.arrows.find((a) => a.id === id) ||
           state.diagram.attributes.find((a) => a.id === id) ||
           state.diagram.connections.find((c) => c.id === id) ||
+          state.diagram.generalizations.find((g) => g.id === id) ||
           undefined
         );
       },
