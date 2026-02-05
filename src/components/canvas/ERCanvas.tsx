@@ -29,6 +29,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const lastPinchDistanceRef = useRef<number | null>(null);
 	const lastPinchCenterRef = useRef<{ x: number; y: number } | null>(null);
+	const lastTapTimeRef = useRef<number>(0); // Track last tap to prevent double-firing with click
 	const [selectionBox, setSelectionBox] = useState<{
 		startX: number;
 		startY: number;
@@ -720,16 +721,70 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		stage.batchDraw();
 	};
 
-	// Handle touch events (tap) - same logic as click
+	// Handle touch events (tap) - same logic as click but with touch-specific position handling
 	const handleStageTap = (
 		e: Konva.KonvaEventObject<PointerEvent | TouchEvent>,
 	) => {
-		// Convert to mouse event format for compatibility
+		const stage = stageRef.current;
+		if (!stage) return;
+
+		// Mark this tap to prevent duplicate handling from click event
+		lastTapTimeRef.current = Date.now();
+
+		// Get touch position from the event itself (more reliable on mobile)
+		let clientX: number;
+		let clientY: number;
+
+		const evt = e.evt as TouchEvent | PointerEvent;
+		if ("changedTouches" in evt && evt.changedTouches.length > 0) {
+			// TouchEvent - use changedTouches for tap end position
+			clientX = evt.changedTouches[0].clientX;
+			clientY = evt.changedTouches[0].clientY;
+		} else if ("clientX" in evt) {
+			// PointerEvent
+			clientX = evt.clientX;
+			clientY = evt.clientY;
+		} else {
+			// Fallback to getPointerPosition
+			const pointer = stage.getPointerPosition();
+			if (!pointer) return;
+			clientX = pointer.x;
+			clientY = pointer.y;
+		}
+
+		// Convert client coordinates to stage coordinates
+		const container = stage.container();
+		const rect = container.getBoundingClientRect();
+		const stageX = clientX - rect.left;
+		const stageY = clientY - rect.top;
+
+		// Apply inverse transform to get canvas coordinates
+		const transform = stage.getAbsoluteTransform().copy();
+		transform.invert();
+		const pos = transform.point({ x: stageX, y: stageY });
+
+		// Empty canvas = Stage or Layer
+		const isEmptyCanvasClick =
+			e.target === e.target.getStage() || e.target.getType() === "Layer";
+
+		// Handle entity creation mode
+		if (mode === "entity" && isEmptyCanvasClick) {
+			addEntity(pos);
+			return;
+		}
+
+		// Handle relationship creation mode
+		if (mode === "relationship" && isEmptyCanvasClick) {
+			addRelationship(pos);
+			return;
+		}
+
+		// For other modes, delegate to the regular click handler (but it will skip due to tap guard)
 		const mouseEvent = {
 			...e,
 			evt: {
 				...e.evt,
-				shiftKey: false, // Touch events don't have shift key
+				shiftKey: false,
 			},
 		} as Konva.KonvaEventObject<MouseEvent>;
 		handleStageClick(mouseEvent);
@@ -898,6 +953,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		const stage = stageRef.current;
 		if (!stage) return;
+
+		// Skip if a tap just happened (prevents double-firing on touch devices)
+		const timeSinceLastTap = Date.now() - lastTapTimeRef.current;
+		if (timeSinceLastTap < 100) {
+			return;
+		}
 
 		// Check if click originated from a warning badge or popover
 		const target = e.evt.target as HTMLElement;
