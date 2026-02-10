@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Group, Line, Text, Circle } from "react-konva";
+import { Group, Line, Circle } from "react-konva";
 import type { Connection } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getThemeColorsSync } from "../../lib/themeColors";
@@ -42,7 +42,6 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 		waypoints,
 		cardinality,
 		participation,
-		labelPosition,
 		fromPoint,
 		toPoint,
 	} = connection;
@@ -121,17 +120,6 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 		fromPoint !== "center" ? fromPoint : undefined,
 		toPoint !== "center" ? toPoint : undefined,
 	);
-
-	// Calculate label position (default to midpoint if not set)
-	// Use original straight points for label positioning to keep it centered
-	const defaultLabelPos = {
-		x: (straightPoints[0] + straightPoints[straightPoints.length - 2]) / 2,
-		y: (straightPoints[1] + straightPoints[straightPoints.length - 1]) / 2,
-	};
-	const labelPos = labelPosition || defaultLabelPos;
-
-	// Format label text
-	const labelText = `${cardinality} (${participation})`;
 
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		if (mode === "select") {
@@ -275,45 +263,11 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 				</>
 			)}
 
-			{/* Connection label (cardinality and participation) */}
-			<Group
-				x={labelPos.x}
-				y={labelPos.y}
-				draggable={selected && mode === "select"}
-				onDragEnd={(e) => {
-					updateConnection(id, {
-						labelPosition: {
-							x: e.target.x(),
-							y: e.target.y(),
-						},
-					});
-				}}
-				onClick={(e) => {
-					e.cancelBubble = true;
-				}}
-			>
-				{/* Label background - use fill color for background */}
-				<Text
-					text={labelText}
-					fontSize={12}
-					fontStyle="bold"
-					fill={colors.fill}
-					padding={4}
-					align="center"
-					offsetX={-20}
-					offsetY={-8}
-				/>
-				<Text
-					text={labelText}
-					fontSize={12}
-					fontStyle="bold"
-					fill={selected ? "#3b82f6" : colors.text}
-					padding={4}
-					align="center"
-					offsetX={-20}
-					offsetY={-8}
-				/>
-			</Group>
+			{/* Cardinality/participation is conveyed by visual symbols:
+			   - Arrow (triangle) at entity end = cardinality "1"
+			   - Double line = total participation
+			   - Single line = partial participation
+			   No text labels needed */}
 		</Group>
 	);
 };
