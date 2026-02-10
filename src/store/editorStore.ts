@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
 import type { Entity, Relationship, Connection, Generalization, EditorState, Position, LineShape, ArrowShape, Attribute, EntityAttribute, ConnectionPoint, ConnectionStyle, Cardinality, Participation, Diagram, ValidationError } from '../types';
-import { getClosestEdge, getBestAvailableEdge, areEntitiesConnected, connectionExists } from '../lib/utils';
+import { getClosestEdge, getBestAvailableEdge, connectionExists } from '../lib/utils';
 import { validateEntity, validateRelationship, validateAttribute, validateConnection, validateDiagram, isValidEntityName, checkUniqueEntityName, checkUniqueRelationshipName, checkUniqueAttributeName } from '../lib/validation';
 
 interface EditorStore extends EditorState {
@@ -1535,7 +1535,6 @@ export const useEditorStore = create<EditorStore>()(
           const entity1 = state.diagram.entities.find((e) => e.id === entityId1);
           const entity2 = state.diagram.entities.find((e) => e.id === entityId2);
           if (!entity1 || !entity2) return;
-          if (areEntitiesConnected(state.diagram, entityId1, entityId2)) return;
 
           const card1: Cardinality = type === 'n-n' ? 'N' : '1';
           const card2: Cardinality = type === '1-1' ? '1' : 'N';
@@ -1552,9 +1551,22 @@ export const useEditorStore = create<EditorStore>()(
           };
           const midX = (center1.x + center2.x) / 2;
           const midY = (center1.y + center2.y) / 2;
+
+          // Count existing relationships between this entity pair to offset position
+          const existingCount = state.diagram.relationships.filter(
+            (r) => r.entityIds.includes(entityId1) && r.entityIds.includes(entityId2)
+          ).length;
+          // Offset perpendicular to the line between entities so they don't overlap
+          const dx = center2.x - center1.x;
+          const dy = center2.y - center1.y;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const perpX = -dy / len;
+          const perpY = dx / len;
+          const offsetDistance = existingCount * 100;
+
           const relPosition: Position = {
-            x: midX - relWidth / 2,
-            y: midY - relHeight / 2,
+            x: midX - relWidth / 2 + perpX * offsetDistance,
+            y: midY - relHeight / 2 + perpY * offsetDistance,
           };
 
           const relId = generateId();

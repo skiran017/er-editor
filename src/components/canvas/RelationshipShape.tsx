@@ -6,7 +6,6 @@ import {
 	getClosestEdge,
 	getBestAvailableEdge,
 	connectionExists,
-	anotherRelationshipConnectsPair,
 } from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
 import { showToast } from "../ui/toast";
@@ -317,28 +316,6 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 							);
 							setDrawingConnection(false, null, null, null, []);
 							return;
-						}
-
-						// Don't allow a second relationship between the same two entities (Connect tool)
-						if (fromElement.type === "entity") {
-							const entityIdBeingAdded = drawingConnection.fromId;
-							const wouldDuplicatePair = relationship.entityIds.some(
-								(existingId) =>
-									anotherRelationshipConnectsPair(
-										diagram,
-										id,
-										existingId,
-										entityIdBeingAdded,
-									),
-							);
-							if (wouldDuplicatePair) {
-								showToast(
-									"These two entities are already connected by another relationship.",
-									"warning",
-								);
-								setDrawingConnection(false, null, null, null, []);
-								return;
-							}
 						}
 
 						// Calculate the center of the fromElement

@@ -6,9 +6,7 @@ import { isValidEntityName } from "../../lib/validation";
 import {
 	getClosestEdge,
 	getBestAvailableEdge,
-	areEntitiesConnected,
 	connectionExists,
-	anotherRelationshipConnectsPair,
 } from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
 import { showToast } from "../ui/toast";
@@ -269,17 +267,6 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 				setPendingQuickRelationship(null);
 				return;
 			}
-			if (
-				areEntitiesConnected(
-					diagram,
-					pendingQuickRelationship.firstEntityId,
-					id,
-				)
-			) {
-				showToast("These entities are already connected", "warning");
-				setPendingQuickRelationship(null);
-				return;
-			}
 			const type =
 				mode === "relationship-1-1"
 					? "1-1"
@@ -453,28 +440,6 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 							);
 							setDrawingConnection(false, null, null, null, []);
 							return;
-						}
-
-						// Don't allow a second relationship between the same two entities (Connect tool)
-						if (fromElement.type === "relationship") {
-							const rel = fromElement;
-							// Block if adding this entity would create any pair (existing, id) already connected by another relationship
-							const wouldDuplicatePair = rel.entityIds.some((existingId) =>
-								anotherRelationshipConnectsPair(
-									diagram,
-									rel.id,
-									existingId,
-									id,
-								),
-							);
-							if (wouldDuplicatePair) {
-								showToast(
-									"These two entities are already connected by another relationship.",
-									"warning",
-								);
-								setDrawingConnection(false, null, null, null, []);
-								return;
-							}
 						}
 
 						// Calculate the center of the fromElement

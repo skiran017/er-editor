@@ -30,6 +30,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const lastPinchDistanceRef = useRef<number | null>(null);
 	const lastPinchCenterRef = useRef<{ x: number; y: number } | null>(null);
 	const lastTapTimeRef = useRef<number>(0); // Track last tap to prevent double-firing with click
+	const isTapDelegatingRef = useRef<boolean>(false); // Flag to bypass tap guard during delegation
 
 	// Long press selection refs for mobile
 	const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -742,9 +743,6 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			return;
 		}
 
-		// Mark this tap to prevent duplicate handling from click event
-		lastTapTimeRef.current = Date.now();
-
 		// Get touch position from the event itself (more reliable on mobile)
 		let clientX: number;
 		let clientY: number;
@@ -783,23 +781,29 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 		// Handle entity creation mode
 		if (mode === "entity" && isEmptyCanvasClick) {
+			lastTapTimeRef.current = Date.now();
 			addEntity(pos);
 			return;
 		}
 
 		// Handle relationship creation mode
 		if (mode === "relationship" && isEmptyCanvasClick) {
+			lastTapTimeRef.current = Date.now();
 			addRelationship(pos);
 			return;
 		}
 
 		// Handle select mode - clear selection when tapping on empty canvas
 		if (mode === "select" && isEmptyCanvasClick) {
+			lastTapTimeRef.current = Date.now();
 			clearSelection();
 			return;
 		}
 
-		// For other modes, delegate to the regular click handler (but it will skip due to tap guard)
+		// For other modes (attribute, connect, etc.), delegate to the regular click handler
+		// Set tap guard to prevent the native click from double-firing after delegation
+		lastTapTimeRef.current = Date.now();
+		isTapDelegatingRef.current = true;
 		const mouseEvent = {
 			...e,
 			evt: {
@@ -808,6 +812,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			},
 		} as Konva.KonvaEventObject<MouseEvent>;
 		handleStageClick(mouseEvent);
+		isTapDelegatingRef.current = false;
 	};
 
 	// Handle canvas mouse down (for box selection)
@@ -980,9 +985,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		if (!stage) return;
 
 		// Skip if a tap just happened (prevents double-firing on touch devices)
-		const timeSinceLastTap = Date.now() - lastTapTimeRef.current;
-		if (timeSinceLastTap < 100) {
-			return;
+		// Allow through if explicitly delegated from handleStageTap
+		if (!isTapDelegatingRef.current) {
+			const timeSinceLastTap = Date.now() - lastTapTimeRef.current;
+			if (timeSinceLastTap < 100) {
+				return;
+			}
 		}
 
 		// Check if click originated from a warning badge or popover
@@ -1004,6 +1012,11 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		// Empty canvas = Stage or Layer (in Konva, clicks on empty area hit the Layer)
 		const isEmptyCanvasClick =
 			e.target === e.target.getStage() || e.target.getType() === "Layer";
+
+		// Clear selection when clicking on empty canvas, regardless of current mode
+		if (isEmptyCanvasClick && selectedIds.length > 0) {
+			clearSelection();
+		}
 
 		// Handle connection drawing mode - only for empty space clicks
 		// Entity/Relationship clicks are handled in their respective components
@@ -1070,7 +1083,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			// If not clicking directly, find nearest entity or relationship within reasonable distance
 			if (!targetEntity && !targetRelationship) {
 				let minDistance = Infinity;
-				const maxDistance = 200; // Maximum distance to consider
+				const maxDistance = 100; // Maximum distance from center to consider
 
 				// Check entities first
 				for (const entity of entities) {
