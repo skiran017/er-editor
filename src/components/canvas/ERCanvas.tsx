@@ -1203,7 +1203,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					{
 						name: `Attribute ${attributeCount + 1}`,
 						isKey: false,
-						isPartialKey: false,
+						isDiscriminant: false,
 						isMultivalued: false,
 						isDerived: false,
 					},
@@ -1318,7 +1318,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					{
 						name: `Attribute ${attributeCount + 1}`,
 						isKey: false,
-						isPartialKey: false,
+						isDiscriminant: false,
 						isMultivalued: false,
 						isDerived: false,
 					},

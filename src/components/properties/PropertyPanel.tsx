@@ -189,7 +189,7 @@ const EntityPropertyPanelContent: React.FC<EntityPropertyPanelContentProps> = ({
 			addAttribute(entity.id, {
 				name: newAttributeName.trim(),
 				isKey: false,
-				isPartialKey: false,
+				isDiscriminant: false,
 				isMultivalued: false,
 				isDerived: false,
 			});
@@ -320,10 +320,10 @@ const EntityPropertyPanelContent: React.FC<EntityPropertyPanelContentProps> = ({
 										onChange={(e) =>
 											handleAttributeUpdate(attr.id, {
 												isKey: e.target.checked,
-												// If setting key, unset partial key
-												isPartialKey: e.target.checked
+												// If setting key, unset discriminant
+												isDiscriminant: e.target.checked
 													? false
-													: attr.isPartialKey || false,
+													: attr.isDiscriminant || false,
 											})
 										}
 										className="w-3.5 h-3.5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
@@ -335,18 +335,18 @@ const EntityPropertyPanelContent: React.FC<EntityPropertyPanelContentProps> = ({
 								<label className="flex items-center gap-1.5 text-xs cursor-pointer">
 									<input
 										type="checkbox"
-										checked={attr.isPartialKey || false}
+										checked={attr.isDiscriminant || false}
 										onChange={(e) =>
 											handleAttributeUpdate(attr.id, {
-												isPartialKey: e.target.checked,
-												// If setting partial key, unset key
+												isDiscriminant: e.target.checked,
+												// If setting discriminant, unset key
 												isKey: e.target.checked ? false : attr.isKey,
 											})
 										}
 										className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
 									/>
 									<span className="text-gray-700 dark:text-gray-300">
-										Partial Key
+										Discriminant
 									</span>
 								</label>
 
@@ -633,9 +633,9 @@ const RelationshipPropertyPanelContent: React.FC<
 														? {
 																...a,
 																isKey: e.target.checked,
-																isPartialKey: e.target.checked
+																isDiscriminant: e.target.checked
 																	? false
-																	: a.isPartialKey,
+																	: a.isDiscriminant,
 															}
 														: a,
 												),
@@ -644,9 +644,9 @@ const RelationshipPropertyPanelContent: React.FC<
 												useEditorStore.getState().updateAttributeById;
 											updateAttributeById(attr.id, {
 												isKey: e.target.checked,
-												isPartialKey: e.target.checked
+												isDiscriminant: e.target.checked
 													? false
-													: attr.isPartialKey,
+													: attr.isDiscriminant,
 											});
 										}}
 										className="w-3.5 h-3.5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
@@ -657,7 +657,7 @@ const RelationshipPropertyPanelContent: React.FC<
 								<label className="flex items-center gap-1.5 text-xs cursor-pointer">
 									<input
 										type="checkbox"
-										checked={attr.isPartialKey || false}
+										checked={attr.isDiscriminant || false}
 										onChange={(e) => {
 											const updateRelationship =
 												useEditorStore.getState().updateRelationship;
@@ -666,7 +666,7 @@ const RelationshipPropertyPanelContent: React.FC<
 													a.id === attr.id
 														? {
 																...a,
-																isPartialKey: e.target.checked,
+																isDiscriminant: e.target.checked,
 																isKey: e.target.checked ? false : a.isKey,
 															}
 														: a,
@@ -675,14 +675,14 @@ const RelationshipPropertyPanelContent: React.FC<
 											const updateAttributeById =
 												useEditorStore.getState().updateAttributeById;
 											updateAttributeById(attr.id, {
-												isPartialKey: e.target.checked,
+												isDiscriminant: e.target.checked,
 												isKey: e.target.checked ? false : attr.isKey,
 											});
 										}}
 										className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
 									/>
 									<span className="text-gray-700 dark:text-gray-300">
-										Partial Key
+										Discriminant
 									</span>
 								</label>
 								<label className="flex items-center gap-1.5 text-xs cursor-pointer">
@@ -756,7 +756,7 @@ const RelationshipPropertyPanelContent: React.FC<
 									addRelationshipAttribute(relationship.id, {
 										name: newAttributeName.trim(),
 										isKey: false,
-										isPartialKey: false,
+										isDiscriminant: false,
 										isMultivalued: false,
 										isDerived: false,
 									});
@@ -775,7 +775,7 @@ const RelationshipPropertyPanelContent: React.FC<
 								addRelationshipAttribute(relationship.id, {
 									name: newAttributeName.trim(),
 									isKey: false,
-									isPartialKey: false,
+									isDiscriminant: false,
 									isMultivalued: false,
 									isDerived: false,
 								});
@@ -1400,9 +1400,9 @@ const AttributePropertyPanelContent: React.FC<
 							onChange={(e) => {
 								updateAttributeById(attribute.id, {
 									isKey: e.target.checked,
-									isPartialKey: e.target.checked
+									isDiscriminant: e.target.checked
 										? false
-										: attribute.isPartialKey,
+										: attribute.isDiscriminant,
 								});
 							}}
 							className="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
@@ -1413,16 +1413,16 @@ const AttributePropertyPanelContent: React.FC<
 					<label className="flex items-center gap-2 cursor-pointer">
 						<input
 							type="checkbox"
-							checked={attribute.isPartialKey || false}
+							checked={attribute.isDiscriminant || false}
 							onChange={(e) => {
 								updateAttributeById(attribute.id, {
-									isPartialKey: e.target.checked,
+									isDiscriminant: e.target.checked,
 									isKey: e.target.checked ? false : attribute.isKey,
 								});
 							}}
 							className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
 						/>
-						<span className="text-sm text-gray-700">Partial Key</span>
+						<span className="text-sm text-gray-700">Discriminant</span>
 					</label>
 
 					<label className="flex items-center gap-2 cursor-pointer">

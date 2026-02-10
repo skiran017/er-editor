@@ -20,7 +20,7 @@ export interface EntityAttribute {
   id: string;
   name: string;
   isKey: boolean;
-  isPartialKey: boolean; // Weak key/partial key/discriminator
+  isDiscriminant: boolean; // Discriminant attribute for weak entities
   isMultivalued: boolean;
   isDerived: boolean;
 }
@@ -30,7 +30,7 @@ export interface Attribute extends BaseElement {
   id: string;
   name: string;
   isKey: boolean;
-  isPartialKey: boolean; // Weak key/partial key/discriminator (dashed underline)
+  isDiscriminant: boolean; // Discriminant attribute for weak entities (dashed underline)
   isMultivalued: boolean;
   isDerived: boolean;
   entityId?: string; // Parent entity ID (optional - can be on relationship)

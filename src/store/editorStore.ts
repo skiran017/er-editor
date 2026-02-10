@@ -450,7 +450,7 @@ export const useEditorStore = create<EditorStore>()(
               id: attributeId,
               name: attribute.name,
               isKey: attribute.isKey,
-              isPartialKey: attribute.isPartialKey || false,
+              isDiscriminant: attribute.isDiscriminant || false,
               isMultivalued: attribute.isMultivalued,
               isDerived: attribute.isDerived,
             });
@@ -487,7 +487,7 @@ export const useEditorStore = create<EditorStore>()(
           if (canvasAttribute) {
             if (updates.name !== undefined) canvasAttribute.name = updates.name;
             if (updates.isKey !== undefined) canvasAttribute.isKey = updates.isKey;
-            if (updates.isPartialKey !== undefined) canvasAttribute.isPartialKey = updates.isPartialKey;
+            if (updates.isDiscriminant !== undefined) canvasAttribute.isDiscriminant = updates.isDiscriminant;
             if (updates.isMultivalued !== undefined) canvasAttribute.isMultivalued = updates.isMultivalued;
             if (updates.isDerived !== undefined) canvasAttribute.isDerived = updates.isDerived;
 
@@ -564,7 +564,7 @@ export const useEditorStore = create<EditorStore>()(
               id: attributeId,
               name: attribute.name,
               isKey: attribute.isKey,
-              isPartialKey: attribute.isPartialKey || false,
+              isDiscriminant: attribute.isDiscriminant || false,
               isMultivalued: attribute.isMultivalued,
               isDerived: attribute.isDerived,
             });
@@ -599,7 +599,7 @@ export const useEditorStore = create<EditorStore>()(
                 if (attribute) {
                   if (updates.name !== undefined) attribute.name = updates.name;
                   if (updates.isKey !== undefined) attribute.isKey = updates.isKey;
-                  if (updates.isPartialKey !== undefined) attribute.isPartialKey = updates.isPartialKey;
+                  if (updates.isDiscriminant !== undefined) attribute.isDiscriminant = updates.isDiscriminant;
                   if (updates.isMultivalued !== undefined) attribute.isMultivalued = updates.isMultivalued;
                   if (updates.isDerived !== undefined) attribute.isDerived = updates.isDerived;
                 }
@@ -612,7 +612,7 @@ export const useEditorStore = create<EditorStore>()(
                 if (attribute) {
                   if (updates.name !== undefined) attribute.name = updates.name;
                   if (updates.isKey !== undefined) attribute.isKey = updates.isKey;
-                  if (updates.isPartialKey !== undefined) attribute.isPartialKey = updates.isPartialKey;
+                  if (updates.isDiscriminant !== undefined) attribute.isDiscriminant = updates.isDiscriminant;
                   if (updates.isMultivalued !== undefined) attribute.isMultivalued = updates.isMultivalued;
                   if (updates.isDerived !== undefined) attribute.isDerived = updates.isDerived;
                 }
@@ -1258,7 +1258,15 @@ export const useEditorStore = create<EditorStore>()(
             startPoint: null,
             currentPoint: null,
           };
+          state.drawingConnection = {
+            isDrawing: false,
+            fromId: null,
+            fromPoint: null,
+            currentPoint: null,
+            waypoints: [],
+          };
           state.pendingQuickRelationship = null;
+          state.pendingGeneralizationConnect = null;
         });
       },
 

@@ -46,7 +46,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		position,
 		selected,
 		isKey,
-		isPartialKey,
+		isDiscriminant,
 		isMultivalued,
 		isDerived,
 		entityId,
@@ -506,7 +506,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 				/>
 
 				{/* Key indicator - solid underline for key attributes */}
-				{isKey && !isPartialKey && (
+				{isKey && !isDiscriminant && (
 					<Line
 						points={[
 							-actualTextWidth / 2,
@@ -519,8 +519,8 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 					/>
 				)}
 
-				{/* Partial key indicator - dashed underline for weak/partial keys */}
-				{isPartialKey && (
+				{/* Discriminant indicator - dashed underline for weak entity discriminants */}
+				{isDiscriminant && (
 					<Line
 						points={[
 							-actualTextWidth / 2,

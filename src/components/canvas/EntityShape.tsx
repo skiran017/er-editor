@@ -557,9 +557,10 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		e.cancelBubble = true;
 	};
 
-	const handleDblClick = () => {
-		// Double-click now just ensures selection (property panel will show)
-		selectElement(id, false);
+	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		// Double-click triggers inline text editing
+		e.cancelBubble = true;
+		handleTextDblClick(e);
 	};
 
 	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {

@@ -20,7 +20,7 @@ export function validateEntity(entity: Entity, _diagram: Diagram): string[] {
   }
 
   // Rule: Regular entities must have at least one key attribute
-  // Weak entities don't need regular keys (they use partial keys)
+  // Weak entities don't need regular keys (they use discriminants)
   if (!entity.isWeak) {
     const hasKeyAttribute = entity.attributes.some(attr => attr.isKey);
     if (!hasKeyAttribute) {
@@ -30,7 +30,7 @@ export function validateEntity(entity: Entity, _diagram: Diagram): string[] {
 
   // Rule: Weak entities must have a discriminant attribute
   if (entity.isWeak) {
-    const hasDiscriminant = entity.attributes.some(attr => attr.isPartialKey);
+    const hasDiscriminant = entity.attributes.some(attr => attr.isDiscriminant);
     if (!hasDiscriminant) {
       warnings.push('Weak entity must have a discriminant attribute');
     }
@@ -117,14 +117,14 @@ export function validateAttribute(attribute: Attribute, diagram: Diagram): strin
     warnings.push('Attribute cannot be both key and derived');
   }
 
-  // Rule: Partial key only valid for weak entity attributes
-  if (attribute.isPartialKey) {
+  // Rule: Discriminant only valid for weak entity attributes
+  if (attribute.isDiscriminant) {
     if (attribute.relationshipId) {
-      warnings.push('Partial key cannot be used for relationship attributes');
+      warnings.push('Discriminant cannot be used for relationship attributes');
     } else if (attribute.entityId) {
       const parentEntity = diagram.entities.find(e => e.id === attribute.entityId);
       if (parentEntity && !parentEntity.isWeak) {
-        warnings.push('Partial key only valid for weak entity attributes');
+        warnings.push('Discriminant only valid for weak entity attributes');
       }
     }
   }
