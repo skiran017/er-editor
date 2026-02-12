@@ -16,7 +16,6 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	dragPreviewPositions = {},
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
-	const updateConnection = useEditorStore((state) => state.updateConnection);
 	const updateConnectionWaypoint = useEditorStore(
 		(state) => state.updateConnectionWaypoint,
 	);

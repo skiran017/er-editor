@@ -725,6 +725,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		entities,
 		relationships,
 		attributes,
+		generalizations,
 		updateEntity,
 		updateRelationship,
 		updateGeneralization,

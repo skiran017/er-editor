@@ -151,7 +151,7 @@ const EntityPropertyPanelContent: React.FC<EntityPropertyPanelContentProps> = ({
 		if (entity) {
 			setLocalName(entity.name);
 		}
-	}, [entity?.id, entity?.name]);
+	}, [entity]);
 
 	// Don't render if entity not found
 	if (!entity) {
@@ -440,7 +440,7 @@ const RelationshipPropertyPanelContent: React.FC<
 		if (relationship) {
 			setLocalName(relationship.name);
 		}
-	}, [relationship?.id, relationship?.name]);
+	}, [relationship]);
 
 	// Don't render if relationship not found
 	if (!relationship) {
@@ -1281,7 +1281,7 @@ const AttributePropertyPanelContent: React.FC<
 		if (attribute) {
 			setLocalName(attribute.name);
 		}
-	}, [attribute?.id, attribute?.name]);
+	}, [attribute]);
 
 	// Don't render if attribute not found
 	if (!attribute) {

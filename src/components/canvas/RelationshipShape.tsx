@@ -160,10 +160,11 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		viewport.position.y,
 		size.width,
 		size.height,
+		width,
 		warnings,
 	]);
 
-	// Diamond dimensions
+	// Diamond dimensions (moved before useEffect to satisfy dependency array)
 	const width = size.width;
 	const height = size.height;
 
