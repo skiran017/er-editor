@@ -4,6 +4,175 @@
 
 This document describes the validation rules for the ER Diagram Editor, based on ER theory (Chen notation), professor feedback, and analysis of the Java application (`ERDesigner.jar`).
 
+---
+
+## Chen Notation ER Design Rules — Complete Reference
+
+This section provides a comprehensive reference of ER design rules specific to Chen notation.
+
+### Entities
+
+1. **Strong Entity Key Requirement**
+   - Every strong (regular) entity must have at least one key attribute (underlined)
+   - The key uniquely identifies each entity instance
+
+2. **Weak Entity Requirements**
+   - Must have a discriminant attribute (partial key, dashed underline)
+   - Must participate in exactly one identifying relationship (double diamond)
+   - Must have **total participation** (double line) in the identifying relationship
+   - Must be on the **N-side** of the identifying relationship (cannot be on 1-side)
+   - The discriminant + owner entity's key together form the full identifier
+
+3. **Entity Attributes**
+   - Every entity should have at least one attribute
+   - Entity names must be unique across the diagram
+
+4. **ISA (Generalization) Hierarchy**
+   - Child entities inherit ALL attributes from the parent, including the key
+   - Children do NOT need their own key attribute (they use the inherited key)
+   - Children inherit parent attributes and are valid even with zero own attributes
+   - A child cannot be its own parent (no cycles)
+   - Children should not be weak entities (different concept)
+
+### Relationships
+
+1. **Connectivity**
+   - Every relationship must connect at least 2 entities
+   - Relationships represent associations between entities
+
+2. **Cardinality**
+   - Must be specified on each connection: **1** (one), **N** (many), **M** (many)
+   - Defines how many instances of each entity can participate
+   - Common patterns: 1:1, 1:N, M:N
+
+3. **Participation**
+   - **Partial** (single line): entity instances can exist without participating
+   - **Total** (double line): every entity instance must participate
+   - Example: Employee WORKS_FOR Department (total from Employee = all employees must work for a department)
+
+4. **Identifying Relationships**
+   - Shown as double diamond (weak relationship)
+   - Connects a weak entity to its owner (identifying/parent entity)
+   - Must connect at least one weak entity
+   - Weak entity must have total participation
+
+5. **Relationship Attributes**
+   - Attributes can be attached to relationships (e.g., "grade" on ENROLLS)
+   - Relationship attributes describe the relationship itself
+   - Cannot be marked as key attributes (relationships don't have keys)
+
+### Attributes
+
+1. **Attribute Types**
+   - **Simple**: Single atomic value
+   - **Composite**: Can be divided into sub-attributes (not fully supported yet)
+   - **Multivalued** (double oval): Can have multiple values per entity instance
+   - **Derived** (dashed oval): Calculated from other attributes
+
+2. **Key Attribute Rules**
+   - Cannot be multivalued (key must be single-valued to uniquely identify)
+   - Cannot be derived (key must be stored, not calculated)
+   - Must belong to an entity (not a relationship)
+   - Strong entities: at least one key attribute required
+   - ISA children: inherit key from parent
+
+3. **Discriminant (Partial Key) Rules**
+   - Only valid for weak entity attributes
+   - Cannot be multivalued
+   - Combined with owner's key to identify weak entity instances
+
+4. **Attachment**
+   - Every attribute must attach to exactly one entity OR one relationship (XOR)
+   - Cannot attach to both
+
+### Generalization (ISA)
+
+1. **Structure**
+   - Triangle symbol with "ISA" label
+   - Parent (superclass) at the top
+   - Children (subclasses) connected at the bottom
+
+2. **Inheritance**
+   - Children inherit **all** attributes from parent
+   - Children inherit the parent's **key**
+   - Children add specialized attributes relevant to their subtype
+
+3. **Validation**
+   - Must have at least one child (preferably 2+ for meaningful specialization)
+   - Parent and all children must exist in the diagram
+   - Children should NOT be required to have their own key
+
+4. **Disjoint vs. Overlapping**
+   - Disjoint (d): entity instance belongs to at most one subclass
+   - Overlapping (o): entity instance can belong to multiple subclasses
+   - (Currently not enforced in the tool)
+
+5. **Total vs. Partial**
+   - Total: every parent instance must belong to at least one subclass
+   - Partial: parent instances can exist without being in any subclass
+   - (Currently not enforced in the tool)
+
+### Connections
+
+1. **Definition**
+   - Lines connecting entities to relationships
+   - Each connection has cardinality and participation
+
+2. **Cardinality Combinations**
+   - **1:1** — one-to-one (e.g., Person HAS Passport)
+   - **1:N** — one-to-many (e.g., Department HAS Employees)
+   - **M:N** — many-to-many (e.g., Students ENROLL Courses)
+
+3. **Participation Rules**
+   - Total participation requires every instance to participate
+   - Weak entities must have total participation in their identifying relationship
+
+### Common Patterns & Pitfalls
+
+**Pattern: Weak Entity**
+```
+Building (1) --[CONTAINS]-- (N) Room
+         strong          identifying    weak
+                       (double diamond) (double rectangle)
+```
+- Room is weak (double rectangle)
+- Room has discriminant "room_number" (dashed underline)
+- CONTAINS is identifying relationship (double diamond)
+- Room has total participation (double line from Room)
+- Room is on N-side (many rooms per building)
+
+**Pattern: ISA Hierarchy**
+```
+          Employee (key: emp_id)
+              |
+            [ISA]
+           /     \
+    Hourly      Salaried
+   (+ wage)    (+ salary)
+```
+- Hourly and Salaried inherit emp_id (no own key needed)
+- Children add specialized attributes
+- Hourly and Salaried are valid with just their specialized attributes
+
+**Pitfall: Multivalued Key**
+```
+❌ Person: phone_number (key, multivalued)
+```
+- Cannot be both key and multivalued
+- Key must be single-valued to uniquely identify
+
+**Pitfall: Weak Entity on 1-Side**
+```
+❌ Room (1) --[CONTAINS]-- (N) Furniture
+     weak                        strong
+```
+- Weak entity cannot be on 1-side
+- Must be on N-side of identifying relationship
+
+---
+
+## Validation Rules (Detailed)
+
 Rules are categorized as:
 - **Implemented** — already in `src/lib/validation.ts`
 - **Missing (Must-Have)** — required for correct ER design, not yet implemented

@@ -6,22 +6,32 @@ import type { Entity, Relationship, Attribute, Connection, Diagram, ValidationEr
  */
 
 /**
+ * Helper: Check if entity is a child in an ISA (generalization) hierarchy
+ */
+function isISAChild(entityId: string, diagram: Diagram): boolean {
+  return (diagram.generalizations ?? []).some(gen => gen.childIds.includes(entityId));
+}
+
+/**
  * Validate an entity and return warning messages
  * @param entity - Entity to validate
- * @param _diagram - Diagram context (kept for API consistency)
+ * @param diagram - Diagram context
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function validateEntity(entity: Entity, _diagram: Diagram): string[] {
+export function validateEntity(entity: Entity, diagram: Diagram): string[] {
   const warnings: string[] = [];
 
+  const isChild = isISAChild(entity.id, diagram);
+
   // Rule: Entity must have at least one attribute
-  if (entity.attributes.length === 0) {
+  // Exception: ISA children inherit attributes from parent, so they're valid with zero own attributes
+  if (entity.attributes.length === 0 && !isChild) {
     warnings.push('Entity must have at least one attribute');
   }
 
   // Rule: Regular entities must have at least one key attribute
+  // Exception: ISA children inherit the parent's key, so they don't need their own
   // Weak entities don't need regular keys (they use discriminants)
-  if (!entity.isWeak) {
+  if (!entity.isWeak && !isChild) {
     const hasKeyAttribute = entity.attributes.some(attr => attr.isKey);
     if (!hasKeyAttribute) {
       warnings.push('Entity must have at least one key attribute');
@@ -33,6 +43,36 @@ export function validateEntity(entity: Entity, _diagram: Diagram): string[] {
     const hasDiscriminant = entity.attributes.some(attr => attr.isDiscriminant);
     if (!hasDiscriminant) {
       warnings.push('Weak entity must have a discriminant attribute');
+    }
+
+    // Rule (Bug 10): Weak entity cannot be on 1-side of identifying relationship
+    // Check all connections where this weak entity is involved
+    const connections = diagram.connections.filter(conn =>
+      conn.fromId === entity.id || conn.toId === entity.id
+    );
+
+    for (const conn of connections) {
+      // Find the relationship
+      const relId = conn.fromId === entity.id ? conn.toId : conn.fromId;
+      const rel = diagram.relationships.find(r => r.id === relId);
+
+      if (rel && rel.isWeak) {
+        // This is an identifying relationship - check if weak entity is on 1-side
+        // The weak entity should be on the N-side
+        const entityIsFrom = conn.fromId === entity.id;
+        const cardinality = conn.cardinality?.trim() || '';
+
+        // Check if weak entity is on the 1-side
+        // From entity perspective: if cardinality is "1" or "1:N" and entity is on the from side
+        // To entity perspective: if cardinality is "N:1" and entity is on the to side
+        if (
+          (entityIsFrom && cardinality === '1') ||
+          (!entityIsFrom && cardinality === '1')
+        ) {
+          warnings.push('Weak entity cannot be on 1-side of identifying relationship (must be on N-side)');
+          break;
+        }
+      }
     }
   }
 
@@ -115,6 +155,23 @@ export function validateAttribute(attribute: Attribute, diagram: Diagram): strin
   // Rule: Cannot be both key and derived
   if (attribute.isKey && attribute.isDerived) {
     warnings.push('Attribute cannot be both key and derived');
+  }
+
+  // Rule (Bug 11): Key attribute cannot be multivalued
+  // A key must uniquely identify an entity instance - multivalued attributes cannot serve as keys
+  if (attribute.isKey && attribute.isMultivalued) {
+    warnings.push('Key attribute cannot be multivalued (must be single-valued)');
+  }
+
+  // Rule: Discriminant cannot be multivalued (same reasoning as key)
+  if (attribute.isDiscriminant && attribute.isMultivalued) {
+    warnings.push('Discriminant cannot be multivalued (must be single-valued)');
+  }
+
+  // Rule: Relationship attributes cannot be key attributes
+  // Relationships don't have primary keys in Chen notation
+  if (attribute.isKey && attribute.relationshipId) {
+    warnings.push('Relationship attributes cannot be key attributes');
   }
 
   // Rule: Discriminant only valid for weak entity attributes
