@@ -14,9 +14,13 @@ import Konva from "konva";
 
 interface EntityShapeProps {
 	entity: Entity;
+	dragPreviewPositions?: Record<string, { x: number; y: number }>;
 }
 
-export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
+export const EntityShape: React.FC<EntityShapeProps> = ({
+	entity,
+	dragPreviewPositions = {},
+}) => {
 	const groupRef = useRef<Konva.Group>(null);
 	const textRef = useRef<Konva.Text>(null);
 	const [isEditing, setIsEditing] = useState(false);
@@ -37,6 +41,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		hasWarning,
 		warnings,
 	} = entity;
+	const effectivePosition =
+		id in dragPreviewPositions ? dragPreviewPositions[id] : position;
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
 	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
@@ -606,8 +612,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		<Group
 			ref={groupRef}
 			id={id}
-			x={position.x}
-			y={position.y}
+			x={effectivePosition.x}
+			y={effectivePosition.y}
 			rotation={rotation}
 			draggable={mode === "select"}
 			onDragMove={handleDragMove}

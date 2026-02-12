@@ -8,10 +8,12 @@ import Konva from "konva";
 
 interface ConnectionShapeProps {
 	connection: Connection;
+	dragPreviewPositions?: Record<string, { x: number; y: number }>;
 }
 
 export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 	connection,
+	dragPreviewPositions = {},
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
 	const updateConnection = useEditorStore((state) => state.updateConnection);
@@ -58,6 +60,16 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 		return null;
 	}
 
+	// Use preview positions during group drag for real-time line updates
+	const effectiveFromElement =
+		fromElement.id in dragPreviewPositions
+			? { ...fromElement, position: dragPreviewPositions[fromElement.id] }
+			: fromElement;
+	const effectiveToElement =
+		toElement.id in dragPreviewPositions
+			? { ...toElement, position: dragPreviewPositions[toElement.id] }
+			: toElement;
+
 	// Recalculate connection points based on current element positions
 	const getConnectionPointPosition = (
 		element: typeof fromElement,
@@ -103,8 +115,8 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 		}
 	};
 
-	const fromPos = getConnectionPointPosition(fromElement, fromPoint);
-	const toPos = getConnectionPointPosition(toElement, toPoint);
+	const fromPos = getConnectionPointPosition(effectiveFromElement, fromPoint);
+	const toPos = getConnectionPointPosition(effectiveToElement, toPoint);
 
 	// Build points array: from -> waypoints -> to
 	const straightPoints: number[] = [fromPos.x, fromPos.y];

@@ -13,10 +13,12 @@ import Konva from "konva";
 
 interface RelationshipShapeProps {
 	relationship: Relationship;
+	dragPreviewPositions?: Record<string, { x: number; y: number }>;
 }
 
 export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	relationship,
+	dragPreviewPositions = {},
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
 	const textRef = useRef<Konva.Text>(null);
@@ -40,6 +42,8 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		hasWarning,
 		warnings,
 	} = relationship;
+	const effectivePosition =
+		id in dragPreviewPositions ? dragPreviewPositions[id] : position;
 	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
 	const warningTooltipRef = useRef<HTMLDivElement | null>(null);
 
@@ -480,8 +484,8 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		<Group
 			ref={groupRef}
 			id={id}
-			x={position.x}
-			y={position.y}
+			x={effectivePosition.x}
+			y={effectivePosition.y}
 			rotation={rotation}
 			draggable={mode === "select"}
 			onDragMove={handleDragMove}

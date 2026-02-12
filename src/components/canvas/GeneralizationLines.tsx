@@ -8,11 +8,13 @@ import Konva from "konva";
 
 interface GeneralizationLinesProps {
 	generalization: Generalization;
+	dragPreviewPositions?: Record<string, { x: number; y: number }>;
 }
 
 /** Draws connection lines from parent/children to the ISA triangle (in stage coordinates) */
 export const GeneralizationLines: React.FC<GeneralizationLinesProps> = ({
 	generalization,
+	dragPreviewPositions = {},
 }) => {
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
@@ -38,16 +40,27 @@ export const GeneralizationLines: React.FC<GeneralizationLinesProps> = ({
 		.map((cid) => entities.find((e) => e.id === cid))
 		.filter((e): e is NonNullable<typeof e> => !!e);
 
+	// Use preview positions during group drag for real-time line updates
+	const effectiveGenPosition =
+		id in dragPreviewPositions ? dragPreviewPositions[id] : position;
+	const effectiveParentPosition =
+		parentEntity && parentId in dragPreviewPositions
+			? dragPreviewPositions[parentId]
+			: parentEntity?.position;
+	const effectiveChildPositions = childEntities.map((c) =>
+		c.id in dragPreviewPositions ? dragPreviewPositions[c.id] : c.position
+	);
+
 	const strokeColor = selected ? "#3b82f6" : colors.stroke;
 	const strokeWidth = selected ? 3 : 2;
 
 	// Triangle geometry in stage coordinates
 	// Java app: parent connects to apex (top), children to base (bottom)
-	const apexX = position.x + size.width / 2;
-	const apexY = position.y; // apex at top - parent connects here
-	const baseY = position.y + size.height; // base at bottom - children connect here
-	const baseLeft = position.x;
-	const baseRight = position.x + size.width;
+	const apexX = effectiveGenPosition.x + size.width / 2;
+	const apexY = effectiveGenPosition.y;
+	const baseY = effectiveGenPosition.y + size.height;
+	const baseLeft = effectiveGenPosition.x;
+	const baseRight = effectiveGenPosition.x + size.width;
 
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
 		if (mode === "select") {
@@ -57,31 +70,34 @@ export const GeneralizationLines: React.FC<GeneralizationLinesProps> = ({
 	};
 
 	// Parent connection: orthogonal path (parent bottom -> triangle top)
-	const parentCenterX = parentEntity
-		? parentEntity.position.x + parentEntity.size.width / 2
-		: 0;
-	const parentBottomY = parentEntity
-		? parentEntity.position.y + parentEntity.size.height
-		: 0;
-	const parentLinePoints = parentEntity
+	const parentCenterX =
+		effectiveParentPosition && parentEntity
+			? effectiveParentPosition.x + parentEntity.size.width / 2
+			: 0;
+	const parentBottomY =
+		effectiveParentPosition && parentEntity
+			? effectiveParentPosition.y + parentEntity.size.height
+			: 0;
+	const parentLinePoints = parentEntity && effectiveParentPosition
 		? convertToOrthogonalPath(
 				[parentCenterX, parentBottomY, apexX, apexY],
 				"bottom",
 				"top",
 			)
 		: [];
-	const parentLinePointsOffset = parentEntity
-		? convertToOrthogonalPath(
-				[parentCenterX + 4, parentBottomY, apexX + 4, apexY],
-				"bottom",
-				"top",
-			)
-		: [];
+	const parentLinePointsOffset =
+		parentEntity && effectiveParentPosition
+			? convertToOrthogonalPath(
+					[parentCenterX + 4, parentBottomY, apexX + 4, apexY],
+					"bottom",
+					"top",
+				)
+			: [];
 
 	return (
 		<Group listening={true}>
 			{/* Line(s) from parent bottom to triangle apex (top) - orthogonal routing */}
-			{parentEntity && (
+			{parentEntity && effectiveParentPosition && (
 				<>
 					<Line
 						points={parentLinePoints}
@@ -113,8 +129,9 @@ export const GeneralizationLines: React.FC<GeneralizationLinesProps> = ({
 						[
 							apexX,
 							baseY,
-							childEntities[0].position.x + childEntities[0].size.width / 2,
-							childEntities[0].position.y,
+							effectiveChildPositions[0].x +
+								childEntities[0].size.width / 2,
+							effectiveChildPositions[0].y,
 						],
 						"bottom",
 						"top",
@@ -132,7 +149,8 @@ export const GeneralizationLines: React.FC<GeneralizationLinesProps> = ({
 					{/* Horizontal bar at base - extends to cover children */}
 					{(() => {
 						const childCenterXs = childEntities.map(
-							(c) => c.position.x + c.size.width / 2,
+							(c, i) =>
+								effectiveChildPositions[i].x + c.size.width / 2,
 						);
 						const barLeft = Math.min(baseLeft, ...childCenterXs) - 2;
 						const barRight = Math.max(baseRight, ...childCenterXs) + 2;
@@ -149,9 +167,10 @@ export const GeneralizationLines: React.FC<GeneralizationLinesProps> = ({
 					})()}
 
 					{/* Vertical lines from each child top to base bar */}
-					{childEntities.map((child) => {
-						const childCenterX = child.position.x + child.size.width / 2;
-						const childTopY = child.position.y;
+					{childEntities.map((child, i) => {
+						const childCenterX =
+							effectiveChildPositions[i].x + child.size.width / 2;
+						const childTopY = effectiveChildPositions[i].y;
 						return (
 							<Line
 								key={child.id}

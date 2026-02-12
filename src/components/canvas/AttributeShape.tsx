@@ -8,19 +8,21 @@ import Konva from "konva";
 
 interface AttributeShapeProps {
 	attribute: Attribute;
+	dragPreviewPositions?: Record<string, { x: number; y: number }>;
 }
 
 export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	attribute,
+	dragPreviewPositions = {},
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
 	const textRef = useRef<Konva.Text>(null);
 	const [isEditing, setIsEditing] = useState(false);
 	const updateAttributePosition = useEditorStore(
-		(state) => state.updateAttributePosition
+		(state) => state.updateAttributePosition,
 	);
 	const updateAttributeById = useEditorStore(
-		(state) => state.updateAttributeById
+		(state) => state.updateAttributeById,
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
 	const mode = useEditorStore((state) => state.mode);
@@ -65,6 +67,17 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		? relationships.find((r) => r.id === attribute.relationshipId)
 		: null;
 	const parentElement = parentEntity || parentRelationship;
+
+	// Use preview positions during group drag for real-time line updates
+	const effectiveParentElement =
+		parentElement && parentElement.id in dragPreviewPositions
+			? {
+					...parentElement,
+					position: dragPreviewPositions[parentElement.id],
+				}
+			: parentElement;
+	const effectiveAttributePosition =
+		id in dragPreviewPositions ? dragPreviewPositions[id] : position;
 
 	// Calculate ellipse size based on text (needed for tooltip positioning)
 	const textWidth = name.length * 8 + 20; // Approximate width
@@ -197,28 +210,34 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	const actualTextWidth = name.length * 7; // Approximate character width
 
 	// Calculate connection points dynamically based on closest edges
-	// This ensures the line adjusts when either the parent or attribute moves
+	// Use effective positions (with drag preview) for real-time updates during group drag
 	// Note: In Konva, the Group is at (position.x, position.y) and Ellipse is centered at (0,0) within group
-	// So the actual ellipse center in absolute coordinates is (position.x, position.y)
 	const attributeCenter = {
-		x: position.x,
-		y: position.y,
+		x: effectiveAttributePosition.x,
+		y: effectiveAttributePosition.y,
 	};
-	const parentCenter = {
-		x: parentElement.position.x + parentElement.size.width / 2,
-		y: parentElement.position.y + parentElement.size.height / 2,
-	};
+	const parentCenter = effectiveParentElement
+		? {
+				x:
+					effectiveParentElement.position.x +
+					effectiveParentElement.size.width / 2,
+				y:
+					effectiveParentElement.position.y +
+					effectiveParentElement.size.height / 2,
+			}
+		: { x: 0, y: 0 };
 
 	// Find closest edge on parent element
-	const parentEdge = getClosestEdge(attributeCenter, {
-		position: parentElement.position,
-		size: parentElement.size,
-	});
+	const parentEdge = effectiveParentElement
+		? getClosestEdge(attributeCenter, {
+				position: effectiveParentElement.position,
+				size: effectiveParentElement.size,
+			})
+		: ("top" as const);
 
-	// Find closest edge on attribute (simplified - attributes are ovals, so we use center-relative calculation)
-	// For attributes, we'll connect from the side closest to the parent
+	// Find closest edge on attribute (simplified - attributes are ovals)
 	const attributeEdge = getClosestEdge(parentCenter, {
-		position: { x: position.x, y: position.y },
+		position: effectiveAttributePosition,
 		size: { width: ellipseWidth, height: ellipseHeight },
 	});
 
@@ -230,7 +249,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		},
 		edge: "top" | "right" | "bottom" | "left",
 		isAttribute: boolean = false,
-		targetPoint?: { x: number; y: number } // For ellipse: point we're connecting to
+		targetPoint?: { x: number; y: number }, // For ellipse: point we're connecting to
 	) => {
 		// For attributes (ellipses), the center is at (position.x, position.y) because
 		// the Group is at (position.x, position.y) and Ellipse is centered at (0,0) within the group
@@ -318,13 +337,18 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		}
 	};
 
-	const parentPoint = getConnectionPoint(parentElement, parentEdge);
+	const parentPoint = effectiveParentElement
+		? getConnectionPoint(effectiveParentElement, parentEdge)
+		: { x: 0, y: 0 };
 	// For ellipse, calculate intersection point on the actual ellipse edge
 	const attributePoint = getConnectionPoint(
-		{ position, size: { width: ellipseWidth, height: ellipseHeight } },
+		{
+			position: effectiveAttributePosition,
+			size: { width: ellipseWidth, height: ellipseHeight },
+		},
 		attributeEdge,
 		true,
-		parentPoint // Pass parent point to calculate proper ellipse intersection
+		parentPoint, // Pass parent point to calculate proper ellipse intersection
 	);
 
 	// Handle drag move
@@ -451,12 +475,12 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 				listening={false}
 			/>
 
-			{/* Attribute ellipse */}
+			{/* Attribute ellipse - use effective position so it stays in sync during group drag */}
 			<Group
 				ref={groupRef}
 				id={id}
-				x={position.x}
-				y={position.y}
+				x={effectiveAttributePosition.x}
+				y={effectiveAttributePosition.y}
 				draggable={mode === "select"}
 				onDragMove={handleDragMove}
 				onDragEnd={handleDragEnd}
