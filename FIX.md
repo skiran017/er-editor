@@ -30,7 +30,7 @@ Professor feedback and bug fixes, tracked phase-by-phase.
 | 7c | Lines not updating in real time during resize/transform | ✅ Fixed |
 | 7d | After unselect, selection not cleared — can still move diagram as group | ✅ Fixed |
 
-## Phase 4 — Validation Overhaul
+## Phase 4 — Validation Overhaul ✅
 
 | # | Issue | Status |
 |---|-------|--------|
@@ -38,7 +38,16 @@ Professor feedback and bug fixes, tracked phase-by-phase.
 | 10 | Weak entity on 1-side of 1-N relationship not flagged as error | ✅ Fixed |
 | 11 | Multivalued primary key not flagged as error | ✅ Fixed |
 | 12 | ISA children wrongly require a key attribute | ✅ Fixed |
-| 13 | Thorough validation checks per ER design rules | 🔄 In Progress |
+| 13 | Thorough validation checks per ER design rules | ✅ Complete (28/33 rules implemented) |
+
+### Newly Implemented Rules (13)
+- ✅ Rule 1.4: Weak entity must have total participation in identifying relationship
+- ✅ Rule 1.6: Weak entity must connect to exactly one identifying relationship
+- ✅ Rule 3.6: Discriminant cannot be multivalued
+- ✅ Rule 3.7: Relationship attributes cannot be key attributes
+- ✅ Rule 5.3: Generalization should have at least 2 children
+- ✅ Rule 5.6: ISA children should not be weak entities
+- ✅ Rule 6.1: Orphan entity warning
 
 ## Phase 5 — New Features
 

@@ -197,27 +197,27 @@ Rules are categorized as:
 
 ### 1.4 Weak Entity Must Have Total Participation in Its Identifying Relationship
 - A weak entity is existence-dependent on its owner. It must participate with **total participation** (double line) in its identifying (weak) relationship.
-- **Status**: Missing (Must-Have)
+- **Status**: Implemented
 
 ### 1.5 Weak Entity Must Be on the N-Side of Its Identifying Relationship
 - A weak entity cannot be on the 1-side of a 1:N identifying relationship. It must always be on the N-side (many side).
 - Example: If `Room` is weak and identified through `Building`, then `Room` is on the N-side (many rooms per building).
 - **Professor feedback**: "weak cannot be on 1 side in a 1-N"
-- **Status**: Missing (Must-Have)
+- **Status**: Implemented
 
 ### 1.6 Weak Entity Must Be Connected to Exactly One Identifying Relationship
 - A weak entity must participate in exactly one identifying (weak/double-diamond) relationship that connects it to its owner entity.
-- **Status**: Missing (Must-Have)
+- **Status**: Implemented
 
 ### 1.7 ISA Child Entities Inherit Key from Parent
 - Entities that are children in an ISA (generalization) hierarchy **inherit all attributes from the parent, including the key**. They should NOT be required to have their own key attribute.
 - **Professor feedback**: "for children of ISA you ask for a key" — this is wrong, children inherit the parent's key.
-- **Status**: Missing (Must-Have) — current validation wrongly flags ISA children for missing key
+- **Status**: Implemented
 
 ### 1.8 ISA Child Entities Inherit Attributes from Parent
 - If an entity is a child in a generalization, it inherits the parent's attributes. The child is valid even if it has zero of its own attributes (it still has the inherited ones).
 - **Professor feedback**: ISA restructured children wrongly flagged for "Entity must have at least one attribute"
-- **Status**: Missing (Must-Have) — current validation wrongly flags ISA children for missing attributes
+- **Status**: Implemented
 
 ### 1.9 Entity Names Must Be Unique
 - No two entities can share the same name (case-insensitive).
@@ -283,15 +283,15 @@ Rules are categorized as:
 ### 3.5 Key Attribute Cannot Be Multivalued
 - A primary key must uniquely identify an entity instance. A multivalued attribute cannot serve as a key because it has multiple values per instance.
 - **Professor feedback**: "a primary key cannot be multivalued"
-- **Status**: Missing (Must-Have)
+- **Status**: Implemented
 
 ### 3.6 Discriminant Cannot Be Multivalued
 - Same reasoning as 3.5: a discriminant is part of the composite key for weak entities and cannot hold multiple values.
-- **Status**: Missing (Must-Have)
+- **Status**: Implemented
 
 ### 3.7 Relationship Attributes Cannot Be Key Attributes
 - In Chen notation, relationships do not have primary keys. Attributes of relationships describe the relationship itself (e.g., "grade" on an "enrolls" relationship), and cannot be marked as key.
-- **Status**: Missing (Must-Have)
+- **Status**: Implemented
 
 ### 3.8 Attribute Names Must Be Unique Within Parent
 - No two attributes of the same parent entity/relationship can share the same name.
@@ -327,7 +327,7 @@ Rules are categorized as:
 
 ### 5.3 Should Have at Least 2 Children
 - A generalization with only 1 child is semantically meaningless — the purpose of ISA is to specialize into multiple subtypes.
-- **Status**: Missing (Nice-to-Have)
+- **Status**: Implemented
 
 ### 5.4 Parent Cannot Be Its Own Child
 - The parent entity cannot appear in its own child list.
@@ -339,15 +339,15 @@ Rules are categorized as:
 
 ### 5.6 Child Entities Should Not Be Weak
 - Weak entities should not participate as children in a generalization. The ISA hierarchy is a specialization of strong entities. A weak entity depends on its owner entity through an identifying relationship, which is a different concept.
-- **Status**: Missing (Nice-to-Have)
+- **Status**: Implemented
 
 ### 5.7 Child Inherits Key — Do Not Require Own Key
 - See Rule 1.7. Children inherit the parent's key and should not be flagged for missing key attributes.
-- **Status**: Missing (Must-Have)
+- **Status**: Implemented
 
 ### 5.8 Child Inherits Attributes — Do Not Require Own Attributes
 - See Rule 1.8. Children inherit the parent's attributes and should not be flagged for having zero own attributes.
-- **Status**: Missing (Must-Have)
+- **Status**: Implemented
 
 ---
 
@@ -355,7 +355,7 @@ Rules are categorized as:
 
 ### 6.1 Orphan Entity Warning
 - An entity with no relationships is likely incomplete. Show a warning (not an error).
-- **Status**: Missing (Nice-to-Have)
+- **Status**: Implemented
 
 ### 6.2 Orphan Attribute Warning
 - An attribute without a parent entity/relationship is invalid.
@@ -365,35 +365,35 @@ Rules are categorized as:
 
 ## Implementation Priority
 
-### Phase 4A — Must-Have (Professor Feedback)
+### Phase 4A — Must-Have (Professor Feedback) ✅ COMPLETE
 
 These directly address professor feedback items 9–12:
 
-| Rule | Description | Fixes |
-|------|-------------|-------|
-| 1.7 + 5.7 | ISA children inherit key from parent — don't require own key | Bug 12 |
-| 1.8 + 5.8 | ISA children inherit attributes — don't require own attributes | Bug 9 |
-| 1.5 | Weak entity cannot be on 1-side of identifying relationship | Bug 10 |
-| 3.5 | Key attribute cannot be multivalued | Bug 11 |
+| Rule | Description | Fixes | Status |
+|------|-------------|-------|--------|
+| 1.7 + 5.7 | ISA children inherit key from parent — don't require own key | Bug 12 | ✅ Implemented |
+| 1.8 + 5.8 | ISA children inherit attributes — don't require own attributes | Bug 9 | ✅ Implemented |
+| 1.5 | Weak entity cannot be on 1-side of identifying relationship | Bug 10 | ✅ Implemented |
+| 3.5 | Key attribute cannot be multivalued | Bug 11 | ✅ Implemented |
 
-### Phase 4B — Must-Have (ER Theory)
+### Phase 4B — Must-Have (ER Theory) ✅ COMPLETE
 
-| Rule | Description |
-|------|-------------|
-| 1.4 | Weak entity must have total participation in identifying relationship |
-| 1.6 | Weak entity must connect to exactly one identifying relationship |
-| 3.6 | Discriminant cannot be multivalued |
-| 3.7 | Relationship attributes cannot be key attributes |
+| Rule | Description | Status |
+|------|-------------|--------|
+| 1.4 | Weak entity must have total participation in identifying relationship | ✅ Implemented |
+| 1.6 | Weak entity must connect to exactly one identifying relationship | ✅ Implemented |
+| 3.6 | Discriminant cannot be multivalued | ✅ Implemented |
+| 3.7 | Relationship attributes cannot be key attributes | ✅ Implemented |
 
-### Phase 4C — Nice-to-Have
+### Phase 4C — Nice-to-Have (Partially Complete)
 
-| Rule | Description |
-|------|-------------|
-| 2.5 | Non-identifying relationship should not be marked weak |
-| 2.7 | Recursive relationship distinct role names |
-| 5.3 | Generalization should have at least 2 children |
-| 5.6 | Child entities in ISA should not be weak |
-| 6.1 | Orphan entity warning |
+| Rule | Description | Status |
+|------|-------------|--------|
+| 2.5 | Non-identifying relationship should not be marked weak | ⬜ Not Implemented |
+| 2.7 | Recursive relationship distinct role names | ⬜ Not Implemented (roles not supported) |
+| 5.3 | Generalization should have at least 2 children | ✅ Implemented |
+| 5.6 | Child entities in ISA should not be weak | ✅ Implemented |
+| 6.1 | Orphan entity warning | ✅ Implemented |
 
 ---
 
