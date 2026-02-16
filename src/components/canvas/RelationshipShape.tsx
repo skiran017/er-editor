@@ -50,6 +50,10 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
 
+	// Diamond dimensions - must be declared before useEffect since it's used in the effect
+	const width = size.width;
+	const height = size.height;
+
 	// Get theme-aware colors
 	const [colors, setColors] = useState(getThemeColorsSync());
 	useEffect(() => {
@@ -158,15 +162,9 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		viewport.scale,
 		viewport.position.x,
 		viewport.position.y,
-		size.width,
-		size.height,
 		width,
 		warnings,
 	]);
-
-	// Diamond dimensions (moved before useEffect to satisfy dependency array)
-	const width = size.width;
-	const height = size.height;
 
 	// Handle drag move (update position in real-time for smooth dragging)
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
