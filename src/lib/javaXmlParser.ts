@@ -295,7 +295,7 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
                 position: { x: attrTopLeftX, y: attrTopLeftY },
                 selected: false,
                 isKey: foundAttribute.isKey,
-                isPartialKey: foundAttribute.isPartialKey,
+                isDiscriminant: foundAttribute.isDiscriminant,
                 isMultivalued: foundAttribute.isMultivalued,
                 isDerived: foundAttribute.isDerived,
                 entityId: parentEntityId,
@@ -332,7 +332,7 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
             },
             selected: false,
             isKey: attr.isKey,
-            isPartialKey: attr.isPartialKey,
+            isDiscriminant: attr.isDiscriminant,
             isMultivalued: attr.isMultivalued,
             isDerived: attr.isDerived,
             entityId: entity.id,
@@ -358,7 +358,7 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
             },
             selected: false,
             isKey: attr.isKey,
-            isPartialKey: attr.isPartialKey,
+            isDiscriminant: attr.isDiscriminant,
             isMultivalued: attr.isMultivalued,
             isDerived: attr.isDerived,
             relationshipId: relationship.id,
@@ -529,7 +529,7 @@ function parseJavaEntity(elem: Element, isWeak: boolean, idMap: Map<string, stri
         id: attrOurId,
         name: attrName,
         isKey: false,
-        isPartialKey: false,
+        isDiscriminant: false,
         isMultivalued: multiValued,
         isDerived: derived,
       };
@@ -556,7 +556,7 @@ function parseJavaEntity(elem: Element, isWeak: boolean, idMap: Map<string, stri
     });
   }
 
-  // Parse Discriminant (sets isPartialKey = true)
+  // Parse Discriminant (sets isDiscriminant = true)
   const discriminant = elem.querySelector('Discriminant');
   if (discriminant) {
     const discAttrs = discriminant.querySelectorAll('SimpleAttribute[refid]');
@@ -567,7 +567,7 @@ function parseJavaEntity(elem: Element, isWeak: boolean, idMap: Map<string, stri
         if (attrOurId) {
           const attr = attributes.find(a => a.id === attrOurId);
           if (attr) {
-            attr.isPartialKey = true;
+            attr.isDiscriminant = true;
           }
         }
       }
@@ -618,7 +618,7 @@ function parseJavaRelationship(
         id: attrOurId,
         name: attrName,
         isKey: false,
-        isPartialKey: false,
+        isDiscriminant: false,
         isMultivalued: multiValued,
         isDerived: derived,
       });

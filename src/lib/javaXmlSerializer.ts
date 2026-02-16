@@ -151,11 +151,11 @@ function serializeJavaEntity(entity: Entity, getJavaId: (id: string) => number):
     parts.push('        </PrimaryKey>');
   }
 
-  // Serialize Discriminant (attributes with isPartialKey = true)
-  const partialKeyAttributes = entity.attributes.filter(attr => attr.isPartialKey);
-  if (partialKeyAttributes.length > 0) {
+  // Serialize Discriminant attributes
+  const discriminantAttributes = entity.attributes.filter(attr => attr.isDiscriminant);
+  if (discriminantAttributes.length > 0) {
     parts.push('        <Discriminant>');
-    partialKeyAttributes.forEach((attr) => {
+    discriminantAttributes.forEach((attr) => {
       const attrJavaId = getJavaId(attr.id);
       parts.push(`          <SimpleAttribute refid="${attrJavaId}" />`);
     });

@@ -30,6 +30,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const lastPinchDistanceRef = useRef<number | null>(null);
 	const lastPinchCenterRef = useRef<{ x: number; y: number } | null>(null);
 	const lastTapTimeRef = useRef<number>(0); // Track last tap to prevent double-firing with click
+	const isTapDelegatingRef = useRef<boolean>(false); // Flag to bypass tap guard during delegation
 
 	// Long press selection refs for mobile
 	const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,6 +107,13 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 	const prevNodePositionsRef = useRef<Map<string, { x: number; y: number }>>(
 		new Map(),
 	);
+
+	// Preview positions during group drag/transform - use ref + forceUpdate to avoid
+	// React batching delay (state updates can be batched, causing lag during transform)
+	const dragPreviewPositionsRef = useRef<
+		Record<string, { x: number; y: number }>
+	>({});
+	const [, forceDragPreviewUpdate] = useState({});
 
 	// Update transformer when selection changes
 	useEffect(() => {
@@ -257,6 +265,8 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 							x: draggedNode.x(),
 							y: draggedNode.y(),
 						};
+						dragPreviewPositionsRef.current = {};
+						forceDragPreviewUpdate({});
 
 						// Store initial positions of all selected nodes
 						initialPositions.clear();
@@ -277,18 +287,39 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						const dy = currentY - initialDragNodePos.y;
 
 						// Move all selected nodes by the same delta
-						selectedNodes.forEach((node: Konva.Node) => {
-							if (node === draggedNode) return; // Already moved
+						// Include entities, relationships, attributes, generalizations for line updates
+						const preview: Record<string, { x: number; y: number }> = {};
+						const isEntity = (id: string) => entities.some((e) => e.id === id);
+						const isRel = (id: string) =>
+							relationships.some((r) => r.id === id);
+						const isAttr = (id: string) => attributes.some((a) => a.id === id);
+						const isGen = (id: string) =>
+							generalizations?.some((g) => g.id === id) ?? false;
+						const hasConnections = (id: string) =>
+							isEntity(id) || isRel(id) || isAttr(id) || isGen(id);
 
-							const initialPos = initialPositions.get(node.id());
+						selectedNodes.forEach((node: Konva.Node) => {
+							const nodeId = node.id();
+
+							if (node === draggedNode) {
+								if (hasConnections(nodeId)) {
+									preview[nodeId] = { x: currentX, y: currentY };
+								}
+								return;
+							}
+							const initialPos = initialPositions.get(nodeId);
 							if (initialPos) {
 								const newX = initialPos.x + dx;
 								const newY = initialPos.y + dy;
-								// Update Konva node position directly for smooth dragging
 								node.x(newX);
 								node.y(newY);
+								if (hasConnections(nodeId)) {
+									preview[nodeId] = { x: newX, y: newY };
+								}
 							}
 						});
+						dragPreviewPositionsRef.current = preview;
+						forceDragPreviewUpdate({});
 					};
 
 					const handleNodeDragEnd = () => {
@@ -341,13 +372,40 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						});
 
 						initialPositions.clear();
+						dragPreviewPositionsRef.current = {};
+						forceDragPreviewUpdate({});
 						draggedNode = null;
 						initialDragNodePos = null;
+					};
+
+					// Helper to update preview from current node positions (for live line updates during transform)
+					const updatePreviewFromNodes = () => {
+						const isEntity = (id: string) =>
+							entities.some((e) => e.id === id);
+						const isRel = (id: string) =>
+							relationships.some((r) => r.id === id);
+						const isAttr = (id: string) =>
+							attributes.some((a) => a.id === id);
+						const isGen = (id: string) =>
+							generalizations?.some((g) => g.id === id) ?? false;
+						const hasConnections = (id: string) =>
+							isEntity(id) || isRel(id) || isAttr(id) || isGen(id);
+
+						const preview: Record<string, { x: number; y: number }> = {};
+						selectedNodes.forEach((node: Konva.Node) => {
+							const nodeId = node.id();
+							if (hasConnections(nodeId)) {
+								preview[nodeId] = { x: node.x(), y: node.y() };
+							}
+						});
+						dragPreviewPositionsRef.current = preview;
+						forceDragPreviewUpdate({});
 					};
 
 					// Handle transformer transform (resize/rotate)
 					const handleTransformStart = () => {
 						storeInitialState();
+						updatePreviewFromNodes();
 					};
 
 					const handleTransform = () => {
@@ -368,7 +426,8 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 							Math.abs(currentScaleY - 1) > 0.01;
 
 						if (!isResizing) {
-							// This is rotation only, let transformer handle it naturally
+							// This is rotation only - still update preview for live line updates
+							updatePreviewFromNodes();
 							return;
 						}
 
@@ -435,6 +494,9 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 								node.scaleY(scaleY);
 							}
 						});
+
+						// Update preview so connection lines update in real time during resize
+						updatePreviewFromNodes();
 					};
 
 					const handleTransformEnd = () => {
@@ -616,6 +678,8 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						initialPositions.clear();
 						initialSizes.clear();
 						initialTransformerBox = null;
+						dragPreviewPositionsRef.current = {};
+						forceDragPreviewUpdate({});
 					};
 
 					// Attach drag handlers to all selected nodes
@@ -644,14 +708,24 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				console.error("Error setting transformer nodes:", e);
 			}
 		} else {
+			// Clear selection: remove drag/transform handlers from previously selected nodes
+			// so they don't stay attached and allow group movement after unselect
+			const currentNodes = transformer.nodes() ?? [];
+			currentNodes.forEach((node: Konva.Node) => {
+				node.off("dragstart dragmove dragend");
+			});
+			transformer.off("transformstart transform transformend");
 			transformer.nodes([]);
 			prevNodePositionsRef.current.clear();
+			dragPreviewPositionsRef.current = {};
+			forceDragPreviewUpdate({});
 		}
 	}, [
 		selectedIds,
 		entities,
 		relationships,
 		attributes,
+		generalizations,
 		updateEntity,
 		updateRelationship,
 		updateGeneralization,
@@ -742,9 +816,6 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			return;
 		}
 
-		// Mark this tap to prevent duplicate handling from click event
-		lastTapTimeRef.current = Date.now();
-
 		// Get touch position from the event itself (more reliable on mobile)
 		let clientX: number;
 		let clientY: number;
@@ -783,23 +854,29 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 		// Handle entity creation mode
 		if (mode === "entity" && isEmptyCanvasClick) {
+			lastTapTimeRef.current = Date.now();
 			addEntity(pos);
 			return;
 		}
 
 		// Handle relationship creation mode
 		if (mode === "relationship" && isEmptyCanvasClick) {
+			lastTapTimeRef.current = Date.now();
 			addRelationship(pos);
 			return;
 		}
 
 		// Handle select mode - clear selection when tapping on empty canvas
 		if (mode === "select" && isEmptyCanvasClick) {
+			lastTapTimeRef.current = Date.now();
 			clearSelection();
 			return;
 		}
 
-		// For other modes, delegate to the regular click handler (but it will skip due to tap guard)
+		// For other modes (attribute, connect, etc.), delegate to the regular click handler
+		// Set tap guard to prevent the native click from double-firing after delegation
+		lastTapTimeRef.current = Date.now();
+		isTapDelegatingRef.current = true;
 		const mouseEvent = {
 			...e,
 			evt: {
@@ -808,6 +885,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			},
 		} as Konva.KonvaEventObject<MouseEvent>;
 		handleStageClick(mouseEvent);
+		isTapDelegatingRef.current = false;
 	};
 
 	// Handle canvas mouse down (for box selection)
@@ -980,9 +1058,12 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		if (!stage) return;
 
 		// Skip if a tap just happened (prevents double-firing on touch devices)
-		const timeSinceLastTap = Date.now() - lastTapTimeRef.current;
-		if (timeSinceLastTap < 100) {
-			return;
+		// Allow through if explicitly delegated from handleStageTap
+		if (!isTapDelegatingRef.current) {
+			const timeSinceLastTap = Date.now() - lastTapTimeRef.current;
+			if (timeSinceLastTap < 100) {
+				return;
+			}
 		}
 
 		// Check if click originated from a warning badge or popover
@@ -1004,6 +1085,11 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 		// Empty canvas = Stage or Layer (in Konva, clicks on empty area hit the Layer)
 		const isEmptyCanvasClick =
 			e.target === e.target.getStage() || e.target.getType() === "Layer";
+
+		// Clear selection when clicking on empty canvas, regardless of current mode
+		if (isEmptyCanvasClick && selectedIds.length > 0) {
+			clearSelection();
+		}
 
 		// Handle connection drawing mode - only for empty space clicks
 		// Entity/Relationship clicks are handled in their respective components
@@ -1070,7 +1156,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			// If not clicking directly, find nearest entity or relationship within reasonable distance
 			if (!targetEntity && !targetRelationship) {
 				let minDistance = Infinity;
-				const maxDistance = 200; // Maximum distance to consider
+				const maxDistance = 100; // Maximum distance from center to consider
 
 				// Check entities first
 				for (const entity of entities) {
@@ -1203,7 +1289,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					{
 						name: `Attribute ${attributeCount + 1}`,
 						isKey: false,
-						isPartialKey: false,
+						isDiscriminant: false,
 						isMultivalued: false,
 						isDerived: false,
 					},
@@ -1318,7 +1404,7 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 					{
 						name: `Attribute ${attributeCount + 1}`,
 						isKey: false,
-						isPartialKey: false,
+						isDiscriminant: false,
 						isMultivalued: false,
 						isDerived: false,
 					},
@@ -1754,7 +1840,11 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 				<Layer ref={layerRef}>
 					{/* Render entities */}
 					{entities.map((entity) => (
-						<EntityShape key={entity.id} entity={entity} />
+						<EntityShape
+							key={entity.id}
+							entity={entity}
+							dragPreviewPositions={dragPreviewPositionsRef.current}
+						/>
 					))}
 
 					{/* Render relationships */}
@@ -1762,20 +1852,33 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 						<RelationshipShape
 							key={relationship.id}
 							relationship={relationship}
+							dragPreviewPositions={dragPreviewPositionsRef.current}
 						/>
 					))}
 
 					{/* Render generalizations (lines first, then triangle on top) */}
 					{generalizations.map((gen) => (
-						<GeneralizationLines key={`lines-${gen.id}`} generalization={gen} />
+						<GeneralizationLines
+							key={`lines-${gen.id}`}
+							generalization={gen}
+							dragPreviewPositions={dragPreviewPositionsRef.current}
+						/>
 					))}
 					{generalizations.map((gen) => (
-						<GeneralizationShape key={gen.id} generalization={gen} />
+						<GeneralizationShape
+							key={gen.id}
+							generalization={gen}
+							dragPreviewPositions={dragPreviewPositionsRef.current}
+						/>
 					))}
 
 					{/* Render attributes with connection lines */}
 					{attributes.map((attribute) => (
-						<AttributeShape key={attribute.id} attribute={attribute} />
+						<AttributeShape
+							key={attribute.id}
+							attribute={attribute}
+							dragPreviewPositions={dragPreviewPositionsRef.current}
+						/>
 					))}
 
 					{/* Render lines */}
@@ -1789,7 +1892,11 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 
 					{/* Render connections between entities and relationships - render after other shapes but before preview */}
 					{connections.map((connection) => (
-						<ConnectionShape key={connection.id} connection={connection} />
+						<ConnectionShape
+							key={connection.id}
+							connection={connection}
+							dragPreviewPositions={dragPreviewPositionsRef.current}
+						/>
 					))}
 
 					{/* Preview line while drawing */}

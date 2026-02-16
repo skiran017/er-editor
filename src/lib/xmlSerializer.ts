@@ -109,7 +109,7 @@ function serializeAttribute(attribute: Attribute): string {
   parts.push(`  <attribute id="${escapeXML(attribute.id)}" name="${escapeXML(attribute.name)}"`);
   parts.push(`    x="${attribute.position.x}" y="${attribute.position.y}"`);
   parts.push(`    isKey="${attribute.isKey}"`);
-  parts.push(`    isPartialKey="${attribute.isPartialKey}"`);
+  parts.push(`    isDiscriminant="${attribute.isDiscriminant}"`);
   parts.push(`    isMultivalued="${attribute.isMultivalued}"`);
   parts.push(`    isDerived="${attribute.isDerived}"`);
   if (attribute.entityId) {
@@ -122,11 +122,11 @@ function serializeAttribute(attribute: Attribute): string {
   return parts.join('\n');
 }
 
-function serializeEntityAttribute(attr: { id: string; name: string; isKey: boolean; isPartialKey: boolean; isMultivalued: boolean; isDerived: boolean }, indent: string): string {
+function serializeEntityAttribute(attr: { id: string; name: string; isKey: boolean; isDiscriminant: boolean; isMultivalued: boolean; isDerived: boolean }, indent: string): string {
   const parts: string[] = [];
   parts.push(`${indent}<attribute id="${escapeXML(attr.id)}" name="${escapeXML(attr.name)}"`);
   parts.push(`    isKey="${attr.isKey}"`);
-  parts.push(`    isPartialKey="${attr.isPartialKey}"`);
+  parts.push(`    isDiscriminant="${attr.isDiscriminant}"`);
   parts.push(`    isMultivalued="${attr.isMultivalued}"`);
   parts.push(`    isDerived="${attr.isDerived}"`);
   parts.push('  />');

@@ -6,9 +6,7 @@ import { isValidEntityName } from "../../lib/validation";
 import {
 	getClosestEdge,
 	getBestAvailableEdge,
-	areEntitiesConnected,
 	connectionExists,
-	anotherRelationshipConnectsPair,
 } from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
 import { showToast } from "../ui/toast";
@@ -16,9 +14,13 @@ import Konva from "konva";
 
 interface EntityShapeProps {
 	entity: Entity;
+	dragPreviewPositions?: Record<string, { x: number; y: number }>;
 }
 
-export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
+export const EntityShape: React.FC<EntityShapeProps> = ({
+	entity,
+	dragPreviewPositions = {},
+}) => {
 	const groupRef = useRef<Konva.Group>(null);
 	const textRef = useRef<Konva.Text>(null);
 	const [isEditing, setIsEditing] = useState(false);
@@ -39,6 +41,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		hasWarning,
 		warnings,
 	} = entity;
+	const effectivePosition =
+		id in dragPreviewPositions ? dragPreviewPositions[id] : position;
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
 	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
@@ -269,17 +273,6 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 				setPendingQuickRelationship(null);
 				return;
 			}
-			if (
-				areEntitiesConnected(
-					diagram,
-					pendingQuickRelationship.firstEntityId,
-					id,
-				)
-			) {
-				showToast("These entities are already connected", "warning");
-				setPendingQuickRelationship(null);
-				return;
-			}
 			const type =
 				mode === "relationship-1-1"
 					? "1-1"
@@ -455,28 +448,6 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 							return;
 						}
 
-						// Don't allow a second relationship between the same two entities (Connect tool)
-						if (fromElement.type === "relationship") {
-							const rel = fromElement;
-							// Block if adding this entity would create any pair (existing, id) already connected by another relationship
-							const wouldDuplicatePair = rel.entityIds.some((existingId) =>
-								anotherRelationshipConnectsPair(
-									diagram,
-									rel.id,
-									existingId,
-									id,
-								),
-							);
-							if (wouldDuplicatePair) {
-								showToast(
-									"These two entities are already connected by another relationship.",
-									"warning",
-								);
-								setDrawingConnection(false, null, null, null, []);
-								return;
-							}
-						}
-
 						// Calculate the center of the fromElement
 						const fromCenter = {
 							x: fromElement.position.x + fromElement.size.width / 2,
@@ -557,9 +528,10 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		e.cancelBubble = true;
 	};
 
-	const handleDblClick = () => {
-		// Double-click now just ensures selection (property panel will show)
-		selectElement(id, false);
+	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+		// Double-click triggers inline text editing
+		e.cancelBubble = true;
+		handleTextDblClick(e);
 	};
 
 	const handleTextDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -640,8 +612,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({ entity }) => {
 		<Group
 			ref={groupRef}
 			id={id}
-			x={position.x}
-			y={position.y}
+			x={effectivePosition.x}
+			y={effectivePosition.y}
 			rotation={rotation}
 			draggable={mode === "select"}
 			onDragMove={handleDragMove}

@@ -6,7 +6,6 @@ import {
 	getClosestEdge,
 	getBestAvailableEdge,
 	connectionExists,
-	anotherRelationshipConnectsPair,
 } from "../../lib/utils";
 import { getThemeColorsSync } from "../../lib/themeColors";
 import { showToast } from "../ui/toast";
@@ -14,10 +13,12 @@ import Konva from "konva";
 
 interface RelationshipShapeProps {
 	relationship: Relationship;
+	dragPreviewPositions?: Record<string, { x: number; y: number }>;
 }
 
 export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 	relationship,
+	dragPreviewPositions = {},
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
 	const textRef = useRef<Konva.Text>(null);
@@ -41,11 +42,17 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		hasWarning,
 		warnings,
 	} = relationship;
+	const effectivePosition =
+		id in dragPreviewPositions ? dragPreviewPositions[id] : position;
 	const [showWarningTooltip, setShowWarningTooltip] = useState(false);
 	const warningTooltipRef = useRef<HTMLDivElement | null>(null);
 
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const isMultiSelect = selectedIds.length > 1 && selectedIds.includes(id);
+
+	// Diamond dimensions - must be declared before useEffect since it's used in the effect
+	const width = size.width;
+	const height = size.height;
 
 	// Get theme-aware colors
 	const [colors, setColors] = useState(getThemeColorsSync());
@@ -155,14 +162,9 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		viewport.scale,
 		viewport.position.x,
 		viewport.position.y,
-		size.width,
-		size.height,
+		width,
 		warnings,
 	]);
-
-	// Diamond dimensions
-	const width = size.width;
-	const height = size.height;
 
 	// Handle drag move (update position in real-time for smooth dragging)
 	const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -317,28 +319,6 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 							);
 							setDrawingConnection(false, null, null, null, []);
 							return;
-						}
-
-						// Don't allow a second relationship between the same two entities (Connect tool)
-						if (fromElement.type === "entity") {
-							const entityIdBeingAdded = drawingConnection.fromId;
-							const wouldDuplicatePair = relationship.entityIds.some(
-								(existingId) =>
-									anotherRelationshipConnectsPair(
-										diagram,
-										id,
-										existingId,
-										entityIdBeingAdded,
-									),
-							);
-							if (wouldDuplicatePair) {
-								showToast(
-									"These two entities are already connected by another relationship.",
-									"warning",
-								);
-								setDrawingConnection(false, null, null, null, []);
-								return;
-							}
 						}
 
 						// Calculate the center of the fromElement
@@ -503,8 +483,8 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		<Group
 			ref={groupRef}
 			id={id}
-			x={position.x}
-			y={position.y}
+			x={effectivePosition.x}
+			y={effectivePosition.y}
 			rotation={rotation}
 			draggable={mode === "select"}
 			onDragMove={handleDragMove}

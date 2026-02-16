@@ -1,278 +1,436 @@
 # Validation System Documentation
 
 ## Overview
-This document describes the validation system for the ER Diagram Editor, based on analysis of the Java application (`ERDesigner.jar`) and ER diagram theory (Chen notation).
 
-## Java App Analysis
+This document describes the validation rules for the ER Diagram Editor, based on ER theory (Chen notation), professor feedback, and analysis of the Java application (`ERDesigner.jar`).
 
-### Key Classes and Methods
+---
 
-#### ERDController
-- **`checkErrors(Object object)`**: Checks the error types of a given object
-- **`searchForErrors()`**: Searches the whole schema for errors
-- **`setWarning(GraphicObject go, String warning)`**: Sets a warning on a graphic object
-- **`removeWarning(GraphicObject go, String warning)`**: Removes a warning from a graphic object
+## Chen Notation ER Design Rules — Complete Reference
 
-#### ERDModel
-- **`searchForErrors()`**: Searches the whole database schema for errors
+This section provides a comprehensive reference of ER design rules specific to Chen notation.
 
-#### GraphicObject / MyShape
-- **`warning`** (boolean): Indicates if object has warnings
-- **`warningDescriptions`** (Vector<String>): List of warning messages
+### Entities
 
-### Validation Constants Found
+1. **Strong Entity Key Requirement**
+   - Every strong (regular) entity must have at least one key attribute (underlined)
+   - The key uniquely identifies each entity instance
 
-From `ERDGlobals` and constant analysis:
+2. **Weak Entity Requirements**
+   - Must have a discriminant attribute (partial key, dashed underline)
+   - Must participate in exactly one identifying relationship (double diamond)
+   - Must have **total participation** (double line) in the identifying relationship
+   - Must be on the **N-side** of the identifying relationship (cannot be on 1-side)
+   - The discriminant + owner entity's key together form the full identifier
 
-#### Entity Validation
-- **`erdEntityHasNoPrimaryKey`**: Entity must have a primary key
+3. **Entity Attributes**
+   - Every entity should have at least one attribute
+   - Entity names must be unique across the diagram
 
-#### Relationship Validation
-- **`erdRelationShouldHave2ConnectionsWarning`**: Relationship should have exactly 2 connections
-- **`erdRelationShouldBeIdentifying`**: Relationship should be identifying (for weak entities)
-- **`erdRelationShouldBeNonIdentifying`**: Relationship should be non-identifying
-- **`erdRelationShouldBeOfType`**: Relationship should be of a specific type
+4. **ISA (Generalization) Hierarchy**
+   - Child entities inherit ALL attributes from the parent, including the key
+   - Children do NOT need their own key attribute (they use the inherited key)
+   - Children inherit parent attributes and are valid even with zero own attributes
+   - A child cannot be its own parent (no cycles)
+   - Children should not be weak entities (different concept)
 
-#### Attribute Validation
-- **`erdShouldHaveMoreChildrenWarning`**: Should have more children (likely for attributes needing more connections)
-- **`erdShouldHaveParent`**: Should have a parent (attribute must connect to entity/relationship)
+### Relationships
 
-#### General Validation
-- **`erdCyclesNotAllowedError`** / **`erdCyclesWarning`**: Cycles in relationships are not allowed
-- **`erdCouldNotWriteFileError`**: File write error (not a validation rule)
+1. **Connectivity**
+   - Every relationship must connect at least 2 entities
+   - Relationships represent associations between entities
 
-### Warning System Features
+2. **Cardinality**
+   - Must be specified on each connection: **1** (one), **N** (many), **M** (many)
+   - Defines how many instances of each entity can participate
+   - Common patterns: 1:1, 1:N, M:N
 
-1. **Visual Indicators**:
-   - Red warning icon/tag displayed on objects with warnings
-   - Icon path: `ch/supsi/dlob/resources/images/Warning.png`
+3. **Participation**
+   - **Partial** (single line): entity instances can exist without participating
+   - **Total** (double line): every entity instance must participate
+   - Example: Employee WORKS_FOR Department (total from Employee = all employees must work for a department)
 
-2. **Warning Management**:
-   - Warnings can be enabled/disabled via preferences (`erdShowWarnings`)
-   - "Inspect Warnings" menu option to view warning descriptions
-   - Warnings are stored per graphic object
+4. **Identifying Relationships**
+   - Shown as double diamond (weak relationship)
+   - Connects a weak entity to its owner (identifying/parent entity)
+   - Must connect at least one weak entity
+   - Weak entity must have total participation
 
-3. **Validation Triggers**:
-   - `checkErrors()` is called for individual objects
-   - `searchForErrors()` validates the entire schema
-   - Validation likely runs on:
-     - Object creation
-     - Object modification
-     - Manual validation trigger
+5. **Relationship Attributes**
+   - Attributes can be attached to relationships (e.g., "grade" on ENROLLS)
+   - Relationship attributes describe the relationship itself
+   - Cannot be marked as key attributes (relationships don't have keys)
 
-## Validation Rules
+### Attributes
 
-### Entity Rules
+1. **Attribute Types**
+   - **Simple**: Single atomic value
+   - **Composite**: Can be divided into sub-attributes (not fully supported yet)
+   - **Multivalued** (double oval): Can have multiple values per entity instance
+   - **Derived** (dashed oval): Calculated from other attributes
 
-#### 1. Entity Must Have at Least One Key Attribute
-- **Rule**: Every **regular (strong) entity** must have at least one attribute with `isKey = true`
-- **Exception**: Weak entities don't need regular keys (they use partial keys)
-- **Java Constant**: `erdEntityHasNoPrimaryKey`
-- **Current Implementation**: ✅ Implemented (but needs fix for weak entities)
+2. **Key Attribute Rules**
+   - Cannot be multivalued (key must be single-valued to uniquely identify)
+   - Cannot be derived (key must be stored, not calculated)
+   - Must belong to an entity (not a relationship)
+   - Strong entities: at least one key attribute required
+   - ISA children: inherit key from parent
 
-#### 2. Weak Entity Must Have Discriminant
-- **Rule**: Every **weak entity** must have at least one attribute with `isPartialKey = true`
-- **Reason**: Weak entities are identified by their partial key + owner entity's key
-- **Current Implementation**: ✅ Implemented
+3. **Discriminant (Partial Key) Rules**
+   - Only valid for weak entity attributes
+   - Cannot be multivalued
+   - Combined with owner's key to identify weak entity instances
 
-#### 3. Entity Must Have at Least One Attribute
-- **Rule**: Every entity should have at least one attribute
-- **Status**: Currently commented out in our implementation
-- **Note**: This might be too strict (entities without attributes might be valid in some cases)
+4. **Attachment**
+   - Every attribute must attach to exactly one entity OR one relationship (XOR)
+   - Cannot attach to both
 
-### Relationship Rules
+### Generalization (ISA)
 
-#### 1. Relationship Must Connect at Least 2 Entities
-- **Rule**: Every relationship must connect at least 2 entities
-- **Java Constant**: `erdRelationShouldHave2ConnectionsWarning`
-- **Current Implementation**: ✅ Implemented (checks `relationship.entityIds.length < 2`)
+1. **Structure**
+   - Triangle symbol with "ISA" label
+   - Parent (superclass) at the top
+   - Children (subclasses) connected at the bottom
 
-#### 2. All Connections Must Have Cardinality Defined
-- **Rule**: Every connection from/to a relationship must have a cardinality value
-- **Valid Formats**: `1`, `N`, `1:N`, `N:1`, `1:1`, `N:N`, `M:N`
-- **Current Implementation**: ✅ Implemented
+2. **Inheritance**
+   - Children inherit **all** attributes from parent
+   - Children inherit the parent's **key**
+   - Children add specialized attributes relevant to their subtype
 
-#### 3. All Connections Must Have Participation Defined
-- **Rule**: Every connection must have participation set to either `"partial"` or `"total"`
-- **Current Implementation**: ✅ Implemented
+3. **Validation**
+   - Must have at least one child (preferably 2+ for meaningful specialization)
+   - Parent and all children must exist in the diagram
+   - Children should NOT be required to have their own key
 
-#### 4. Relationship Type Validation
-- **Java Constants Found**:
-  - `erdRelationShouldBeIdentifying`: For weak entity relationships
-  - `erdRelationShouldBeNonIdentifying`: For regular relationships
-  - `erdRelationShouldBeOfType`: Type-specific validation
-- **Status**: ⚠️ Not yet implemented in our app
-- **Note**: This might relate to weak relationships or relationship cardinality presets
+4. **Disjoint vs. Overlapping**
+   - Disjoint (d): entity instance belongs to at most one subclass
+   - Overlapping (o): entity instance can belong to multiple subclasses
+   - (Currently not enforced in the tool)
 
-### Attribute Rules
+5. **Total vs. Partial**
+   - Total: every parent instance must belong to at least one subclass
+   - Partial: parent instances can exist without being in any subclass
+   - (Currently not enforced in the tool)
 
-#### 1. Attribute Must Connect to Exactly One Parent
-- **Rule**: Every attribute must connect to exactly one entity **OR** exactly one relationship (XOR)
-- **Java Constant**: `erdShouldHaveParent`
-- **Current Implementation**: ✅ Implemented
+### Connections
 
-#### 2. Attribute Cannot Connect to Both Entity and Relationship
-- **Rule**: An attribute cannot have both `entityId` and `relationshipId` set
-- **Current Implementation**: ✅ Implemented
+1. **Definition**
+   - Lines connecting entities to relationships
+   - Each connection has cardinality and participation
 
-#### 3. Partial Key Only Valid for Weak Entity Attributes
-- **Rule**: Attributes with `isPartialKey = true` can only belong to weak entities
-- **Exception**: Partial keys cannot be used for relationship attributes
-- **Current Implementation**: ✅ Implemented
+2. **Cardinality Combinations**
+   - **1:1** — one-to-one (e.g., Person HAS Passport)
+   - **1:N** — one-to-many (e.g., Department HAS Employees)
+   - **M:N** — many-to-many (e.g., Students ENROLL Courses)
 
-#### 4. Attribute Cannot Be Both Key and Derived
-- **Rule**: An attribute cannot have both `isKey = true` and `isDerived = true`
-- **Current Implementation**: ✅ Implemented
+3. **Participation Rules**
+   - Total participation requires every instance to participate
+   - Weak entities must have total participation in their identifying relationship
 
-### Connection Rules
+### Common Patterns & Pitfalls
 
-#### 1. Connection Must Connect Valid Elements
-- **Rule**: Both `fromId` and `toId` must reference existing entities or relationships
-- **Current Implementation**: ✅ Implemented
-
-#### 2. Cardinality Format Validation
-- **Rule**: Cardinality must be in a valid format
-- **Valid Formats**: `1`, `N`, `1:N`, `N:1`, `1:1`, `N:N`, `M:N`
-- **Current Implementation**: ✅ Implemented
-
-#### 3. Participation Validation
-- **Rule**: Participation must be either `"partial"` or `"total"`
-- **Current Implementation**: ✅ Implemented
-
-#### 4. Cycles Not Allowed
-- **Java Constant**: `erdCyclesNotAllowedError` / `erdCyclesWarning`
-- **Rule**: Relationships should not create cycles (likely refers to recursive relationships or invalid dependency chains)
-- **Status**: ⚠️ Not yet implemented in our app
-- **Note**: This might be complex to implement - needs clarification on what constitutes a "cycle"
-
-## Current Implementation Status
-
-### ✅ Implemented Rules
-
-1. **Entity**:
-   - ✅ Regular entities must have at least one key attribute
-   - ✅ Weak entities must have discriminant (partial key)
-
-2. **Relationship**:
-   - ✅ Must connect at least 2 entities
-   - ✅ All connections must have cardinality defined
-   - ✅ All connections must have participation defined
-
-3. **Attribute**:
-   - ✅ Must connect to exactly one entity OR one relationship
-   - ✅ Cannot connect to both entity and relationship
-   - ✅ Partial key only valid for weak entity attributes
-   - ✅ Cannot be both key and derived
-
-4. **Connection**:
-   - ✅ Must connect valid elements
-   - ✅ Cardinality format validation
-   - ✅ Participation validation
-
-### ⚠️ Missing Rules (Found in Java App)
-
-1. **Relationship Type Validation**:
-   - Identifying vs non-identifying relationships
-   - Relationship type-specific rules
-
-2. **Cycle Detection**:
-   - Prevent invalid relationship cycles
-   - Needs clarification on what constitutes a "cycle"
-
-3. **Entity Attribute Count**:
-   - Currently commented out: "Entity must have at least one attribute"
-   - Decision needed: Is this required or optional?
-
-## Known Issues / Bugs
-
-### 1. Weak Entity Key Validation Bug ✅ FIXED
-**Issue**: The validation was checking `isKey` for ALL entities, including weak entities. Weak entities don't need regular keys - they need partial keys.
-
-**Fixed**: Updated `validateEntity()` to only check for regular keys on regular (non-weak) entities. Weak entities are now correctly validated only for their partial keys.
-
-**Fix Applied**:
-```typescript
-// Rule: Regular entities must have at least one key attribute
-// Weak entities don't need regular keys (they use partial keys)
-if (!entity.isWeak) {
-  const hasKeyAttribute = entity.attributes.some(attr => attr.isKey);
-  if (!hasKeyAttribute) {
-    warnings.push('Entity must have at least one key attribute');
-  }
-}
+**Pattern: Weak Entity**
 ```
+Building (1) --[CONTAINS]-- (N) Room
+         strong          identifying    weak
+                       (double diamond) (double rectangle)
+```
+- Room is weak (double rectangle)
+- Room has discriminant "room_number" (dashed underline)
+- CONTAINS is identifying relationship (double diamond)
+- Room has total participation (double line from Room)
+- Room is on N-side (many rooms per building)
 
-### 2. Partial Key for Regular Entities ✅ CORRECT BEHAVIOR
-**Note**: When a regular entity has a partial key, it correctly shows warning: "Partial key only valid for weak entity attributes" (from attribute validation). This is the expected behavior - partial keys should only be on weak entities, and regular entities need regular keys.
+**Pattern: ISA Hierarchy**
+```
+          Employee (key: emp_id)
+              |
+            [ISA]
+           /     \
+    Hourly      Salaried
+   (+ wage)    (+ salary)
+```
+- Hourly and Salaried inherit emp_id (no own key needed)
+- Children add specialized attributes
+- Hourly and Salaried are valid with just their specialized attributes
+
+**Pitfall: Multivalued Key**
+```
+❌ Person: phone_number (key, multivalued)
+```
+- Cannot be both key and multivalued
+- Key must be single-valued to uniquely identify
+
+**Pitfall: Weak Entity on 1-Side**
+```
+❌ Room (1) --[CONTAINS]-- (N) Furniture
+     weak                        strong
+```
+- Weak entity cannot be on 1-side
+- Must be on N-side of identifying relationship
+
+---
+
+## Validation Rules (Detailed)
+
+Rules are categorized as:
+- **Implemented** — already in `src/lib/validation.ts`
+- **Missing (Must-Have)** — required for correct ER design, not yet implemented
+- **Missing (Nice-to-Have)** — useful warnings, lower priority
+
+---
+
+## 1. Entity Rules
+
+### 1.1 Strong Entity Must Have a Key Attribute
+- Every strong (regular) entity must have at least one attribute with `isKey = true`.
+- **Status**: Implemented
+
+### 1.2 Weak Entity Must Have a Discriminant
+- Every weak entity must have at least one attribute with `isDiscriminant = true`.
+- The discriminant + owner entity's key together identify the weak entity.
+- **Status**: Implemented
+
+### 1.3 Entity Must Have at Least One Attribute
+- Every entity (strong or weak) should have at least one attribute.
+- **Status**: Implemented
+
+### 1.4 Weak Entity Must Have Total Participation in Its Identifying Relationship
+- A weak entity is existence-dependent on its owner. It must participate with **total participation** (double line) in its identifying (weak) relationship.
+- **Status**: Implemented
+
+### 1.5 Weak Entity Must Be on the N-Side of Its Identifying Relationship
+- A weak entity cannot be on the 1-side of a 1:N identifying relationship. It must always be on the N-side (many side).
+- Example: If `Room` is weak and identified through `Building`, then `Room` is on the N-side (many rooms per building).
+- **Professor feedback**: "weak cannot be on 1 side in a 1-N"
+- **Status**: Implemented
+
+### 1.6 Weak Entity Must Be Connected to Exactly One Identifying Relationship
+- A weak entity must participate in exactly one identifying (weak/double-diamond) relationship that connects it to its owner entity.
+- **Status**: Implemented
+
+### 1.7 ISA Child Entities Inherit Key from Parent
+- Entities that are children in an ISA (generalization) hierarchy **inherit all attributes from the parent, including the key**. They should NOT be required to have their own key attribute.
+- **Professor feedback**: "for children of ISA you ask for a key" — this is wrong, children inherit the parent's key.
+- **Status**: Implemented
+
+### 1.8 ISA Child Entities Inherit Attributes from Parent
+- If an entity is a child in a generalization, it inherits the parent's attributes. The child is valid even if it has zero of its own attributes (it still has the inherited ones).
+- **Professor feedback**: ISA restructured children wrongly flagged for "Entity must have at least one attribute"
+- **Status**: Implemented
+
+### 1.9 Entity Names Must Be Unique
+- No two entities can share the same name (case-insensitive).
+- **Status**: Implemented (via `checkUniqueEntityName`)
+
+### 1.10 Entity Names Must Be Non-Empty
+- An entity must have a non-empty name.
+- **Status**: Implemented (via `isValidEntityName`)
+
+---
+
+## 2. Relationship Rules
+
+### 2.1 Relationship Must Connect at Least 2 Entities
+- Every relationship must have at least 2 entity connections.
+- **Status**: Implemented
+
+### 2.2 All Connections Must Have Cardinality Defined
+- Every connection to/from a relationship must have a cardinality value.
+- **Status**: Implemented
+
+### 2.3 All Connections Must Have Participation Defined
+- Every connection must have participation set to `"partial"` or `"total"`.
+- **Status**: Implemented
+
+### 2.4 Identifying (Weak) Relationship Must Connect at Least One Weak Entity
+- A relationship marked as `isWeak = true` must connect to at least one weak entity.
+- **Status**: Implemented
+
+### 2.5 Non-Identifying Relationship Should Not Be Marked as Weak
+- A relationship connecting only strong entities should not be marked as identifying (weak).
+- **Status**: Missing (Nice-to-Have)
+
+### 2.6 Relationship Names Must Be Unique
+- No two relationships can share the same name (case-insensitive).
+- **Status**: Implemented (via `checkUniqueRelationshipName`)
+
+### 2.7 Recursive Relationship Must Have Distinct Role Names
+- When an entity participates in a relationship with itself (recursive/self-relationship), each connection should have a distinct role to avoid ambiguity (e.g., "supervisor" / "supervisee").
+- **Status**: Missing (Nice-to-Have) — role names not yet supported
+
+---
+
+## 3. Attribute Rules
+
+### 3.1 Attribute Must Connect to Exactly One Parent
+- Every attribute must connect to exactly one entity OR exactly one relationship (XOR).
+- **Status**: Implemented
+
+### 3.2 Attribute Cannot Connect to Both Entity and Relationship
+- An attribute cannot have both `entityId` and `relationshipId` set.
+- **Status**: Implemented
+
+### 3.3 Discriminant Only Valid for Weak Entity Attributes
+- `isDiscriminant = true` is only valid on attributes belonging to weak entities.
+- Cannot be used on relationship attributes.
+- **Status**: Implemented
+
+### 3.4 Attribute Cannot Be Both Key and Derived
+- A derived attribute (calculated from other data) cannot serve as a key.
+- **Status**: Implemented
+
+### 3.5 Key Attribute Cannot Be Multivalued
+- A primary key must uniquely identify an entity instance. A multivalued attribute cannot serve as a key because it has multiple values per instance.
+- **Professor feedback**: "a primary key cannot be multivalued"
+- **Status**: Implemented
+
+### 3.6 Discriminant Cannot Be Multivalued
+- Same reasoning as 3.5: a discriminant is part of the composite key for weak entities and cannot hold multiple values.
+- **Status**: Implemented
+
+### 3.7 Relationship Attributes Cannot Be Key Attributes
+- In Chen notation, relationships do not have primary keys. Attributes of relationships describe the relationship itself (e.g., "grade" on an "enrolls" relationship), and cannot be marked as key.
+- **Status**: Implemented
+
+### 3.8 Attribute Names Must Be Unique Within Parent
+- No two attributes of the same parent entity/relationship can share the same name.
+- **Status**: Implemented (via `checkUniqueAttributeName`)
+
+---
+
+## 4. Connection Rules
+
+### 4.1 Connection Must Connect Valid Elements
+- Both `fromId` and `toId` must reference existing entities or relationships.
+- **Status**: Implemented
+
+### 4.2 Cardinality Format Validation
+- Cardinality must be a valid format: `1`, `N`, `M`.
+- **Status**: Implemented
+
+### 4.3 Participation Format Validation
+- Participation must be `"partial"` or `"total"`.
+- **Status**: Implemented
+
+---
+
+## 5. Generalization (ISA) Rules
+
+### 5.1 Parent Entity Must Exist
+- The parent (superclass) entity must exist in the diagram.
+- **Status**: Implemented
+
+### 5.2 Must Have at Least One Child
+- A generalization must have at least one child (subclass) entity.
+- **Status**: Implemented
+
+### 5.3 Should Have at Least 2 Children
+- A generalization with only 1 child is semantically meaningless — the purpose of ISA is to specialize into multiple subtypes.
+- **Status**: Implemented
+
+### 5.4 Parent Cannot Be Its Own Child
+- The parent entity cannot appear in its own child list.
+- **Status**: Implemented
+
+### 5.5 All Children Must Exist
+- Every child entity referenced in `childIds` must exist in the diagram.
+- **Status**: Implemented
+
+### 5.6 Child Entities Should Not Be Weak
+- Weak entities should not participate as children in a generalization. The ISA hierarchy is a specialization of strong entities. A weak entity depends on its owner entity through an identifying relationship, which is a different concept.
+- **Status**: Implemented
+
+### 5.7 Child Inherits Key — Do Not Require Own Key
+- See Rule 1.7. Children inherit the parent's key and should not be flagged for missing key attributes.
+- **Status**: Implemented
+
+### 5.8 Child Inherits Attributes — Do Not Require Own Attributes
+- See Rule 1.8. Children inherit the parent's attributes and should not be flagged for having zero own attributes.
+- **Status**: Implemented
+
+---
+
+## 6. Structural / Diagram-Level Rules
+
+### 6.1 Orphan Entity Warning
+- An entity with no relationships is likely incomplete. Show a warning (not an error).
+- **Status**: Implemented
+
+### 6.2 Orphan Attribute Warning
+- An attribute without a parent entity/relationship is invalid.
+- **Status**: Implemented (via Rule 3.1)
+
+---
+
+## Implementation Priority
+
+### Phase 4A — Must-Have (Professor Feedback) ✅ COMPLETE
+
+These directly address professor feedback items 9–12:
+
+| Rule | Description | Fixes | Status |
+|------|-------------|-------|--------|
+| 1.7 + 5.7 | ISA children inherit key from parent — don't require own key | Bug 12 | ✅ Implemented |
+| 1.8 + 5.8 | ISA children inherit attributes — don't require own attributes | Bug 9 | ✅ Implemented |
+| 1.5 | Weak entity cannot be on 1-side of identifying relationship | Bug 10 | ✅ Implemented |
+| 3.5 | Key attribute cannot be multivalued | Bug 11 | ✅ Implemented |
+
+### Phase 4B — Must-Have (ER Theory) ✅ COMPLETE
+
+| Rule | Description | Status |
+|------|-------------|--------|
+| 1.4 | Weak entity must have total participation in identifying relationship | ✅ Implemented |
+| 1.6 | Weak entity must connect to exactly one identifying relationship | ✅ Implemented |
+| 3.6 | Discriminant cannot be multivalued | ✅ Implemented |
+| 3.7 | Relationship attributes cannot be key attributes | ✅ Implemented |
+
+### Phase 4C — Nice-to-Have (Partially Complete)
+
+| Rule | Description | Status |
+|------|-------------|--------|
+| 2.5 | Non-identifying relationship should not be marked weak | ⬜ Not Implemented |
+| 2.7 | Recursive relationship distinct role names | ⬜ Not Implemented (roles not supported) |
+| 5.3 | Generalization should have at least 2 children | ✅ Implemented |
+| 5.6 | Child entities in ISA should not be weak | ✅ Implemented |
+| 6.1 | Orphan entity warning | ✅ Implemented |
+
+---
 
 ## Validation Architecture
 
-### Current Implementation
+### Functions (`src/lib/validation.ts`)
 
-1. **Validation Functions** (`src/lib/validation.ts`):
-   - `validateEntity(entity, diagram): string[]`
-   - `validateRelationship(relationship, diagram): string[]`
-   - `validateAttribute(attribute, diagram): string[]`
-   - `validateConnection(connection, diagram): string[]`
-   - `validateDiagram(diagram): ValidationError[]`
+- `validateEntity(entity, diagram): string[]`
+- `validateRelationship(relationship, diagram): string[]`
+- `validateAttribute(attribute, diagram): string[]`
+- `validateConnection(connection, diagram): string[]`
+- `validateGeneralization(gen, diagram): string[]`
+- `validateDiagram(diagram): ValidationError[]`
 
-2. **Store Integration** (`src/store/editorStore.ts`):
-   - `validateElement(id: string): void` - validate single element
-   - `validateAll(): void` - validate entire diagram
-   - `getValidationErrors(): ValidationError[]` - get all errors
-   - Auto-validation on mutations (add, update, delete)
+### Store Integration (`src/store/editorStore.ts`)
 
-3. **Visual Display**:
-   - Red warning badge (circle with "!") on elements with warnings
-   - Hover tooltip showing warning messages
-   - `hasWarning: boolean` and `warnings: string[]` on Entity, Relationship, Attribute
+- `validateElement(id)` — validate a single element
+- `validateAll()` — validate entire diagram
+- `getValidationErrors()` — get all errors
+- Auto-validation on mutations (add, update, delete)
 
-4. **Configuration**:
-   - `validationEnabled: boolean` in EditorState (default: true)
-   - Can be disabled via query parameter: `?validation=false`
+### Visual Display
 
-## Recommendations
+- Red warning badge ("!") on elements with warnings
+- Hover tooltip showing warning messages
+- `hasWarning: boolean` and `warnings: string[]` on Entity, Relationship, Attribute
 
-### Immediate Fixes
+### Configuration
 
-1. **Fix Weak Entity Key Validation**:
-   - Only check for `isKey` on regular entities
-   - Weak entities should only be checked for `isPartialKey`
+- `validationEnabled: boolean` (default: false, toggle in Menu)
+- Exam mode via `?examMode=true` query parameter
 
-2. **Clarify Entity Attribute Requirement**:
-   - Decide if "Entity must have at least one attribute" should be enforced
-   - Currently commented out - needs decision
-
-### Future Enhancements
-
-1. **Implement Cycle Detection**:
-   - Research what the Java app considers a "cycle"
-   - Implement cycle detection algorithm
-   - Add warning for detected cycles
-
-2. **Relationship Type Validation**:
-   - Understand identifying vs non-identifying relationships
-   - Implement relationship type-specific rules
-   - Possibly related to weak relationships
-
-3. **Warning Message Localization**:
-   - Store warning messages in i18n bundles
-   - Support English and Italian warning messages
-
-4. **Warning Inspection UI**:
-   - Add "Inspect Warnings" menu option (like Java app)
-   - Show all warnings in a dedicated panel
-   - Allow filtering by element type
+---
 
 ## References
 
-- **Java App JAR**: `/Users/skiran017/Pictures/er-editor/ERDesigner.jar`
-- **Extracted Documentation**: `/tmp/erdesigner_extract/documents/`
-- **Key Classes**:
-  - `ch.supsi.dlob.erdesigner.ERDController`
-  - `ch.supsi.dlob.erdesigner.ERDModel`
-  - `ch.supsi.dlob.erdesigner.ERDGlobals`
-  - `ch.supsi.dlob.erdesigner.graphicconstructs.GraphicObject`
-- **Current Implementation**: `src/lib/validation.ts`
-- **Objective**: `Objective.MD` (lines 79-84)
-
+- Peter Chen, "The Entity-Relationship Model" (1976)
+- Elmasri & Navathe, "Fundamentals of Database Systems"
+- Java ERDesigner: `ch.supsi.dlob.erdesigner.ERDController`, `ERDModel`, `ERDGlobals`
+- Implementation: `src/lib/validation.ts`

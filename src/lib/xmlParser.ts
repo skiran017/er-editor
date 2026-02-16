@@ -206,7 +206,7 @@ function parseAttribute(elem: Element): Attribute {
   const entityId = elem.getAttribute('entityId') || undefined;
   const relationshipId = elem.getAttribute('relationshipId') || undefined;
   const isKey = elem.getAttribute('isKey') === 'true';
-  const isPartialKey = elem.getAttribute('isPartialKey') === 'true';
+  const isDiscriminant = elem.getAttribute('isDiscriminant') === 'true' || elem.getAttribute('isPartialKey') === 'true';
   const isMultivalued = elem.getAttribute('isMultivalued') === 'true';
   const isDerived = elem.getAttribute('isDerived') === 'true';
 
@@ -217,7 +217,7 @@ function parseAttribute(elem: Element): Attribute {
     position: { x, y },
     selected: false,
     isKey,
-    isPartialKey,
+    isDiscriminant,
     isMultivalued,
     isDerived,
     entityId,
@@ -229,7 +229,7 @@ function parseEntityAttribute(elem: Element): EntityAttribute {
   const id = elem.getAttribute('id') || generateId();
   const name = elem.getAttribute('name') || 'Attribute';
   const isKey = elem.getAttribute('isKey') === 'true';
-  const isPartialKey = elem.getAttribute('isPartialKey') === 'true';
+  const isDiscriminant = elem.getAttribute('isDiscriminant') === 'true' || elem.getAttribute('isPartialKey') === 'true';
   const isMultivalued = elem.getAttribute('isMultivalued') === 'true';
   const isDerived = elem.getAttribute('isDerived') === 'true';
 
@@ -237,7 +237,7 @@ function parseEntityAttribute(elem: Element): EntityAttribute {
     id,
     name,
     isKey,
-    isPartialKey,
+    isDiscriminant,
     isMultivalued,
     isDerived,
   };

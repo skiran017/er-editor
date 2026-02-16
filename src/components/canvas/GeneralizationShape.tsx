@@ -8,10 +8,12 @@ import Konva from "konva";
 
 interface GeneralizationShapeProps {
 	generalization: Generalization;
+	dragPreviewPositions?: Record<string, { x: number; y: number }>;
 }
 
 export const GeneralizationShape: React.FC<GeneralizationShapeProps> = ({
 	generalization,
+	dragPreviewPositions = {},
 }) => {
 	const groupRef = useRef<Konva.Group>(null);
 	const selectElement = useEditorStore((state) => state.selectElement);
@@ -24,6 +26,8 @@ export const GeneralizationShape: React.FC<GeneralizationShapeProps> = ({
 	);
 
 	const { id, position, size, selected } = generalization;
+	const effectivePosition =
+		id in dragPreviewPositions ? dragPreviewPositions[id] : position;
 	const width = size.width;
 	const height = size.height;
 
@@ -93,8 +97,8 @@ export const GeneralizationShape: React.FC<GeneralizationShapeProps> = ({
 		<Group
 			ref={groupRef}
 			id={id}
-			x={position.x}
-			y={position.y}
+			x={effectivePosition.x}
+			y={effectivePosition.y}
 			draggable={mode === "select"}
 			onDragMove={handleDragMove}
 			onDragEnd={handleDragEnd}
