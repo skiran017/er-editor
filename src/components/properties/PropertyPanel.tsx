@@ -1269,12 +1269,18 @@ const AttributePropertyPanelContent: React.FC<
 	);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
+	const allAttributes = useEditorStore((state) => state.diagram.attributes);
 	const diagram = useEditorStore((state) => state.diagram);
 
 	const updateAttributeById = useEditorStore(
 		(state) => state.updateAttributeById,
 	);
+	const addSubAttribute = useEditorStore((state) => state.addSubAttribute);
+	const deleteAttributeById = useEditorStore(
+		(state) => state.deleteAttributeById,
+	);
 	const [localName, setLocalName] = useState(attribute?.name || "");
+	const [newSubName, setNewSubName] = useState("");
 
 	// Sync local name when attribute changes
 	useEffect(() => {
@@ -1452,8 +1458,84 @@ const AttributePropertyPanelContent: React.FC<
 						/>
 						<span className="text-sm text-gray-700">Derived</span>
 					</label>
+
+					<label className="flex items-center gap-2 cursor-pointer">
+						<input
+							type="checkbox"
+							checked={attribute.isComposite || false}
+							onChange={(e) => {
+								updateAttributeById(attribute.id, {
+									isComposite: e.target.checked,
+									subAttributeIds: e.target.checked ? attribute.subAttributeIds || [] : [],
+								});
+							}}
+							className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+						/>
+						<span className="text-sm text-gray-700">Composite</span>
+					</label>
 				</div>
 			</div>
+
+			{/* Sub-Attributes (only for composite) */}
+			{attribute.isComposite && (
+				<div>
+					<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+						Sub-Attributes
+					</label>
+					<div className="space-y-2 mb-3">
+						{(attribute.subAttributeIds || []).map((subId) => {
+							const sub = allAttributes.find((a) => a.id === subId);
+							if (!sub) return null;
+							return (
+								<div
+									key={subId}
+									className="flex items-center justify-between p-2 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800"
+								>
+									<span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+										{sub.name}
+										{sub.isMultivalued && <span className="ml-1 text-blue-500 text-xs">(MV)</span>}
+										{sub.isDerived && <span className="ml-1 text-purple-500 text-xs">(D)</span>}
+									</span>
+									<button
+										type="button"
+										onClick={() => deleteAttributeById(subId)}
+										className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+									>
+										<Trash2 size={14} />
+									</button>
+								</div>
+							);
+						})}
+					</div>
+					<div className="flex gap-2">
+						<input
+							type="text"
+							value={newSubName}
+							onChange={(e) => setNewSubName(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && newSubName.trim()) {
+									addSubAttribute(attribute.id, newSubName.trim());
+									setNewSubName("");
+								}
+							}}
+							className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-800 dark:text-gray-200"
+							placeholder="Sub-attribute name"
+						/>
+						<button
+							type="button"
+							onClick={() => {
+								if (newSubName.trim()) {
+									addSubAttribute(attribute.id, newSubName.trim());
+									setNewSubName("");
+								}
+							}}
+							className="p-1.5 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded-md border border-teal-300 dark:border-teal-700"
+						>
+							<Plus size={16} />
+						</button>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 };

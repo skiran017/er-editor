@@ -205,10 +205,14 @@ function parseAttribute(elem: Element): Attribute {
   const y = parseFloat(elem.getAttribute('y') || '0');
   const entityId = elem.getAttribute('entityId') || undefined;
   const relationshipId = elem.getAttribute('relationshipId') || undefined;
+  const parentAttributeId = elem.getAttribute('parentAttributeId') || undefined;
   const isKey = elem.getAttribute('isKey') === 'true';
   const isDiscriminant = elem.getAttribute('isDiscriminant') === 'true' || elem.getAttribute('isPartialKey') === 'true';
   const isMultivalued = elem.getAttribute('isMultivalued') === 'true';
   const isDerived = elem.getAttribute('isDerived') === 'true';
+  const isComposite = elem.getAttribute('isComposite') === 'true';
+  const subAttributeIdsStr = elem.getAttribute('subAttributeIds');
+  const subAttributeIds = subAttributeIdsStr ? subAttributeIdsStr.split(',').filter(Boolean) : undefined;
 
   return {
     id,
@@ -222,6 +226,9 @@ function parseAttribute(elem: Element): Attribute {
     isDerived,
     entityId,
     relationshipId,
+    parentAttributeId,
+    isComposite: isComposite || undefined,
+    subAttributeIds: subAttributeIds && subAttributeIds.length > 0 ? subAttributeIds : undefined,
   };
 }
 
@@ -232,6 +239,7 @@ function parseEntityAttribute(elem: Element): EntityAttribute {
   const isDiscriminant = elem.getAttribute('isDiscriminant') === 'true' || elem.getAttribute('isPartialKey') === 'true';
   const isMultivalued = elem.getAttribute('isMultivalued') === 'true';
   const isDerived = elem.getAttribute('isDerived') === 'true';
+  const isComposite = elem.getAttribute('isComposite') === 'true';
 
   return {
     id,
@@ -240,6 +248,7 @@ function parseEntityAttribute(elem: Element): EntityAttribute {
     isDiscriminant,
     isMultivalued,
     isDerived,
+    isComposite: isComposite || undefined,
   };
 }
 

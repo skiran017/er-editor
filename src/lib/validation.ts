@@ -256,6 +256,26 @@ export function validateAttribute(attribute: Attribute, diagram: Diagram): strin
     }
   }
 
+  // Rule 3.9: Composite attribute should have at least one sub-attribute
+  if (attribute.isComposite && (!attribute.subAttributeIds || attribute.subAttributeIds.length === 0)) {
+    warnings.push('Composite attribute should have at least one sub-attribute');
+  }
+
+  // Rule 3.10: Sub-attributes cannot be key attributes
+  if (attribute.parentAttributeId && attribute.isKey) {
+    warnings.push('Sub-attributes cannot be key attributes');
+  }
+
+  // Rule 3.11: Sub-attributes cannot be discriminants
+  if (attribute.parentAttributeId && attribute.isDiscriminant) {
+    warnings.push('Sub-attributes cannot be discriminant attributes');
+  }
+
+  // Rule 3.12: Sub-attributes cannot be composite (only 1 level of nesting)
+  if (attribute.parentAttributeId && attribute.isComposite) {
+    warnings.push('Sub-attributes cannot be composite (only one level of nesting allowed)');
+  }
+
   return warnings;
 }
 
