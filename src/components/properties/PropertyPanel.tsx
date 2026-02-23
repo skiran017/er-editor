@@ -48,6 +48,17 @@ const useIsMobile = () => {
 export const PropertyPanel: React.FC = () => {
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
+	const deleteEntity = useEditorStore((state) => state.deleteEntity);
+	const deleteRelationship = useEditorStore(
+		(state) => state.deleteRelationship,
+	);
+	const deleteAttributeById = useEditorStore(
+		(state) => state.deleteAttributeById,
+	);
+	const deleteConnection = useEditorStore((state) => state.deleteConnection);
+	const deleteGeneralization = useEditorStore(
+		(state) => state.deleteGeneralization,
+	);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
 	const connections = useEditorStore((state) => state.diagram.connections);
@@ -103,6 +114,16 @@ export const PropertyPanel: React.FC = () => {
 		panelIcon = <Circle className="w-5 h-5 text-green-600" />;
 	}
 
+	const handleDelete = () => {
+		if (!selectedId) return;
+		if (entity) deleteEntity(selectedId);
+		else if (relationship) deleteRelationship(selectedId);
+		else if (attribute) deleteAttributeById(selectedId);
+		else if (connection) deleteConnection(selectedId);
+		else if (generalization) deleteGeneralization(selectedId);
+		clearSelection();
+	};
+
 	return (
 		<Sheet open={isOpen} onOpenChange={(open) => !open && clearSelection()}>
 			<SheetContent
@@ -112,9 +133,17 @@ export const PropertyPanel: React.FC = () => {
 				onOpenAutoFocus={(e) => e.preventDefault()}
 			>
 				<SheetHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
-					<SheetTitle className="flex items-center gap-2">
+					<SheetTitle className="flex items-center gap-2 pr-8">
 						{panelIcon}
-						{panelTitle}
+						<span className="flex-1">{panelTitle}</span>
+						<button
+							type="button"
+							onClick={handleDelete}
+							className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
+							title="Delete element"
+						>
+							<Trash2 size={18} />
+						</button>
 					</SheetTitle>
 				</SheetHeader>
 				<div className="flex-1 overflow-y-auto px-4 pb-20 md:pb-4">
@@ -1466,7 +1495,9 @@ const AttributePropertyPanelContent: React.FC<
 							onChange={(e) => {
 								updateAttributeById(attribute.id, {
 									isComposite: e.target.checked,
-									subAttributeIds: e.target.checked ? attribute.subAttributeIds || [] : [],
+									subAttributeIds: e.target.checked
+										? attribute.subAttributeIds || []
+										: [],
 								});
 							}}
 							className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
@@ -1493,8 +1524,12 @@ const AttributePropertyPanelContent: React.FC<
 								>
 									<span className="text-sm text-gray-700 dark:text-gray-300 truncate">
 										{sub.name}
-										{sub.isMultivalued && <span className="ml-1 text-blue-500 text-xs">(MV)</span>}
-										{sub.isDerived && <span className="ml-1 text-purple-500 text-xs">(D)</span>}
+										{sub.isMultivalued && (
+											<span className="ml-1 text-blue-500 text-xs">(MV)</span>
+										)}
+										{sub.isDerived && (
+											<span className="ml-1 text-purple-500 text-xs">(D)</span>
+										)}
 									</span>
 									<button
 										type="button"
