@@ -27,6 +27,8 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		(state) => state.updateRelationship,
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
+	const addRelationshipAttribute = useEditorStore((state) => state.addRelationshipAttribute);
+	const attributes = useEditorStore((state) => state.diagram.attributes);
 	const mode = useEditorStore((state) => state.mode);
 	const diagram = useEditorStore((state) => state.diagram);
 	const viewport = useEditorStore((state) => state.viewport);
@@ -232,6 +234,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 			},
 		} as Konva.KonvaEventObject<MouseEvent>;
 		handleClick(mouseEvent);
+		if (mouseEvent.cancelBubble) e.cancelBubble = true;
 	};
 
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -390,12 +393,46 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		}
 		if (mode === "select") {
 			selectElement(id, e.evt.shiftKey);
-			e.cancelBubble = true;
 		}
+		if (mode === "attribute") {
+			const textNode = textRef.current;
+			const group = groupRef.current;
+			if (textNode && group) {
+				const localPos = group.getRelativePointerPosition();
+				if (localPos) {
+					const pad = 6;
+					const tw = textNode.getTextWidth();
+					const th = textNode.fontSize();
+					const tx = (width - tw) / 2;
+					const ty = (height - th) / 2;
+					if (
+						localPos.x >= tx - pad && localPos.x <= tx + tw + pad &&
+						localPos.y >= ty - pad && localPos.y <= ty + th + pad
+					) {
+						e.cancelBubble = true;
+						return;
+					}
+				}
+			}
+			const attributeCount = attributes.filter((a) => a.relationshipId === id).length;
+			const offset = 60;
+			const spacing = 40;
+			const attrPosition = {
+				x: relationship.position.x + relationship.size.width + offset,
+				y: relationship.position.y + relationship.size.height / 2 + attributeCount * spacing,
+			};
+			addRelationshipAttribute(id, {
+				name: `Attribute ${attributeCount + 1}`,
+				isKey: false,
+				isDiscriminant: false,
+				isMultivalued: false,
+				isDerived: false,
+			}, attrPosition);
+		}
+		e.cancelBubble = true;
 	};
 
 	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-		// Double-click triggers text editing
 		e.cancelBubble = true;
 		handleTextDblClick(e);
 	};
@@ -424,11 +461,15 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		input.style.fontSize = "14px";
 		input.style.fontWeight = "bold";
 		input.style.textAlign = "center";
-		input.style.border = "2px solid #3b82f6";
-		input.style.borderRadius = "4px";
-		input.style.padding = "4px";
+		const isDark = document.documentElement.classList.contains("dark");
+		input.style.border = isDark ? "2px solid #60a5fa" : "2px solid #3b82f6";
+		input.style.borderRadius = "6px";
+		input.style.padding = "4px 8px";
 		input.style.zIndex = "1000";
-		input.style.backgroundColor = "white";
+		input.style.backgroundColor = isDark ? "#1e293b" : "#ffffff";
+		input.style.color = isDark ? "#f1f5f9" : "#1e293b";
+		input.style.outline = "none";
+		input.style.boxShadow = isDark ? "0 0 0 3px rgba(96,165,250,0.3)" : "0 0 0 3px rgba(59,130,246,0.2)";
 
 		document.body.appendChild(input);
 		input.focus();

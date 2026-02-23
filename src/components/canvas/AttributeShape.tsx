@@ -402,11 +402,15 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		input.style.height = "24px";
 		input.style.fontSize = "12px";
 		input.style.textAlign = "center";
-		input.style.border = "2px solid #3b82f6";
-		input.style.borderRadius = "4px";
-		input.style.padding = "2px";
+		const isDark = document.documentElement.classList.contains("dark");
+		input.style.border = isDark ? "2px solid #60a5fa" : "2px solid #3b82f6";
+		input.style.borderRadius = "6px";
+		input.style.padding = "2px 6px";
 		input.style.zIndex = "1000";
-		input.style.backgroundColor = "white";
+		input.style.backgroundColor = isDark ? "#1e293b" : "#ffffff";
+		input.style.color = isDark ? "#f1f5f9" : "#1e293b";
+		input.style.outline = "none";
+		input.style.boxShadow = isDark ? "0 0 0 3px rgba(96,165,250,0.3)" : "0 0 0 3px rgba(59,130,246,0.2)";
 
 		document.body.appendChild(input);
 		input.focus();
