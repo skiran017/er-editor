@@ -307,6 +307,7 @@ function parseConnection(elem: Element): Connection {
   const labelX = elem.getAttribute('labelX') ? parseFloat(elem.getAttribute('labelX')!) : undefined;
   const labelY = elem.getAttribute('labelY') ? parseFloat(elem.getAttribute('labelY')!) : undefined;
   const labelPosition = labelX !== undefined && labelY !== undefined ? { x: labelX, y: labelY } : undefined;
+  const role = elem.getAttribute('role') || undefined;
 
   // Calculate position from points
   const minX = points.length > 0 ? Math.min(...points.filter((_, i) => i % 2 === 0)) : 0;
@@ -327,6 +328,7 @@ function parseConnection(elem: Element): Connection {
     position: { x: minX, y: minY },
     selected: false,
     labelPosition,
+    role,
   };
 }
 

@@ -88,6 +88,7 @@ export interface Connection extends BaseElement {
   cardinality: Cardinality; // Cardinality at the 'to' end
   participation: Participation; // Participation at the 'to' end
   labelPosition?: Position; // Position of the cardinality/participation label
+  role?: string; // Role label for recursive relationships (e.g., "manager", "subordinate")
 }
 
 export interface Generalization extends BaseElement {

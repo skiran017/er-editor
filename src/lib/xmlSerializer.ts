@@ -158,6 +158,9 @@ function serializeConnection(connection: Connection): string {
   if (connection.labelPosition) {
     parts.push(`    labelX="${connection.labelPosition.x}" labelY="${connection.labelPosition.y}"`);
   }
+  if (connection.role) {
+    parts.push(`    role="${escapeXML(connection.role)}"`);
+  }
 
   parts.push('>');
 

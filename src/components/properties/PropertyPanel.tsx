@@ -476,14 +476,6 @@ const RelationshipPropertyPanelContent: React.FC<
 		return null;
 	}
 
-	// Find the connection that links this relationship to the given entity (so diagram stays in sync)
-	const getConnectionForEntity = (entityId: string) =>
-		connections.find(
-			(c) =>
-				(c.fromId === relationship.id && c.toId === entityId) ||
-				(c.fromId === entityId && c.toId === relationship.id),
-		);
-
 	// Check for unique name
 	const isNameUnique = checkUniqueRelationshipName(
 		relationship.id,
@@ -504,10 +496,18 @@ const RelationshipPropertyPanelContent: React.FC<
 		}
 	};
 
-	// Get connected entities
-	const connectedEntities = relationship.entityIds
+	// Get connected entities (unique for display list)
+	const connectedEntities = [...new Set(relationship.entityIds)]
 		.map((id) => entities.find((e) => e.id === id))
 		.filter(Boolean) as Entity[];
+
+	// Get all connections for this relationship (for per-connection editing)
+	const relConnections = connections.filter(
+		(c) =>
+			(c.fromId === relationship.id && entities.some((e) => e.id === c.toId)) ||
+			(c.toId === relationship.id && entities.some((e) => e.id === c.fromId)),
+	);
+	const isRecursive = connectedEntities.length === 1 && relConnections.length >= 2;
 
 	return (
 		<div className="space-y-6 pt-4">
@@ -842,47 +842,65 @@ const RelationshipPropertyPanelContent: React.FC<
 				)}
 			</div>
 
-			{/* Connection Details */}
-			{connectedEntities.length > 0 && (
+			{/* Connection Details — iterate over connections for per-leg editing */}
+			{relConnections.length > 0 && (
 				<div>
 					<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-						Connection Details
+						Connection Details {isRecursive && <span className="text-xs text-purple-500 ml-1">(Recursive)</span>}
 					</label>
 					<div className="space-y-3">
-						{connectedEntities.map((entity) => {
-							const cardinality = relationship.cardinalities[entity.id] || "1";
-							const participation =
-								relationship.participations[entity.id] || "partial";
+						{relConnections.map((conn, idx) => {
+							const entityId = conn.fromId === relationship.id ? conn.toId : conn.fromId;
+							const entity = entities.find((e) => e.id === entityId);
+							if (!entity) return null;
 
 							return (
 								<div
-									key={entity.id}
+									key={conn.id}
 									className="p-3 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900/50"
 								>
-									<div className="font-medium text-sm mb-2">{entity.name}</div>
+									<div className="font-medium text-sm mb-2">
+										{entity.name}
+										{isRecursive && (
+											<span className="text-xs text-gray-500 ml-1">
+												({conn.role || `Role ${idx + 1}`})
+											</span>
+										)}
+									</div>
+									{isRecursive && (
+										<div className="mb-2">
+											<label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+												Role Label
+											</label>
+											<input
+												type="text"
+												value={conn.role || ""}
+												onChange={(e) => updateConnection(conn.id, { role: e.target.value })}
+												className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 dark:bg-gray-800 dark:text-gray-200"
+												placeholder={`e.g., ${idx === 0 ? "manager" : "subordinate"}`}
+											/>
+										</div>
+									)}
 									<div className="grid grid-cols-2 gap-2">
 										<div>
-											<label className="block text-xs text-gray-600 mb-1">
+											<label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
 												Cardinality
 											</label>
 											<select
-												value={cardinality}
+												value={conn.cardinality || "1"}
 												onChange={(e) => {
 													const newCardinality = e.target.value as Cardinality;
-													updateRelationship(relationship.id, {
-														cardinalities: {
-															...relationship.cardinalities,
-															[entity.id]: newCardinality,
-														},
-													});
-													const conn = getConnectionForEntity(entity.id);
-													if (conn) {
-														updateConnection(conn.id, {
-															cardinality: newCardinality,
+													updateConnection(conn.id, { cardinality: newCardinality });
+													if (!isRecursive) {
+														updateRelationship(relationship.id, {
+															cardinalities: {
+																...relationship.cardinalities,
+																[entityId]: newCardinality,
+															},
 														});
 													}
 												}}
-												className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+												className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 dark:bg-gray-800 dark:text-gray-200"
 											>
 												<option value="1">1</option>
 												<option value="N">N</option>
@@ -890,28 +908,24 @@ const RelationshipPropertyPanelContent: React.FC<
 											</select>
 										</div>
 										<div>
-											<label className="block text-xs text-gray-600 mb-1">
+											<label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
 												Participation
 											</label>
 											<select
-												value={participation}
+												value={conn.participation || "partial"}
 												onChange={(e) => {
-													const newParticipation = e.target
-														.value as Participation;
-													updateRelationship(relationship.id, {
-														participations: {
-															...relationship.participations,
-															[entity.id]: newParticipation,
-														},
-													});
-													const conn = getConnectionForEntity(entity.id);
-													if (conn) {
-														updateConnection(conn.id, {
-															participation: newParticipation,
+													const newParticipation = e.target.value as Participation;
+													updateConnection(conn.id, { participation: newParticipation });
+													if (!isRecursive) {
+														updateRelationship(relationship.id, {
+															participations: {
+																...relationship.participations,
+																[entityId]: newParticipation,
+															},
 														});
 													}
 												}}
-												className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+												className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 dark:bg-gray-800 dark:text-gray-200"
 											>
 												<option value="partial">Partial</option>
 												<option value="total">Total</option>

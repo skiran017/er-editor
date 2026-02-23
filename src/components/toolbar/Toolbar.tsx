@@ -8,6 +8,7 @@ import {
 	ZoomOut,
 	Trash2,
 	Square,
+	Diamond,
 } from "lucide-react";
 import {
 	TbRelationOneToOne,
@@ -111,6 +112,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			id: "entity",
 			icon: Square,
 			label: "Entity (E)",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
+			id: "relationship",
+			icon: Diamond,
+			label: "Relationship (R)",
 			size: 18,
 			type: "lucide" as const,
 		},

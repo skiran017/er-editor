@@ -35,11 +35,27 @@ export function connectionExists(
   fromId: string,
   toId: string
 ): boolean {
-  return diagram.connections.some(
+  // For entity-to-relationship connections, allow up to 2 connections
+  // (supports recursive relationships where same entity connects twice)
+  const existing = diagram.connections.filter(
     (c) =>
       (c.fromId === fromId && c.toId === toId) ||
       (c.fromId === toId && c.toId === fromId)
   );
+
+  // Check if one side is a relationship — if so, allow 2 connections (recursive)
+  const entities = diagram.entities;
+  const relationships = diagram.relationships;
+  const fromIsEntity = entities.some((e) => e.id === fromId);
+  const toIsEntity = entities.some((e) => e.id === toId);
+  const fromIsRel = relationships.some((r) => r.id === fromId);
+  const toIsRel = relationships.some((r) => r.id === toId);
+
+  if ((fromIsEntity && toIsRel) || (fromIsRel && toIsEntity)) {
+    return existing.length >= 2;
+  }
+
+  return existing.length >= 1;
 }
 
 export function cn(...inputs: ClassValue[]) {

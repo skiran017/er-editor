@@ -896,14 +896,11 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.connections.push(newConnection);
 
           // Update relationship entityIds if connecting entity to relationship
+          // Allow duplicates for recursive relationships (same entity connected twice)
           if (fromElement.type === 'entity' && toElement.type === 'relationship') {
-            if (!toElement.entityIds.includes(fromId)) {
-              toElement.entityIds.push(fromId);
-            }
+            toElement.entityIds.push(fromId);
           } else if (fromElement.type === 'relationship' && toElement.type === 'entity') {
-            if (!fromElement.entityIds.includes(toId)) {
-              fromElement.entityIds.push(toId);
-            }
+            fromElement.entityIds.push(toId);
           }
 
           // Auto-validate if enabled
@@ -1000,9 +997,11 @@ export const useEditorStore = create<EditorStore>()(
               state.diagram.relationships.find(r => r.id === connection.toId);
 
             if (fromElement?.type === 'relationship' && toElement?.type === 'entity') {
-              fromElement.entityIds = fromElement.entityIds.filter(eid => eid !== connection.toId);
+              const idx = fromElement.entityIds.indexOf(connection.toId);
+              if (idx !== -1) fromElement.entityIds.splice(idx, 1);
             } else if (fromElement?.type === 'entity' && toElement?.type === 'relationship') {
-              toElement.entityIds = toElement.entityIds.filter(eid => eid !== connection.fromId);
+              const idx = toElement.entityIds.indexOf(connection.fromId);
+              if (idx !== -1) toElement.entityIds.splice(idx, 1);
             }
           }
 
