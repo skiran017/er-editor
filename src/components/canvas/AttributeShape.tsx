@@ -25,8 +25,10 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		(state) => state.updateAttributeById,
 	);
 	const selectElement = useEditorStore((state) => state.selectElement);
+	const addSubAttribute = useEditorStore((state) => state.addSubAttribute);
 	const mode = useEditorStore((state) => state.mode);
 	const entities = useEditorStore((state) => state.diagram.entities);
+	const allAttributes = useEditorStore((state) => state.diagram.attributes);
 	const viewport = useEditorStore((state) => state.viewport);
 
 	// Get theme-aware colors (must be before early returns)
@@ -52,6 +54,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		isMultivalued,
 		isDerived,
 		entityId,
+		parentAttributeId,
 		hasWarning,
 		warnings,
 	} = attribute;
@@ -67,6 +70,11 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		? relationships.find((r) => r.id === attribute.relationshipId)
 		: null;
 	const parentElement = parentEntity || parentRelationship;
+
+	// For sub-attributes, the visual parent is the parent attribute (not entity/relationship)
+	const parentAttr = parentAttributeId
+		? allAttributes.find((a) => a.id === parentAttributeId)
+		: null;
 
 	// Use preview positions during group drag for real-time line updates
 	const effectiveParentElement =
@@ -198,11 +206,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 	]);
 
 	// Early returns MUST come after all hooks
-	if (!parentEntity && !parentRelationship) {
-		return null;
-	}
-
-	if (!parentElement) {
+	if (!parentAttr && !parentEntity && !parentRelationship) {
 		return null;
 	}
 
@@ -216,26 +220,39 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		x: effectiveAttributePosition.x,
 		y: effectiveAttributePosition.y,
 	};
-	const parentCenter = effectiveParentElement
-		? {
-				x:
-					effectiveParentElement.position.x +
-					effectiveParentElement.size.width / 2,
-				y:
-					effectiveParentElement.position.y +
-					effectiveParentElement.size.height / 2,
-			}
-		: { x: 0, y: 0 };
 
-	// Find closest edge on parent element
-	const parentEdge = effectiveParentElement
+	// For sub-attributes, connect to parent attribute; otherwise connect to parent entity/relationship
+	const effectiveParentAttr = parentAttr && parentAttr.id in dragPreviewPositions
+		? { ...parentAttr, position: dragPreviewPositions[parentAttr.id] }
+		: parentAttr;
+
+	const isSubAttribute = !!parentAttr;
+	const parentAttrTextWidth = parentAttr ? Math.max(80, parentAttr.name.length * 8 + 20) : 0;
+	const parentAttrEllipseH = 30;
+
+	const parentCenter = isSubAttribute && effectiveParentAttr
+		? { x: effectiveParentAttr.position.x, y: effectiveParentAttr.position.y }
+		: effectiveParentElement
+			? {
+					x: effectiveParentElement.position.x + effectiveParentElement.size.width / 2,
+					y: effectiveParentElement.position.y + effectiveParentElement.size.height / 2,
+				}
+			: { x: 0, y: 0 };
+
+	// Find closest edge on parent
+	const parentEdge = isSubAttribute && effectiveParentAttr
 		? getClosestEdge(attributeCenter, {
-				position: effectiveParentElement.position,
-				size: effectiveParentElement.size,
+				position: { x: effectiveParentAttr.position.x - parentAttrTextWidth / 2, y: effectiveParentAttr.position.y - parentAttrEllipseH / 2 },
+				size: { width: parentAttrTextWidth, height: parentAttrEllipseH },
 			})
-		: ("top" as const);
+		: effectiveParentElement
+			? getClosestEdge(attributeCenter, {
+					position: effectiveParentElement.position,
+					size: effectiveParentElement.size,
+				})
+			: ("top" as const);
 
-	// Find closest edge on attribute (simplified - attributes are ovals)
+	// Find closest edge on this attribute
 	const attributeEdge = getClosestEdge(parentCenter, {
 		position: effectiveAttributePosition,
 		size: { width: ellipseWidth, height: ellipseHeight },
@@ -337,9 +354,16 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		}
 	};
 
-	const parentPoint = effectiveParentElement
-		? getConnectionPoint(effectiveParentElement, parentEdge)
-		: { x: 0, y: 0 };
+	const parentPoint = isSubAttribute && effectiveParentAttr
+		? getConnectionPoint(
+				{ position: effectiveParentAttr.position, size: { width: parentAttrTextWidth, height: parentAttrEllipseH } },
+				parentEdge,
+				true,
+				attributeCenter,
+			)
+		: effectiveParentElement
+			? getConnectionPoint(effectiveParentElement, parentEdge)
+			: { x: 0, y: 0 };
 	// For ellipse, calculate intersection point on the actual ellipse edge
 	const attributePoint = getConnectionPoint(
 		{
@@ -348,7 +372,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		},
 		attributeEdge,
 		true,
-		parentPoint, // Pass parent point to calculate proper ellipse intersection
+		parentPoint,
 	);
 
 	// Handle drag move
@@ -371,10 +395,42 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		if (mode === "select") {
 			selectElement(id, e.evt.shiftKey);
 		}
+		if (mode === "attribute") {
+			const textNode = textRef.current;
+			const group = groupRef.current;
+			if (textNode && group) {
+				const localPos = group.getRelativePointerPosition();
+				if (localPos) {
+					const pad = 4;
+					const tw = textNode.getTextWidth();
+					const th = textNode.fontSize();
+					const tx = -tw / 2;
+					const ty = -th / 2;
+					if (
+						localPos.x >= tx - pad && localPos.x <= tx + tw + pad &&
+						localPos.y >= ty - pad && localPos.y <= ty + th + pad
+					) {
+						e.cancelBubble = true;
+						return;
+					}
+				}
+			}
+			const siblingCount = allAttributes.filter((a) => a.parentAttributeId === id).length;
+			addSubAttribute(id, `Sub ${siblingCount + 1}`);
+		}
+		e.cancelBubble = true;
+	};
+
+	const handleTap = (e: Konva.KonvaEventObject<PointerEvent | TouchEvent>) => {
+		const mouseEvent = {
+			...e,
+			evt: { ...e.evt, shiftKey: false },
+		} as Konva.KonvaEventObject<MouseEvent>;
+		handleClick(mouseEvent);
+		if (mouseEvent.cancelBubble) e.cancelBubble = true;
 	};
 
 	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-		// Double-click triggers text editing
 		e.cancelBubble = true;
 		handleTextDblClick(e);
 	};
@@ -402,11 +458,15 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		input.style.height = "24px";
 		input.style.fontSize = "12px";
 		input.style.textAlign = "center";
-		input.style.border = "2px solid #3b82f6";
-		input.style.borderRadius = "4px";
-		input.style.padding = "2px";
+		const isDark = document.documentElement.classList.contains("dark");
+		input.style.border = isDark ? "2px solid #34d399" : "2px solid #10b981";
+		input.style.borderRadius = "6px";
+		input.style.padding = "2px 6px";
 		input.style.zIndex = "1000";
-		input.style.backgroundColor = "white";
+		input.style.backgroundColor = isDark ? "#1a2e2a" : "#ecfdf5";
+		input.style.color = isDark ? "#f1f5f9" : "#1e293b";
+		input.style.outline = "none";
+		input.style.boxShadow = isDark ? "0 0 0 3px rgba(52,211,153,0.25)" : "0 0 0 3px rgba(16,185,129,0.15)";
 
 		document.body.appendChild(input);
 		input.focus();
@@ -421,9 +481,16 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 		let isRemoved = false;
 
+		const saveName = () => {
+			const newName = input.value.trim();
+			if (newName.length > 0) {
+				updateAttributeById(id, { name: newName });
+			}
+		};
+
 		input.addEventListener("keydown", (e) => {
 			if (e.key === "Enter") {
-				updateAttributeById(id, { name: input.value });
+				saveName();
 				if (!isRemoved) {
 					isRemoved = true;
 					removeInput();
@@ -438,7 +505,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 		input.addEventListener("blur", () => {
 			if (!isRemoved) {
-				updateAttributeById(id, { name: input.value });
+				saveName();
 				isRemoved = true;
 				removeInput();
 			}
@@ -485,6 +552,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 				onDragMove={handleDragMove}
 				onDragEnd={handleDragEnd}
 				onClick={handleClick}
+				onTap={handleTap}
 				onDblClick={handleDblClick}
 				hitStrokeWidth={10}
 			>

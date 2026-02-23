@@ -14,6 +14,7 @@ interface EditorStore extends EditorState {
   // Attribute actions
   addAttribute: (entityId: string, attribute: Omit<EntityAttribute, 'id'>, customPosition?: Position) => void;
   addRelationshipAttribute: (relationshipId: string, attribute: Omit<EntityAttribute, 'id'>, customPosition?: Position) => void;
+  addSubAttribute: (parentAttributeId: string, name: string, position?: Position) => void;
   updateAttribute: (entityId: string, attributeId: string, updates: Partial<EntityAttribute>) => void;
   updateAttributeById: (attributeId: string, updates: Partial<Attribute>) => void;
   deleteAttribute: (entityId: string, attributeId: string) => void;
@@ -573,6 +574,58 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      addSubAttribute: (parentAttributeId, name, customPosition) => {
+        set((state) => {
+          const parent = state.diagram.attributes.find((a) => a.id === parentAttributeId);
+          if (!parent) return;
+
+          // Enforce unique name among siblings (case-insensitive)
+          const siblings = state.diagram.attributes.filter((a) => a.parentAttributeId === parentAttributeId);
+          if (siblings.some((s) => s.name.toLowerCase() === name.toLowerCase())) return;
+
+          const subId = generateId();
+          const siblingCount = siblings.length;
+          const defaultPosition = {
+            x: parent.position.x + 80,
+            y: parent.position.y - 30 + siblingCount * 50,
+          };
+
+          const newSub: Attribute = {
+            id: subId,
+            type: 'attribute',
+            name,
+            isKey: false,
+            isDiscriminant: false,
+            isMultivalued: false,
+            isDerived: false,
+            entityId: parent.entityId,
+            relationshipId: parent.relationshipId,
+            parentAttributeId,
+            position: customPosition || defaultPosition,
+            selected: false,
+          };
+
+          // Mark parent as composite and track child
+          parent.isComposite = true;
+          if (!parent.subAttributeIds) parent.subAttributeIds = [];
+          parent.subAttributeIds.push(subId);
+
+          state.diagram.attributes.push(newSub);
+
+          // Also sync composite flag to parent entity/relationship's attributes array
+          if (parent.entityId) {
+            const entity = state.diagram.entities.find((e) => e.id === parent.entityId);
+            const entityAttr = entity?.attributes.find((a) => a.id === parentAttributeId);
+            if (entityAttr) entityAttr.isComposite = true;
+          }
+          if (parent.relationshipId) {
+            const rel = state.diagram.relationships.find((r) => r.id === parent.relationshipId);
+            const relAttr = rel?.attributes.find((a) => a.id === parentAttributeId);
+            if (relAttr) relAttr.isComposite = true;
+          }
+        });
+      },
+
       updateAttributeById: (attributeId, updates) => {
         set((state) => {
           const canvasAttribute = state.diagram.attributes.find((a) => a.id === attributeId);
@@ -650,27 +703,45 @@ export const useEditorStore = create<EditorStore>()(
       deleteAttributeById: (attributeId) => {
         set((state) => {
           const canvasAttribute = state.diagram.attributes.find((a) => a.id === attributeId);
-          if (canvasAttribute) {
-            // Remove from parent entity
-            if (canvasAttribute.entityId) {
-              const entity = state.diagram.entities.find((e) => e.id === canvasAttribute.entityId);
-              if (entity) {
-                entity.attributes = entity.attributes.filter((a) => a.id !== attributeId);
-              }
-            }
-            // Remove from parent relationship
-            if (canvasAttribute.relationshipId) {
-              const relationship = state.diagram.relationships.find((r) => r.id === canvasAttribute.relationshipId);
-              if (relationship) {
-                relationship.attributes = relationship.attributes.filter((a) => a.id !== attributeId);
+          if (!canvasAttribute) return;
+
+          // Collect IDs to remove: this attribute + all sub-attributes if composite
+          const idsToRemove = new Set<string>([attributeId]);
+          if (canvasAttribute.subAttributeIds) {
+            for (const subId of canvasAttribute.subAttributeIds) idsToRemove.add(subId);
+          }
+
+          // If this is a sub-attribute, remove from parent's subAttributeIds
+          if (canvasAttribute.parentAttributeId) {
+            const parentAttr = state.diagram.attributes.find((a) => a.id === canvasAttribute.parentAttributeId);
+            if (parentAttr && parentAttr.subAttributeIds) {
+              parentAttr.subAttributeIds = parentAttr.subAttributeIds.filter((id) => id !== attributeId);
+              if (parentAttr.subAttributeIds.length === 0) {
+                parentAttr.isComposite = false;
               }
             }
           }
+
+          // Remove from parent entity
+          if (canvasAttribute.entityId) {
+            const entity = state.diagram.entities.find((e) => e.id === canvasAttribute.entityId);
+            if (entity) {
+              entity.attributes = entity.attributes.filter((a) => !idsToRemove.has(a.id));
+            }
+          }
+          // Remove from parent relationship
+          if (canvasAttribute.relationshipId) {
+            const relationship = state.diagram.relationships.find((r) => r.id === canvasAttribute.relationshipId);
+            if (relationship) {
+              relationship.attributes = relationship.attributes.filter((a) => !idsToRemove.has(a.id));
+            }
+          }
+
           // Remove from canvas attributes
-          state.diagram.attributes = state.diagram.attributes.filter((a) => a.id !== attributeId);
+          state.diagram.attributes = state.diagram.attributes.filter((a) => !idsToRemove.has(a.id));
 
           // Auto-validate parent if enabled
-          if (state.validationEnabled && canvasAttribute) {
+          if (state.validationEnabled) {
             if (canvasAttribute.entityId) {
               const entity = state.diagram.entities.find((e) => e.id === canvasAttribute.entityId);
               if (entity) {
@@ -825,14 +896,11 @@ export const useEditorStore = create<EditorStore>()(
           state.diagram.connections.push(newConnection);
 
           // Update relationship entityIds if connecting entity to relationship
+          // Allow duplicates for recursive relationships (same entity connected twice)
           if (fromElement.type === 'entity' && toElement.type === 'relationship') {
-            if (!toElement.entityIds.includes(fromId)) {
-              toElement.entityIds.push(fromId);
-            }
+            toElement.entityIds.push(fromId);
           } else if (fromElement.type === 'relationship' && toElement.type === 'entity') {
-            if (!fromElement.entityIds.includes(toId)) {
-              fromElement.entityIds.push(toId);
-            }
+            fromElement.entityIds.push(toId);
           }
 
           // Auto-validate if enabled
@@ -929,9 +997,11 @@ export const useEditorStore = create<EditorStore>()(
               state.diagram.relationships.find(r => r.id === connection.toId);
 
             if (fromElement?.type === 'relationship' && toElement?.type === 'entity') {
-              fromElement.entityIds = fromElement.entityIds.filter(eid => eid !== connection.toId);
+              const idx = fromElement.entityIds.indexOf(connection.toId);
+              if (idx !== -1) fromElement.entityIds.splice(idx, 1);
             } else if (fromElement?.type === 'entity' && toElement?.type === 'relationship') {
-              toElement.entityIds = toElement.entityIds.filter(eid => eid !== connection.fromId);
+              const idx = toElement.entityIds.indexOf(connection.fromId);
+              if (idx !== -1) toElement.entityIds.splice(idx, 1);
             }
           }
 

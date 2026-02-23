@@ -23,6 +23,7 @@ export interface EntityAttribute {
   isDiscriminant: boolean; // Discriminant attribute for weak entities
   isMultivalued: boolean;
   isDerived: boolean;
+  isComposite?: boolean;
 }
 
 // Full attribute with position for canvas rendering
@@ -35,6 +36,9 @@ export interface Attribute extends BaseElement {
   isDerived: boolean;
   entityId?: string; // Parent entity ID (optional - can be on relationship)
   relationshipId?: string; // Parent relationship ID (optional - for relationship attributes)
+  parentAttributeId?: string; // Parent attribute ID (for sub-attributes of composite attributes)
+  subAttributeIds?: string[]; // Child attribute IDs (for composite attributes)
+  isComposite?: boolean;
   type: 'attribute';
   hasWarning?: boolean; // Indicates if attribute has validation warnings
   warnings?: string[]; // List of warning messages
@@ -84,6 +88,7 @@ export interface Connection extends BaseElement {
   cardinality: Cardinality; // Cardinality at the 'to' end
   participation: Participation; // Participation at the 'to' end
   labelPosition?: Position; // Position of the cardinality/participation label
+  role?: string; // Role label for recursive relationships (e.g., "manager", "subordinate")
 }
 
 export interface Generalization extends BaseElement {

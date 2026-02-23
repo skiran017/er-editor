@@ -102,24 +102,19 @@ export function validateEntity(entity: Entity, diagram: Diagram): string[] {
     );
 
     // Track identifying relationships for Rules 1.4, 1.5, 1.6
-    let identifyingRelationshipCount = 0;
+    const identifyingRelIds = new Set<string>();
 
     for (const conn of connections) {
-      // Find the relationship
       const relId = conn.fromId === entity.id ? conn.toId : conn.fromId;
       const rel = diagram.relationships.find(r => r.id === relId);
 
       if (rel && rel.isWeak) {
-        identifyingRelationshipCount++;
+        identifyingRelIds.add(rel.id);
 
         // Rule 1.5 (Bug 10): Weak entity cannot be on 1-side of identifying relationship
-        const entityIsFrom = conn.fromId === entity.id;
         const cardinality = conn.cardinality?.trim() || '';
 
-        if (
-          (entityIsFrom && cardinality === '1') ||
-          (!entityIsFrom && cardinality === '1')
-        ) {
+        if (cardinality === '1') {
           warnings.push('Weak entity cannot be on 1-side of identifying relationship (must be on N-side)');
         }
 
@@ -131,10 +126,10 @@ export function validateEntity(entity: Entity, diagram: Diagram): string[] {
     }
 
     // Rule 1.6: Weak entity must connect to exactly one identifying relationship
-    if (identifyingRelationshipCount === 0) {
+    if (identifyingRelIds.size === 0) {
       warnings.push('Weak entity must connect to at least one identifying relationship');
-    } else if (identifyingRelationshipCount > 1) {
-      warnings.push('Weak entity must connect to exactly one identifying relationship (currently has ' + identifyingRelationshipCount + ')');
+    } else if (identifyingRelIds.size > 1) {
+      warnings.push('Weak entity must connect to exactly one identifying relationship (currently has ' + identifyingRelIds.size + ')');
     }
   }
 
@@ -155,9 +150,10 @@ export function validateEntity(entity: Entity, diagram: Diagram): string[] {
 export function validateRelationship(relationship: Relationship, diagram: Diagram): string[] {
   const warnings: string[] = [];
 
-  // Rule: Relationship must connect at least 2 entities
+  // Rule: Relationship must connect at least 2 entity slots
+  // (recursive relationships have the same entity twice — that's valid)
   if (relationship.entityIds.length < 2) {
-    warnings.push('Relationship must connect at least 2 entities');
+    warnings.push('Relationship must connect at least 2 entities (or be a recursive relationship)');
   }
 
   // Rule: All connections must have cardinality defined
@@ -254,6 +250,26 @@ export function validateAttribute(attribute: Attribute, diagram: Diagram): strin
         warnings.push('Discriminant only valid for weak entity attributes');
       }
     }
+  }
+
+  // Rule 3.9: Composite attribute should have at least one sub-attribute
+  if (attribute.isComposite && (!attribute.subAttributeIds || attribute.subAttributeIds.length === 0)) {
+    warnings.push('Composite attribute should have at least one sub-attribute');
+  }
+
+  // Rule 3.10: Sub-attributes cannot be key attributes
+  if (attribute.parentAttributeId && attribute.isKey) {
+    warnings.push('Sub-attributes cannot be key attributes');
+  }
+
+  // Rule 3.11: Sub-attributes cannot be discriminants
+  if (attribute.parentAttributeId && attribute.isDiscriminant) {
+    warnings.push('Sub-attributes cannot be discriminant attributes');
+  }
+
+  // Rule 3.12: Sub-attributes cannot be composite (only 1 level of nesting)
+  if (attribute.parentAttributeId && attribute.isComposite) {
+    warnings.push('Sub-attributes cannot be composite (only one level of nesting allowed)');
   }
 
   return warnings;

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Group, Line, Circle } from "react-konva";
+import { Group, Line, Circle, Text } from "react-konva";
 import type { Connection } from "../../types";
 import { useEditorStore } from "../../store/editorStore";
 import { getThemeColorsSync } from "../../lib/themeColors";
@@ -274,11 +274,33 @@ export const ConnectionShape: React.FC<ConnectionShapeProps> = ({
 				</>
 			)}
 
-			{/* Cardinality/participation is conveyed by visual symbols:
-			   - Arrow (triangle) at entity end = cardinality "1"
-			   - Double line = total participation
-			   - Single line = partial participation
-			   No text labels needed */}
+			{/* Role label for recursive relationships */}
+			{connection.role && points.length >= 4 && (() => {
+				const ex = entityIsToEnd ? points[points.length - 2] : points[0];
+				const ey = entityIsToEnd ? points[points.length - 1] : points[1];
+				const px = entityIsToEnd ? points[points.length - 4] : points[2];
+				const py = entityIsToEnd ? points[points.length - 3] : points[3];
+				const angle = Math.atan2(ey - py, ex - px);
+				const perpX = -Math.sin(angle) * 14;
+				const perpY = Math.cos(angle) * 14;
+				const midFactor = 0.25;
+				const labelX = ex + (px - ex) * midFactor + perpX;
+				const labelY = ey + (py - ey) * midFactor + perpY;
+				return (
+					<Text
+						x={labelX - 30}
+						y={labelY - 7}
+						width={60}
+						height={14}
+						text={connection.role}
+						fontSize={11}
+						fill={colors.text}
+						align="center"
+						fontStyle="italic"
+						listening={false}
+					/>
+				);
+			})()}
 		</Group>
 	);
 };

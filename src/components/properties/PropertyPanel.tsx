@@ -48,6 +48,17 @@ const useIsMobile = () => {
 export const PropertyPanel: React.FC = () => {
 	const selectedIds = useEditorStore((state) => state.selectedIds);
 	const clearSelection = useEditorStore((state) => state.clearSelection);
+	const deleteEntity = useEditorStore((state) => state.deleteEntity);
+	const deleteRelationship = useEditorStore(
+		(state) => state.deleteRelationship,
+	);
+	const deleteAttributeById = useEditorStore(
+		(state) => state.deleteAttributeById,
+	);
+	const deleteConnection = useEditorStore((state) => state.deleteConnection);
+	const deleteGeneralization = useEditorStore(
+		(state) => state.deleteGeneralization,
+	);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
 	const connections = useEditorStore((state) => state.diagram.connections);
@@ -103,6 +114,16 @@ export const PropertyPanel: React.FC = () => {
 		panelIcon = <Circle className="w-5 h-5 text-green-600" />;
 	}
 
+	const handleDelete = () => {
+		if (!selectedId) return;
+		if (entity) deleteEntity(selectedId);
+		else if (relationship) deleteRelationship(selectedId);
+		else if (attribute) deleteAttributeById(selectedId);
+		else if (connection) deleteConnection(selectedId);
+		else if (generalization) deleteGeneralization(selectedId);
+		clearSelection();
+	};
+
 	return (
 		<Sheet open={isOpen} onOpenChange={(open) => !open && clearSelection()}>
 			<SheetContent
@@ -112,9 +133,17 @@ export const PropertyPanel: React.FC = () => {
 				onOpenAutoFocus={(e) => e.preventDefault()}
 			>
 				<SheetHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
-					<SheetTitle className="flex items-center gap-2">
+					<SheetTitle className="flex items-center gap-2 pr-8">
 						{panelIcon}
-						{panelTitle}
+						<span className="flex-1">{panelTitle}</span>
+						<button
+							type="button"
+							onClick={handleDelete}
+							className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
+							title="Delete element"
+						>
+							<Trash2 size={18} />
+						</button>
 					</SheetTitle>
 				</SheetHeader>
 				<div className="flex-1 overflow-y-auto px-4 pb-20 md:pb-4">
@@ -447,14 +476,6 @@ const RelationshipPropertyPanelContent: React.FC<
 		return null;
 	}
 
-	// Find the connection that links this relationship to the given entity (so diagram stays in sync)
-	const getConnectionForEntity = (entityId: string) =>
-		connections.find(
-			(c) =>
-				(c.fromId === relationship.id && c.toId === entityId) ||
-				(c.fromId === entityId && c.toId === relationship.id),
-		);
-
 	// Check for unique name
 	const isNameUnique = checkUniqueRelationshipName(
 		relationship.id,
@@ -475,10 +496,18 @@ const RelationshipPropertyPanelContent: React.FC<
 		}
 	};
 
-	// Get connected entities
-	const connectedEntities = relationship.entityIds
+	// Get connected entities (unique for display list)
+	const connectedEntities = [...new Set(relationship.entityIds)]
 		.map((id) => entities.find((e) => e.id === id))
 		.filter(Boolean) as Entity[];
+
+	// Get all connections for this relationship (for per-connection editing)
+	const relConnections = connections.filter(
+		(c) =>
+			(c.fromId === relationship.id && entities.some((e) => e.id === c.toId)) ||
+			(c.toId === relationship.id && entities.some((e) => e.id === c.fromId)),
+	);
+	const isRecursive = connectedEntities.length === 1 && relConnections.length >= 2;
 
 	return (
 		<div className="space-y-6 pt-4">
@@ -813,47 +842,65 @@ const RelationshipPropertyPanelContent: React.FC<
 				)}
 			</div>
 
-			{/* Connection Details */}
-			{connectedEntities.length > 0 && (
+			{/* Connection Details — iterate over connections for per-leg editing */}
+			{relConnections.length > 0 && (
 				<div>
 					<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-						Connection Details
+						Connection Details {isRecursive && <span className="text-xs text-purple-500 ml-1">(Recursive)</span>}
 					</label>
 					<div className="space-y-3">
-						{connectedEntities.map((entity) => {
-							const cardinality = relationship.cardinalities[entity.id] || "1";
-							const participation =
-								relationship.participations[entity.id] || "partial";
+						{relConnections.map((conn, idx) => {
+							const entityId = conn.fromId === relationship.id ? conn.toId : conn.fromId;
+							const entity = entities.find((e) => e.id === entityId);
+							if (!entity) return null;
 
 							return (
 								<div
-									key={entity.id}
+									key={conn.id}
 									className="p-3 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900/50"
 								>
-									<div className="font-medium text-sm mb-2">{entity.name}</div>
+									<div className="font-medium text-sm mb-2">
+										{entity.name}
+										{isRecursive && (
+											<span className="text-xs text-gray-500 ml-1">
+												({conn.role || `Role ${idx + 1}`})
+											</span>
+										)}
+									</div>
+									{isRecursive && (
+										<div className="mb-2">
+											<label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+												Role Label
+											</label>
+											<input
+												type="text"
+												value={conn.role || ""}
+												onChange={(e) => updateConnection(conn.id, { role: e.target.value })}
+												className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 dark:bg-gray-800 dark:text-gray-200"
+												placeholder={`e.g., ${idx === 0 ? "manager" : "subordinate"}`}
+											/>
+										</div>
+									)}
 									<div className="grid grid-cols-2 gap-2">
 										<div>
-											<label className="block text-xs text-gray-600 mb-1">
+											<label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
 												Cardinality
 											</label>
 											<select
-												value={cardinality}
+												value={conn.cardinality || "1"}
 												onChange={(e) => {
 													const newCardinality = e.target.value as Cardinality;
-													updateRelationship(relationship.id, {
-														cardinalities: {
-															...relationship.cardinalities,
-															[entity.id]: newCardinality,
-														},
-													});
-													const conn = getConnectionForEntity(entity.id);
-													if (conn) {
-														updateConnection(conn.id, {
-															cardinality: newCardinality,
+													updateConnection(conn.id, { cardinality: newCardinality });
+													if (!isRecursive) {
+														updateRelationship(relationship.id, {
+															cardinalities: {
+																...relationship.cardinalities,
+																[entityId]: newCardinality,
+															},
 														});
 													}
 												}}
-												className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+												className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 dark:bg-gray-800 dark:text-gray-200"
 											>
 												<option value="1">1</option>
 												<option value="N">N</option>
@@ -861,28 +908,24 @@ const RelationshipPropertyPanelContent: React.FC<
 											</select>
 										</div>
 										<div>
-											<label className="block text-xs text-gray-600 mb-1">
+											<label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
 												Participation
 											</label>
 											<select
-												value={participation}
+												value={conn.participation || "partial"}
 												onChange={(e) => {
-													const newParticipation = e.target
-														.value as Participation;
-													updateRelationship(relationship.id, {
-														participations: {
-															...relationship.participations,
-															[entity.id]: newParticipation,
-														},
-													});
-													const conn = getConnectionForEntity(entity.id);
-													if (conn) {
-														updateConnection(conn.id, {
-															participation: newParticipation,
+													const newParticipation = e.target.value as Participation;
+													updateConnection(conn.id, { participation: newParticipation });
+													if (!isRecursive) {
+														updateRelationship(relationship.id, {
+															participations: {
+																...relationship.participations,
+																[entityId]: newParticipation,
+															},
 														});
 													}
 												}}
-												className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+												className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 dark:bg-gray-800 dark:text-gray-200"
 											>
 												<option value="partial">Partial</option>
 												<option value="total">Total</option>
@@ -1269,12 +1312,18 @@ const AttributePropertyPanelContent: React.FC<
 	);
 	const entities = useEditorStore((state) => state.diagram.entities);
 	const relationships = useEditorStore((state) => state.diagram.relationships);
+	const allAttributes = useEditorStore((state) => state.diagram.attributes);
 	const diagram = useEditorStore((state) => state.diagram);
 
 	const updateAttributeById = useEditorStore(
 		(state) => state.updateAttributeById,
 	);
+	const addSubAttribute = useEditorStore((state) => state.addSubAttribute);
+	const deleteAttributeById = useEditorStore(
+		(state) => state.deleteAttributeById,
+	);
 	const [localName, setLocalName] = useState(attribute?.name || "");
+	const [newSubName, setNewSubName] = useState("");
 
 	// Sync local name when attribute changes
 	useEffect(() => {
@@ -1452,8 +1501,90 @@ const AttributePropertyPanelContent: React.FC<
 						/>
 						<span className="text-sm text-gray-700">Derived</span>
 					</label>
+
+					<label className="flex items-center gap-2 cursor-pointer">
+						<input
+							type="checkbox"
+							checked={attribute.isComposite || false}
+							onChange={(e) => {
+								updateAttributeById(attribute.id, {
+									isComposite: e.target.checked,
+									subAttributeIds: e.target.checked
+										? attribute.subAttributeIds || []
+										: [],
+								});
+							}}
+							className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+						/>
+						<span className="text-sm text-gray-700">Composite</span>
+					</label>
 				</div>
 			</div>
+
+			{/* Sub-Attributes (only for composite) */}
+			{attribute.isComposite && (
+				<div>
+					<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+						Sub-Attributes
+					</label>
+					<div className="space-y-2 mb-3">
+						{(attribute.subAttributeIds || []).map((subId) => {
+							const sub = allAttributes.find((a) => a.id === subId);
+							if (!sub) return null;
+							return (
+								<div
+									key={subId}
+									className="flex items-center justify-between p-2 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800"
+								>
+									<span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+										{sub.name}
+										{sub.isMultivalued && (
+											<span className="ml-1 text-blue-500 text-xs">(MV)</span>
+										)}
+										{sub.isDerived && (
+											<span className="ml-1 text-purple-500 text-xs">(D)</span>
+										)}
+									</span>
+									<button
+										type="button"
+										onClick={() => deleteAttributeById(subId)}
+										className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+									>
+										<Trash2 size={14} />
+									</button>
+								</div>
+							);
+						})}
+					</div>
+					<div className="flex gap-2">
+						<input
+							type="text"
+							value={newSubName}
+							onChange={(e) => setNewSubName(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && newSubName.trim()) {
+									addSubAttribute(attribute.id, newSubName.trim());
+									setNewSubName("");
+								}
+							}}
+							className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-800 dark:text-gray-200"
+							placeholder="Sub-attribute name"
+						/>
+						<button
+							type="button"
+							onClick={() => {
+								if (newSubName.trim()) {
+									addSubAttribute(attribute.id, newSubName.trim());
+									setNewSubName("");
+								}
+							}}
+							className="p-1.5 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded-md border border-teal-300 dark:border-teal-700"
+						>
+							<Plus size={16} />
+						</button>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 };

@@ -26,6 +26,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({
 	const [isEditing, setIsEditing] = useState(false);
 	const updateEntity = useEditorStore((state) => state.updateEntity);
 	const selectElement = useEditorStore((state) => state.selectElement);
+	const addAttribute = useEditorStore((state) => state.addAttribute);
+	const attributes = useEditorStore((state) => state.diagram.attributes);
 	const mode = useEditorStore((state) => state.mode);
 	const diagram = useEditorStore((state) => state.diagram);
 	const viewport = useEditorStore((state) => state.viewport);
@@ -254,6 +256,7 @@ export const EntityShape: React.FC<EntityShapeProps> = ({
 			},
 		} as Konva.KonvaEventObject<MouseEvent>;
 		handleClick(mouseEvent);
+		if (mouseEvent.cancelBubble) e.cancelBubble = true;
 	};
 
 	const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -525,11 +528,45 @@ export const EntityShape: React.FC<EntityShapeProps> = ({
 		if (mode === "select") {
 			selectElement(id, e.evt.shiftKey);
 		}
+		if (mode === "attribute") {
+			const textNode = textRef.current;
+			const group = groupRef.current;
+			if (textNode && group) {
+				const localPos = group.getRelativePointerPosition();
+				if (localPos) {
+					const pad = 6;
+					const tw = textNode.getTextWidth();
+					const th = textNode.height();
+					const tx = (size.width - tw) / 2;
+					const ty = textNode.y();
+					if (
+						localPos.x >= tx - pad && localPos.x <= tx + tw + pad &&
+						localPos.y >= ty - pad && localPos.y <= ty + th + pad
+					) {
+						e.cancelBubble = true;
+						return;
+					}
+				}
+			}
+			const attributeCount = attributes.filter((a) => a.entityId === id).length;
+			const offset = 60;
+			const spacing = 40;
+			const attrPosition = {
+				x: entity.position.x + entity.size.width + offset,
+				y: entity.position.y + entity.size.height / 2 + attributeCount * spacing,
+			};
+			addAttribute(id, {
+				name: `Attribute ${attributeCount + 1}`,
+				isKey: false,
+				isDiscriminant: false,
+				isMultivalued: false,
+				isDerived: false,
+			}, attrPosition);
+		}
 		e.cancelBubble = true;
 	};
 
 	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-		// Double-click triggers inline text editing
 		e.cancelBubble = true;
 		handleTextDblClick(e);
 	};
@@ -558,11 +595,15 @@ export const EntityShape: React.FC<EntityShapeProps> = ({
 		input.style.fontSize = "16px";
 		input.style.fontWeight = "bold";
 		input.style.textAlign = "center";
-		input.style.border = "2px solid #3b82f6";
-		input.style.borderRadius = "4px";
-		input.style.padding = "4px";
+		const isDark = document.documentElement.classList.contains("dark");
+		input.style.border = isDark ? "2px solid #60a5fa" : "2px solid #3b82f6";
+		input.style.borderRadius = "6px";
+		input.style.padding = "4px 8px";
 		input.style.zIndex = "1000";
-		input.style.backgroundColor = "white";
+		input.style.backgroundColor = isDark ? "#1e2a40" : "#eff6ff";
+		input.style.color = isDark ? "#f1f5f9" : "#1e293b";
+		input.style.outline = "none";
+		input.style.boxShadow = isDark ? "0 0 0 3px rgba(96,165,250,0.25)" : "0 0 0 3px rgba(59,130,246,0.15)";
 
 		document.body.appendChild(input);
 		input.focus();

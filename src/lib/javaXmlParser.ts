@@ -100,12 +100,12 @@ export function parseJavaXMLToDiagram(xmlString: string): Diagram {
     });
 
     identifyingOneToOne.forEach((elem) => {
-      const relationship = parseJavaRelationship(elem, 'OneToOne', idMap);
+      const relationship = parseJavaRelationship(elem, 'OneToOne', idMap, true);
       diagram.relationships.push(relationship);
     });
 
     identifyingOneToN.forEach((elem) => {
-      const relationship = parseJavaRelationship(elem, 'OneToN', idMap);
+      const relationship = parseJavaRelationship(elem, 'OneToN', idMap, true);
       diagram.relationships.push(relationship);
     });
   }
@@ -589,7 +589,8 @@ function parseJavaEntity(elem: Element, isWeak: boolean, idMap: Map<string, stri
 function parseJavaRelationship(
   elem: Element,
   _relType: 'OneToOne' | 'OneToN' | 'NToN',
-  idMap: Map<string, string>
+  idMap: Map<string, string>,
+  isIdentifying = false
 ): Relationship {
   const javaId = elem.getAttribute('id') || '';
   const name = elem.getAttribute('name') || 'Relationship';
@@ -667,7 +668,7 @@ function parseJavaRelationship(
     attributes,
     cardinalities,
     participations,
-    isWeak: false, // Java format doesn't have weak relationships in the same way
+    isWeak: isIdentifying,
     size: { width, height },
   };
 }

@@ -6,11 +6,7 @@ import {
 	Redo2,
 	ZoomIn,
 	ZoomOut,
-	Minus,
-	ArrowLeft,
-	ArrowRight,
 	Trash2,
-	MoreVertical,
 	Square,
 	Diamond,
 } from "lucide-react";
@@ -26,12 +22,6 @@ import {
 	ConnectIcon,
 } from "../../assets/icons";
 import { Menu } from "../menu/Menu";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
 import {
 	useEditorStore,
 	useUndo,
@@ -126,6 +116,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 			type: "lucide" as const,
 		},
 		{
+			id: "relationship",
+			icon: Diamond,
+			label: "Relationship (R)",
+			size: 18,
+			type: "lucide" as const,
+		},
+		{
 			id: "attribute",
 			icon: TbOvalVertical,
 			label: "Attribute (A)",
@@ -177,37 +174,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 	] as const;
 
 	// Overflow tools (shown in dropdown)
-	const moreTools = [
-		{
-			id: "relationship",
-			icon: Diamond,
-			label: "Relationship (R)",
-			size: 18,
-			type: "lucide" as const,
-		},
-		{
-			id: "line",
-			icon: Minus,
-			label: "Line (L)",
-			size: 18,
-			type: "lucide" as const,
-		},
-		{
-			id: "arrow-left",
-			icon: ArrowLeft,
-			label: "Arrow Left",
-			size: 18,
-			type: "lucide" as const,
-		},
-		{
-			id: "arrow-right",
-			icon: ArrowRight,
-			label: "Arrow Right",
-			size: 18,
-			type: "lucide" as const,
-		},
-	] as const;
-
 	const handleZoomIn = () => {
 		setZoom(Math.min(viewport.scale * 1.2, 3));
 	};
@@ -483,45 +449,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 								</button>
 							);
 						})}
-					</div>
-
-					{/* More tools dropdown */}
-					<div className="flex items-center gap-0.5 mr-2 border-r border-gray-200 dark:border-gray-700 pr-2 shrink-0">
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<button
-									className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-									title="More tools"
-								>
-									<MoreVertical size={18} />
-								</button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent
-								side="bottom"
-								align="start"
-								className="min-w-[160px]"
-							>
-								{moreTools.map((tool) => {
-									const Icon = tool.icon;
-									const isActive = mode === tool.id;
-
-									return (
-										<DropdownMenuItem
-											key={tool.id}
-											onClick={() => setMode(tool.id as typeof mode)}
-											className={cn(
-												"flex items-center gap-2 cursor-pointer",
-												isActive &&
-													"bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
-											)}
-										>
-											<Icon size={tool.size} />
-											<span className="text-sm">{tool.label}</span>
-										</DropdownMenuItem>
-									);
-								})}
-							</DropdownMenuContent>
-						</DropdownMenu>
 					</div>
 
 					{/* History tools */}

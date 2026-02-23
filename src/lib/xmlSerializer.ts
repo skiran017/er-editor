@@ -118,17 +118,29 @@ function serializeAttribute(attribute: Attribute): string {
   if (attribute.relationshipId) {
     parts.push(`    relationshipId="${escapeXML(attribute.relationshipId)}"`);
   }
+  if (attribute.parentAttributeId) {
+    parts.push(`    parentAttributeId="${escapeXML(attribute.parentAttributeId)}"`);
+  }
+  if (attribute.isComposite) {
+    parts.push(`    isComposite="true"`);
+  }
+  if (attribute.subAttributeIds && attribute.subAttributeIds.length > 0) {
+    parts.push(`    subAttributeIds="${attribute.subAttributeIds.map(escapeXML).join(',')}"`);
+  }
   parts.push('  />');
   return parts.join('\n');
 }
 
-function serializeEntityAttribute(attr: { id: string; name: string; isKey: boolean; isDiscriminant: boolean; isMultivalued: boolean; isDerived: boolean }, indent: string): string {
+function serializeEntityAttribute(attr: { id: string; name: string; isKey: boolean; isDiscriminant: boolean; isMultivalued: boolean; isDerived: boolean; isComposite?: boolean }, indent: string): string {
   const parts: string[] = [];
   parts.push(`${indent}<attribute id="${escapeXML(attr.id)}" name="${escapeXML(attr.name)}"`);
   parts.push(`    isKey="${attr.isKey}"`);
   parts.push(`    isDiscriminant="${attr.isDiscriminant}"`);
   parts.push(`    isMultivalued="${attr.isMultivalued}"`);
   parts.push(`    isDerived="${attr.isDerived}"`);
+  if (attr.isComposite) {
+    parts.push(`    isComposite="true"`);
+  }
   parts.push('  />');
   return parts.join('\n');
 }
@@ -145,6 +157,9 @@ function serializeConnection(connection: Connection): string {
 
   if (connection.labelPosition) {
     parts.push(`    labelX="${connection.labelPosition.x}" labelY="${connection.labelPosition.y}"`);
+  }
+  if (connection.role) {
+    parts.push(`    role="${escapeXML(connection.role)}"`);
   }
 
   parts.push('>');
