@@ -459,14 +459,14 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 		input.style.fontSize = "12px";
 		input.style.textAlign = "center";
 		const isDark = document.documentElement.classList.contains("dark");
-		input.style.border = isDark ? "2px solid #60a5fa" : "2px solid #3b82f6";
+		input.style.border = isDark ? "2px solid #34d399" : "2px solid #10b981";
 		input.style.borderRadius = "6px";
 		input.style.padding = "2px 6px";
 		input.style.zIndex = "1000";
-		input.style.backgroundColor = isDark ? "#1e293b" : "#ffffff";
+		input.style.backgroundColor = isDark ? "#1a2e2a" : "#ecfdf5";
 		input.style.color = isDark ? "#f1f5f9" : "#1e293b";
 		input.style.outline = "none";
-		input.style.boxShadow = isDark ? "0 0 0 3px rgba(96,165,250,0.3)" : "0 0 0 3px rgba(59,130,246,0.2)";
+		input.style.boxShadow = isDark ? "0 0 0 3px rgba(52,211,153,0.25)" : "0 0 0 3px rgba(16,185,129,0.15)";
 
 		document.body.appendChild(input);
 		input.focus();
@@ -481,9 +481,16 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 		let isRemoved = false;
 
+		const saveName = () => {
+			const newName = input.value.trim();
+			if (newName.length > 0) {
+				updateAttributeById(id, { name: newName });
+			}
+		};
+
 		input.addEventListener("keydown", (e) => {
 			if (e.key === "Enter") {
-				updateAttributeById(id, { name: input.value });
+				saveName();
 				if (!isRemoved) {
 					isRemoved = true;
 					removeInput();
@@ -498,7 +505,7 @@ export const AttributeShape: React.FC<AttributeShapeProps> = ({
 
 		input.addEventListener("blur", () => {
 			if (!isRemoved) {
-				updateAttributeById(id, { name: input.value });
+				saveName();
 				isRemoved = true;
 				removeInput();
 			}

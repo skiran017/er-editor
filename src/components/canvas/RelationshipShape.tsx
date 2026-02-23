@@ -462,14 +462,14 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		input.style.fontWeight = "bold";
 		input.style.textAlign = "center";
 		const isDark = document.documentElement.classList.contains("dark");
-		input.style.border = isDark ? "2px solid #60a5fa" : "2px solid #3b82f6";
+		input.style.border = isDark ? "2px solid #a78bfa" : "2px solid #8b5cf6";
 		input.style.borderRadius = "6px";
 		input.style.padding = "4px 8px";
 		input.style.zIndex = "1000";
-		input.style.backgroundColor = isDark ? "#1e293b" : "#ffffff";
+		input.style.backgroundColor = isDark ? "#1e1b2e" : "#f5f3ff";
 		input.style.color = isDark ? "#f1f5f9" : "#1e293b";
 		input.style.outline = "none";
-		input.style.boxShadow = isDark ? "0 0 0 3px rgba(96,165,250,0.3)" : "0 0 0 3px rgba(59,130,246,0.2)";
+		input.style.boxShadow = isDark ? "0 0 0 3px rgba(167,139,250,0.25)" : "0 0 0 3px rgba(139,92,246,0.15)";
 
 		document.body.appendChild(input);
 		input.focus();
@@ -484,9 +484,16 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 
 		let isRemoved = false;
 
+		const saveName = () => {
+			const newName = input.value.trim();
+			if (newName.length > 0) {
+				updateRelationship(id, { name: newName });
+			}
+		};
+
 		input.addEventListener("keydown", (e) => {
 			if (e.key === "Enter") {
-				updateRelationship(id, { name: input.value });
+				saveName();
 				if (!isRemoved) {
 					isRemoved = true;
 					removeInput();
@@ -501,7 +508,7 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 
 		input.addEventListener("blur", () => {
 			if (!isRemoved) {
-				updateRelationship(id, { name: input.value });
+				saveName();
 				isRemoved = true;
 				removeInput();
 			}

@@ -600,10 +600,10 @@ export const EntityShape: React.FC<EntityShapeProps> = ({
 		input.style.borderRadius = "6px";
 		input.style.padding = "4px 8px";
 		input.style.zIndex = "1000";
-		input.style.backgroundColor = isDark ? "#1e293b" : "#ffffff";
+		input.style.backgroundColor = isDark ? "#1e2a40" : "#eff6ff";
 		input.style.color = isDark ? "#f1f5f9" : "#1e293b";
 		input.style.outline = "none";
-		input.style.boxShadow = isDark ? "0 0 0 3px rgba(96,165,250,0.3)" : "0 0 0 3px rgba(59,130,246,0.2)";
+		input.style.boxShadow = isDark ? "0 0 0 3px rgba(96,165,250,0.25)" : "0 0 0 3px rgba(59,130,246,0.15)";
 
 		document.body.appendChild(input);
 		input.focus();
