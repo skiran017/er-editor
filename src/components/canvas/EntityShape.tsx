@@ -524,8 +524,8 @@ export const EntityShape: React.FC<EntityShapeProps> = ({
 		}
 		if (mode === "select") {
 			selectElement(id, e.evt.shiftKey);
+			e.cancelBubble = true;
 		}
-		e.cancelBubble = true;
 	};
 
 	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {

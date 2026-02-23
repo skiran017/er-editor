@@ -390,8 +390,8 @@ export const RelationshipShape: React.FC<RelationshipShapeProps> = ({
 		}
 		if (mode === "select") {
 			selectElement(id, e.evt.shiftKey);
+			e.cancelBubble = true;
 		}
-		e.cancelBubble = true;
 	};
 
 	const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {

@@ -1144,12 +1144,26 @@ export const ERCanvas = forwardRef<ERCanvasRef>((_props, ref) => {
 			let targetEntity = null;
 			let targetRelationship = null;
 
-			// Check if clicking directly on an entity or relationship
-			if (clickedNode && clickedNode.getType() === "Group") {
-				const groupId = clickedNode.id();
-				targetEntity = entities.find((e) => e.id === groupId);
-				if (!targetEntity) {
-					targetRelationship = relationships.find((r) => r.id === groupId);
+			// Check if clicking directly on an entity or relationship (or their children like Rect/Text)
+			if (clickedNode) {
+				const checkNode = (node: typeof clickedNode) => {
+					if (node.getType() === "Group" && node.id()) {
+						const gid = node.id();
+						targetEntity = entities.find((e) => e.id === gid) || null;
+						if (!targetEntity) {
+							targetRelationship = relationships.find((r) => r.id === gid) || null;
+						}
+					}
+				};
+				checkNode(clickedNode);
+				// If clicked a child (Rect, Text), walk up parents
+				if (!targetEntity && !targetRelationship) {
+					let parent = clickedNode.getParent();
+					for (let i = 0; i < 2 && parent; i++) {
+						checkNode(parent);
+						if (targetEntity || targetRelationship) break;
+						parent = parent.getParent();
+					}
 				}
 			}
 
