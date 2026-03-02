@@ -58,52 +58,108 @@ Professor feedback and bug fixes, tracked phase-by-phase.
 
 ---
 
-## Phase 5 — Moodle Integration Notes
+## Phase 5 — Moodle Integration Notes (Raw XML + Java Compatibility)
 
-Reference: [moodle-essay-drawio](https://github.com/slashdotted/moodle-essay-drawio) — Example embedding draw.io in Moodle quiz.
+Reference: [moodle-essay-drawio](https://github.com/slashdotted/moodle-essay-drawio) — embedding pattern we will adapt for ER Editor.
 
-### How moodle-essay-drawio Works
+### Integration Goal
 
-1. **Moodle Essay Question** — Uses essay question type with response format set to *Plain text, monospaced font*.
-2. **Script Injection** — Question text includes a `<script>` tag loading `moodle-essay-drawio.js` and a `<div id="drawio_editor"></div>` container.
-3. **Replace Textarea** — Script hides Moodle's `textarea.form-control` and injects an iframe into the container.
-4. **draw.io Embed URL** — `https://embed.diagrams.net/?embed=1&ui=minimal&saveAndExit=0&noSaveBtn=1&noExitBtn=1&spin=1&proto=json&modified=0`
-5. **postMessage Protocol** — Bidirectional communication:
-   - **init**: draw.io sends init; script responds with `{action: 'load', xml: '...', autosave: 1}` (or `{action: 'load', xml: ''}` for empty).
-   - **save / autosave**: draw.io sends content; script writes `JSON.stringify(data)` to `moodle_textarea.textContent`.
-6. **Persistence** — Moodle saves the textarea value as the student's submission. No server-side integration needed; content is stored in the question response.
-7. **Constraints** — One question per page; one question per page when reviewing attempts.
+- Store **raw ER XML string** directly in Moodle essay textarea (no JSON wrapper).
+- Use iframe + `postMessage` bridge between Moodle page and ER Editor.
+- Keep output compatible with current ER Editor import/export, and provide a clear path for Java app interoperability.
 
-### Adapting for ER Editor
+### Step-by-Step Implementation Plan
 
-| Aspect | draw.io approach | ER Editor approach |
-|--------|------------------|-------------------|
-| **Editor source** | External service (embed.diagrams.net) | Self-hosted; bundle built app or serve from CDN |
-| **Data format** | JSON (draw.io format) | **XML** (ERDesigner-compatible) or JSON |
-| **Container** | Same: div + hide textarea | Same pattern |
-| **postMessage** | Full protocol (init, load, save, autosave) | Need equivalent: init → load diagram XML; save/autosave → write XML to textarea |
-| **UI** | Minimal (noSaveBtn, noExitBtn) | Exam mode: hide menus, toolbar minimal; `?examMode=true` already exists |
+#### Step 1 — Define message contract (freeze before coding)
 
-### ER Editor Integration Checklist
+Use a strict message schema with `source` + `type`:
 
-1. **Build embeddable bundle** — Produce a standalone build loadable via iframe (e.g. `er-editor.html` or `embed.html`).
-2. **postMessage API** — Implement bidirectional protocol:
-   - Listen for `init` from parent → respond with `load` + diagram XML (or empty).
-   - On diagram save/autosave → `postMessage` to parent with `{event: 'save'|'autosave', xml: '...'}`.
-   - Parent script writes `xml` (or a wrapper JSON) to `moodle_textarea.textContent`.
-3. **moodle-essay-er-editor.js** — Create a script analogous to moodle-essay-drawio:
-   - Find `textarea.form-control`, hide it.
-   - Create iframe with `src` pointing to er-editor embed URL.
-   - Handle init/load/save via postMessage; persist XML to textarea.
-4. **Moodle question setup** — Plain text format; Question text: `<script src="...moodle-essay-er-editor.js"></script><div id="er_editor"></div>`.
-5. **Exam mode** — Use `?examMode=true` in embed URL to disable validation toggle, simplify UI.
-6. **Review flow** — When grading, load saved XML into read-only or minimal editor for display.
+- **Parent (Moodle) → Editor iframe**
+  - `{ source: "moodle-er-host", type: "init", xml: "<ERDiagram...>" }`
+  - `{ source: "moodle-er-host", type: "load", xml: "<ERDiagram...>" }`
+  - `{ source: "moodle-er-host", type: "setReadOnly", value: true|false }`
+- **Editor iframe → Parent (Moodle)**
+  - `{ source: "er-editor", type: "ready" }`
+  - `{ source: "er-editor", type: "autosave", xml: "<ERDiagram...>" }`
+  - `{ source: "er-editor", type: "save", xml: "<ERDiagram...>" }`
+  - `{ source: "er-editor", type: "error", message: "..." }`
 
-### Considerations
+#### Step 2 — Add embed mode entrypoint in ER app
 
-- **CORS** — If er-editor is on a different origin, ensure postMessage `origin` checks are correct.
-- **Autosave** — ER editor may need periodic auto-export to XML + postMessage to parent (like draw.io autosave).
-- **One question per page** — Same constraint as draw.io to avoid conflicts.
+- Use URL flags: `?embed=true&examMode=true`.
+- In embed mode:
+  - Keep canvas/tools needed for drawing.
+  - Hide file-import/export actions and non-essential UI.
+  - Keep exam restrictions enabled.
+
+#### Step 3 — Implement iframe bridge inside ER app
+
+- On app boot, send `ready` to parent.
+- Listen for `init` / `load` messages:
+  - Parse incoming XML.
+  - Load into store (`loadDiagram` replace mode).
+- On diagram changes:
+  - Serialize diagram to **standard XML** string.
+  - Debounce and send `autosave`.
+- On blur/unmount/manual trigger:
+  - Send `save` with latest XML.
+
+#### Step 4 — Create `moodle-essay-er-editor.js` host script
+
+- Find `textarea.form-control`, hide it, mount iframe into `<div id="er_editor"></div>`.
+- Use `DOMContentLoaded` (not `window.onload`).
+- On iframe `ready`, send `init` with current `textarea.value` (if empty, send empty XML).
+- On `autosave`/`save`, write XML back to `textarea.value`.
+- Trigger `input`/`change` events after write, so Moodle reliably captures updates.
+
+#### Step 5 — Security hardening
+
+- Validate `event.origin` (no wildcard in production).
+- Validate `source` and `type` fields before processing.
+- Use strict `targetOrigin` in `postMessage`.
+- Ignore unknown events safely.
+
+#### Step 6 — Review/Grading mode
+
+- On attempt review page:
+  - Load stored XML via `init/load`.
+  - Send `setReadOnly: true` (or use `?readOnly=true`).
+  - Disable autosave in read-only mode.
+
+#### Step 7 — End-to-end validation checklist
+
+1. New attempt opens with blank diagram.
+2. Editing triggers autosave and updates textarea.
+3. Reload restores last saved diagram from textarea XML.
+4. Submission stores XML in Moodle response.
+5. Review renders same diagram in read-only mode.
+6. Invalid XML path handled gracefully with user-visible error.
+
+### Java App Compatibility Plan
+
+Canonical storage in Moodle will be **standard ER XML**.
+
+- Why: standard XML is already first-class in this editor and easiest for autosave.
+- Java app compatibility options:
+  1. **Recommended:** keep Moodle storage in standard XML; when needed, convert using existing **Export Java XML** flow.
+  2. **Optional enhancement:** add embed query param `format=java` so iframe autosave emits Java XML directly for Moodle instances that require it.
+
+This keeps Moodle integration simple now while preserving interoperability with the Java app ecosystem.
+
+### Moodle Question Setup Template
+
+Use Essay question with plain text response format, and include:
+
+```html
+<script src=".../moodle-essay-er-editor.js"></script>
+<div id="er_editor"></div>
+```
+
+### Operational Notes
+
+- One essay editor question per page remains the safest setup.
+- If cross-origin hosting is used, keep origin allowlists in sync between script and iframe app.
+- Log protocol errors in console during rollout, then reduce logging once stable.
 
 ---
 

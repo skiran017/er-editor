@@ -59,6 +59,8 @@ interface ToolbarProps {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
+	const embedMode =
+		new URLSearchParams(window.location.search).get("embed") === "true";
 	const mode = useEditorStore((state) => state.mode);
 	const setMode = useEditorStore((state) => state.setMode);
 	const setZoom = useEditorStore((state) => state.setZoom);
@@ -413,17 +415,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({ stageRef }) => {
 				</AlertDialogContent>
 			</AlertDialog>
 
-			{/* Hamburger Menu - Separate, fixed at top-left */}
-			<div className="fixed top-4 left-4 z-50">
-				<Menu
-					onImport={handleImport}
-					onExportXML={() => handleExport("standard")}
-					onExportJavaXML={() => handleExport("java")}
-					onExportImage={handleExportImage}
-					onResetCanvas={handleResetCanvas}
-					onShowShortcuts={handleShowShortcuts}
-				/>
-			</div>
+			{/* Hamburger Menu - hidden in embed mode */}
+			{!embedMode && (
+				<div className="fixed top-4 left-4 z-50">
+					<Menu
+						onImport={handleImport}
+						onExportXML={() => handleExport("standard")}
+						onExportJavaXML={() => handleExport("java")}
+						onExportImage={handleExportImage}
+						onResetCanvas={handleResetCanvas}
+						onShowShortcuts={handleShowShortcuts}
+					/>
+				</div>
+			)}
 
 			{/* Toolbar - Scrollable on mobile, centered on desktop */}
 			<div className="fixed bottom-4 left-4 right-4 md:bottom-auto md:top-4 md:left-1/2 md:-translate-x-1/2 md:right-auto z-50 md:max-w-max">
