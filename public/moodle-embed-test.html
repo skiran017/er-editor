@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>ER Editor Moodle Embed Test</title>
+	<style>
+		body {
+			font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+			margin: 0;
+			padding: 24px;
+			background: #f8fafc;
+			color: #0f172a;
+		}
+		.wrap {
+			max-width: 1100px;
+			margin: 0 auto;
+			display: grid;
+			gap: 16px;
+		}
+		.panel {
+			background: #fff;
+			border: 1px solid #e2e8f0;
+			border-radius: 10px;
+			padding: 12px;
+		}
+		#er_editor {
+			border: 1px solid #cbd5e1;
+			border-radius: 10px;
+			min-height: 550px;
+			overflow: hidden;
+			background: #fff;
+		}
+		textarea.form-control {
+			width: 100%;
+			min-height: 150px;
+			font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		}
+		.hint {
+			font-size: 14px;
+			color: #475569;
+		}
+		.debug-toolbar {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			margin-bottom: 10px;
+			flex-wrap: wrap;
+		}
+		.debug-btn {
+			border: 1px solid #cbd5e1;
+			background: #f8fafc;
+			color: #0f172a;
+			padding: 6px 10px;
+			border-radius: 6px;
+			cursor: pointer;
+			font-size: 12px;
+		}
+		.debug-btn:hover {
+			background: #eef2ff;
+		}
+		.debug-log {
+			margin: 0;
+			padding-left: 18px;
+			max-height: 130px;
+			overflow: auto;
+			font-size: 12px;
+			color: #334155;
+		}
+		.debug-log li {
+			margin: 2px 0;
+		}
+		.debug-xml {
+			margin-top: 10px;
+			padding: 10px;
+			background: #0f172a;
+			color: #e2e8f0;
+			border-radius: 8px;
+			font-size: 12px;
+			line-height: 1.45;
+			white-space: pre-wrap;
+			word-break: break-word;
+			max-height: 220px;
+			overflow: auto;
+		}
+	</style>
+</head>
+<body>
+	<div class="wrap">
+		<div class="panel">
+			<h2 style="margin: 0 0 8px;">ER Editor Embed</h2>
+			<p class="hint" style="margin: 0;">
+				This simulates Moodle essay behavior locally: textarea is hidden by script,
+				iframe editor is mounted, and raw XML is synced through postMessage.
+			</p>
+		</div>
+
+		<div class="panel">
+			<h3 style="margin: 0 0 8px;">Debug</h3>
+			<p class="hint" style="margin: 0 0 10px;">
+				Last message from editor:
+				<strong id="debug-message-type">none</strong>
+				at
+				<strong id="debug-message-time">--:--:--</strong>
+			</p>
+			<div class="debug-toolbar">
+				<button id="copy-latest-xml" class="debug-btn" type="button">Copy latest XML</button>
+				<button id="clear-debug-log" class="debug-btn" type="button">Clear log</button>
+			</div>
+			<ol id="debug-log" class="debug-log">
+				<li>No events yet.</li>
+			</ol>
+			<pre id="debug-xml-preview" class="debug-xml">(No XML payload yet)</pre>
+		</div>
+
+		<div id="er_editor" class="panel"></div>
+
+		<div class="panel" id="question-42">
+			<h3 style="margin-top: 0;">Simulated Moodle textarea</h3>
+			<textarea
+				name="question_answer"
+				class="form-control"
+				id="question_answer_id"
+				rows="25"
+				cols="60"
+				placeholder="Raw XML will be stored here by autosave..."
+			></textarea>
+		</div>
+	</div>
+
+	<script src="./moodle-essay-er-editor.js"></script>
+	<script>
+		(function () {
+			const typeEl = document.getElementById("debug-message-type");
+			const timeEl = document.getElementById("debug-message-time");
+			const logEl = document.getElementById("debug-log");
+			const xmlPreviewEl = document.getElementById("debug-xml-preview");
+			const copyBtn = document.getElementById("copy-latest-xml");
+			const clearBtn = document.getElementById("clear-debug-log");
+			const iframe = document.querySelector("#er_editor iframe");
+			const expectedOrigin = iframe ? new URL(iframe.src).origin : "https://er-editor.vercel.app";
+			const MAX_LOG_ITEMS = 12;
+			const PREVIEW_LIMIT = 1200;
+			let latestXml = "";
+
+			function addLogLine(type) {
+				const item = document.createElement("li");
+				item.textContent = `${new Date().toLocaleTimeString()} — ${type}`;
+				const noEvents = logEl.querySelector("li");
+				if (noEvents && noEvents.textContent === "No events yet.") {
+					logEl.innerHTML = "";
+				}
+				logEl.prepend(item);
+				while (logEl.children.length > MAX_LOG_ITEMS) {
+					logEl.removeChild(logEl.lastChild);
+				}
+			}
+
+			function updateXmlPreview(xml) {
+				if (!xml) {
+					xmlPreviewEl.textContent = "(No XML payload yet)";
+					return;
+				}
+				const trimmed = xml.length > PREVIEW_LIMIT ? `${xml.slice(0, PREVIEW_LIMIT)}\n\n... (truncated)` : xml;
+				xmlPreviewEl.textContent = trimmed;
+			}
+
+			window.addEventListener("message", function (evt) {
+				if (evt.origin !== expectedOrigin) return;
+				const data = evt.data;
+				if (!data || data.source !== "er-editor" || typeof data.type !== "string") {
+					return;
+				}
+
+				typeEl.textContent = data.type;
+				timeEl.textContent = new Date().toLocaleTimeString();
+				addLogLine(data.type);
+
+				if (typeof data.xml === "string") {
+					latestXml = data.xml;
+					updateXmlPreview(latestXml);
+				}
+			});
+
+			copyBtn.addEventListener("click", async function () {
+				if (!latestXml) return;
+				try {
+					await navigator.clipboard.writeText(latestXml);
+					copyBtn.textContent = "Copied!";
+					setTimeout(() => {
+						copyBtn.textContent = "Copy latest XML";
+					}, 1200);
+				} catch {
+					copyBtn.textContent = "Copy failed";
+					setTimeout(() => {
+						copyBtn.textContent = "Copy latest XML";
+					}, 1200);
+				}
+			});
+
+			clearBtn.addEventListener("click", function () {
+				logEl.innerHTML = "<li>No events yet.</li>";
+				latestXml = "";
+				updateXmlPreview("");
+			});
+		})();
+	</script>
+</body>
+</html>

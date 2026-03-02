@@ -5,6 +5,9 @@ import { PropertyPanel } from "./components/properties/PropertyPanel";
 import { ToastContainer, useToast } from "./components/ui/toast";
 import { useEditorStore } from "./store/editorStore";
 import { useThemeStore } from "./store/themeStore";
+import { parseXMLToDiagram } from "./lib/xmlParser";
+import { serializeDiagramToXML } from "./lib/xmlSerializer";
+import type { Diagram } from "./types";
 
 function App() {
 	const setMode = useEditorStore((state) => state.setMode);
@@ -20,10 +23,129 @@ function App() {
 	// Initialize exam mode from query parameter
 	useEffect(() => {
 		const urlParams = new URLSearchParams(window.location.search);
+		const embedMode = urlParams.get("embed") === "true";
 		const examModeParam = urlParams.get("examMode");
-		// Default: false, only enabled if ?examMode=true
-		const examMode = examModeParam === "true";
+		// In embed mode, default to exam mode unless explicitly disabled.
+		const examMode =
+			examModeParam === "true" || (embedMode && examModeParam !== "false");
 		useEditorStore.getState().setExamMode(examMode);
+	}, []);
+
+	// Moodle/embed bridge: raw XML in postMessage payloads.
+	useEffect(() => {
+		const urlParams = new URLSearchParams(window.location.search);
+		const embedMode = urlParams.get("embed") === "true";
+		if (!embedMode || window.parent === window) return;
+
+		const parentOriginParam = urlParams.get("parentOrigin");
+		let targetOrigin = "*";
+		if (parentOriginParam) {
+			targetOrigin = parentOriginParam;
+		} else if (document.referrer) {
+			try {
+				targetOrigin = new URL(document.referrer).origin;
+			} catch {
+				targetOrigin = "*";
+			}
+		}
+
+		const postToParent = (payload: Record<string, unknown>) => {
+			window.parent.postMessage(
+				{ source: "er-editor", ...payload },
+				targetOrigin,
+			);
+		};
+
+		const loadEmptyDiagram = () => {
+			const emptyDiagram: Diagram = {
+				entities: [],
+				relationships: [],
+				connections: [],
+				generalizations: [],
+				lines: [],
+				arrows: [],
+				attributes: [],
+			};
+			useEditorStore.getState().loadDiagram(emptyDiagram, true);
+		};
+
+		const saveAndPost = (eventType: "save" | "autosave") => {
+			try {
+				const xml = serializeDiagramToXML(useEditorStore.getState().diagram);
+				postToParent({ type: eventType, xml });
+			} catch (error) {
+				postToParent({
+					type: "error",
+					message:
+						error instanceof Error
+							? error.message
+							: "Failed to serialize diagram",
+				});
+			}
+		};
+
+		let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
+		const scheduleAutosave = () => {
+			if (autosaveTimeout) clearTimeout(autosaveTimeout);
+			autosaveTimeout = setTimeout(() => {
+				saveAndPost("autosave");
+				autosaveTimeout = null;
+			}, 800);
+		};
+
+		const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+			if (state.diagram !== prevState.diagram) {
+				scheduleAutosave();
+			}
+		});
+
+		const handleMessage = (event: MessageEvent) => {
+			if (targetOrigin !== "*" && event.origin !== targetOrigin) return;
+			const data = event.data;
+			if (!data || typeof data !== "object") return;
+
+			const source = (data as { source?: unknown }).source;
+			const type = (data as { type?: unknown }).type;
+			if (source !== "moodle-er-host" || typeof type !== "string") return;
+
+			if (type === "init" || type === "load") {
+				try {
+					const xml = (data as { xml?: unknown }).xml;
+					if (typeof xml === "string" && xml.trim().length > 0) {
+						const parsed = parseXMLToDiagram(xml);
+						useEditorStore.getState().loadDiagram(parsed, true);
+					} else {
+						loadEmptyDiagram();
+					}
+				} catch (error) {
+					postToParent({
+						type: "error",
+						message:
+							error instanceof Error
+								? error.message
+								: "Failed to load provided XML",
+					});
+				}
+			}
+		};
+
+		const handlePageHide = () => {
+			saveAndPost("save");
+		};
+
+		window.addEventListener("message", handleMessage);
+		window.addEventListener("pagehide", handlePageHide);
+		window.addEventListener("beforeunload", handlePageHide);
+
+		postToParent({ type: "ready" });
+
+		return () => {
+			window.removeEventListener("message", handleMessage);
+			window.removeEventListener("pagehide", handlePageHide);
+			window.removeEventListener("beforeunload", handlePageHide);
+			if (autosaveTimeout) clearTimeout(autosaveTimeout);
+			unsubscribe();
+		};
 	}, []);
 
 	// Keyboard shortcuts
