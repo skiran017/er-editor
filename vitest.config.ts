@@ -20,6 +20,20 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       exclude: ['src/legacy/**', '**/*.test.{ts,tsx}', '**/.gitkeep', 'tests/**'],
+      thresholds: {
+        'src/domain/**': {
+          statements: 95,
+          branches: 90,
+          functions: 95,
+          lines: 95,
+        },
+        'src/notation/chen/rules/**': {
+          statements: 90,
+          branches: 85,
+          functions: 90,
+          lines: 90,
+        },
+      },
     },
   },
 })
