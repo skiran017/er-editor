@@ -14,7 +14,6 @@ export {
   type RubberbandState,
   type SelectionPayload,
 } from './selectionStore'
-export { useInteractionStore, type InteractionStoreState } from './interactionStore'
 export { useValidationStore, type ValidationStoreState } from './validationStore'
 export {
   useUiStore,
