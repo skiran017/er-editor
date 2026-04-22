@@ -208,13 +208,15 @@ export const orphanEntityWarningRule: ValidationRule = {
   check: (diagram) => {
     const out: ValidationError[] = []
     for (const e of nodesByKind(diagram, 'entity')) {
-      const hasRelationship = incidentEdges(diagram, e.id).some((edge) => {
+      const edges = incidentEdges(diagram, e.id)
+      const hasRelationship = edges.some((edge) => {
         if (!isEntityRelationshipEdge(edge)) return false
         const otherId = edge.sourceId === e.id ? edge.targetId : edge.sourceId
         const other = diagram.nodesById[otherId]
         return !!other && isRelationshipNode(other)
       })
-      if (!hasRelationship) {
+      const hasIsaParticipation = edges.some(isIsaEdge)
+      if (!hasRelationship && !hasIsaParticipation) {
         out.push(err('chen.entity.orphan-warning', e.id, 'validation.chen.entity.orphan-warning', 'warning'))
       }
     }
