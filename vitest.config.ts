@@ -33,6 +33,18 @@ export default defineConfig({
           functions: 90,
           lines: 90,
         },
+        'src/state/**': {
+          statements: 85,
+          branches: 80,
+          functions: 85,
+          lines: 85,
+        },
+        'src/app/**': {
+          statements: 85,
+          branches: 80,
+          functions: 85,
+          lines: 85,
+        },
       },
     },
   },
