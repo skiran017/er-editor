@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, afterEach, afterAll } from 'vitest'
+import i18next from 'i18next'
 import { initI18n } from './init'
 
 describe('initI18n', () => {
-  beforeEach(async () => {
-    // i18next is a singleton; tests can assume it's already initialised after the first call.
+  afterEach(async () => {
+    // Singleton survives across files; always leave it in English for downstream suites.
+    if (i18next.isInitialized) await i18next.changeLanguage('en')
   })
 
   it('resolves after initialisation', async () => {
@@ -41,4 +43,15 @@ describe('initI18n', () => {
     expect(i.t('save', { ns: 'common' })).toBeTruthy()
     await i.changeLanguage('en')
   })
+
+  it('parallel calls share a single in-flight init (race-safe)', async () => {
+    const [a, b, c] = await Promise.all([initI18n(), initI18n(), initI18n()])
+    expect(a).toBe(b)
+    expect(b).toBe(c)
+    expect(a.isInitialized).toBe(true)
+  })
+})
+
+afterAll(async () => {
+  if (i18next.isInitialized) await i18next.changeLanguage('en')
 })

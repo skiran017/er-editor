@@ -35,16 +35,22 @@ const resources = {
   },
 } as const
 
+let inFlight: Promise<typeof i18next> | null = null
+
 export const initI18n = async (): Promise<typeof i18next> => {
   if (i18next.isInitialized) return i18next
-  await i18next.use(initReactI18next).init({
-    resources,
-    lng: 'en', // Phase 7 will read `?lang=…` and write this.
-    fallbackLng: 'en',
-    ns: ['common', 'toolbar', 'menu', 'properties', 'modals', 'validation'],
-    defaultNS: 'common',
-    interpolation: { escapeValue: false },
-    returnNull: false,
-  })
-  return i18next
+  if (inFlight) return inFlight
+  inFlight = (async () => {
+    await i18next.use(initReactI18next).init({
+      resources,
+      lng: 'en', // Phase 7 will read `?lang=…` and write this.
+      fallbackLng: 'en',
+      ns: ['common', 'toolbar', 'menu', 'properties', 'modals', 'validation'],
+      defaultNS: 'common',
+      interpolation: { escapeValue: false },
+      returnNull: false,
+    })
+    return i18next
+  })()
+  return inFlight
 }
