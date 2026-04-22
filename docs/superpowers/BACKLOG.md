@@ -56,6 +56,11 @@ Tooling decision (VitePress / Docusaurus / Astro Starlight), information archite
 - Known prior gaps to re-verify against the real file: entity sizing (Java 80×40), orthogonal connection routing, relationship dynamic sizing, ID numeric↔nanoid mapping stability across round-trips.
 - **Native-JSON format naming:** when the SUPSI sample arrives, review its element tags and group our native-JSON output shape to minimise codec transform cost (shape-alignment only — the domain model stays clean and notation-agnostic).
 
+## Phase 8 pre-cutover bundle-size audit checklist
+
+- **Dual Zustand versions** in the runtime bundle: `@xyflow/react@12` bundles its own internal `zustand@4.x` while our stores use `zustand@5.x`. Both land in production unless tree-shaking eliminates one — verify during the Phase 8 <500 KB gzip target check.
+- **Dual nanoid versions**: `nanoid@3` (transitive via `postcss`) vs our declared `nanoid@5`. Tiny package, but note during the same audit.
+
 ## Deferred / removed from v1 scope (revisit when relevant)
 
 - **Free-form lines & arrows** (removed) — revisit only if students/profs request annotation capabilities.

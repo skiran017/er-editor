@@ -6,7 +6,7 @@
 
 **Architecture:** Stepwise migration on the `v2` branch. Each step is small, committed, and keeps the repo in a known state. No code from v1 is deleted yet — `legacy/` stays as reference until the v2 rewrite reaches parity (Phase 8). ESLint blocks imports from `legacy/` so the new tree cannot accidentally depend on it. `tsconfig.app.json` excludes `legacy/` from the build so the new app can remove Konva cleanly.
 
-**Tech Stack:** React 19 + TypeScript + Vite 7 + Tailwind v4 + `@xyflow/react` 12 + `xstate` 5 + Zustand 5 + Immer 10 + Zundo 2 + Vitest 3 + Playwright 1.49 + pnpm. ESLint 9 flat config.
+**Tech Stack:** React 19 + TypeScript + Vite 7 + Tailwind v4 + `@xyflow/react` 12 + `xstate` 5 + Zustand 5 + Immer 10 + Zundo 2 + Vitest 3 + Playwright 1.x (resolves current) + pnpm. ESLint 9 flat config.
 
 **Reference spec:** [docs/superpowers/specs/2026-04-22-target-architecture-design.md](../specs/2026-04-22-target-architecture-design.md) — the authoritative design doc. When this plan and the spec conflict, the spec wins.
 
