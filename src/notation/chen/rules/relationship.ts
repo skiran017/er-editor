@@ -42,8 +42,7 @@ export const relationshipCardinalityRequiredRule: ValidationRule = {
     for (const r of nodesByKind(diagram, 'relationship')) {
       for (const edge of incidentERs(diagram, r.id)) {
         if (!VALID.has(String(edge.cardinality).trim())) {
-          out.push(err('chen.relationship.cardinality-required', r.id, 'validation.chen.relationship.cardinality-required'))
-          break
+          out.push(err('chen.relationship.cardinality-required', edge.id, 'validation.chen.relationship.cardinality-required'))
         }
       }
     }
@@ -61,8 +60,7 @@ export const relationshipParticipationRequiredRule: ValidationRule = {
     for (const r of nodesByKind(diagram, 'relationship')) {
       for (const edge of incidentERs(diagram, r.id)) {
         if (!VALID.has(String(edge.participation))) {
-          out.push(err('chen.relationship.participation-required', r.id, 'validation.chen.relationship.participation-required'))
-          break
+          out.push(err('chen.relationship.participation-required', edge.id, 'validation.chen.relationship.participation-required'))
         }
       }
     }
@@ -96,11 +94,11 @@ export const nonIdentifyingNotWeakRule: ValidationRule = {
   check: (diagram) => {
     const out: ValidationError[] = []
     for (const r of nodesByKind(diagram, 'relationship')) {
-      if (!r.isIdentifying) continue
+      if (r.isIdentifying) continue
       const hasWeak = connectedEntityIds(diagram, r.id)
         .map((id) => diagram.nodesById[id])
         .some((n) => n && isEntityNode(n) && n.isWeak)
-      if (!hasWeak) {
+      if (hasWeak) {
         out.push(err('chen.relationship.non-identifying-not-weak', r.id, 'validation.chen.relationship.non-identifying-not-weak'))
       }
     }

@@ -1794,7 +1794,7 @@ Create `src/platform/i18n/locales/en/validation.json`:
         "cardinality-required": "All connections on this relationship must have cardinality defined.",
         "participation-required": "All connections on this relationship must have participation defined.",
         "identifying-needs-weak": "Identifying relationship must connect at least one weak entity.",
-        "non-identifying-not-weak": "Non-identifying relationship should not be marked as identifying.",
+        "non-identifying-not-weak": "Non-identifying relationship is connected to a weak entity; it should probably be marked identifying.",
         "name-unique": "Relationship name \"{{name}}\" is already used by another relationship.",
         "recursive-roles-distinct": "Recursive relationship must have distinct, non-empty roles on both edges."
       },
@@ -1850,7 +1850,7 @@ Create `src/platform/i18n/locales/it/validation.json` (English fallback values; 
         "cardinality-required": "All connections on this relationship must have cardinality defined.",
         "participation-required": "All connections on this relationship must have participation defined.",
         "identifying-needs-weak": "Identifying relationship must connect at least one weak entity.",
-        "non-identifying-not-weak": "Non-identifying relationship should not be marked as identifying.",
+        "non-identifying-not-weak": "Non-identifying relationship is connected to a weak entity; it should probably be marked identifying.",
         "name-unique": "Relationship name \"{{name}}\" is already used by another relationship.",
         "recursive-roles-distinct": "Recursive relationship must have distinct, non-empty roles on both edges."
       },
@@ -2458,7 +2458,7 @@ Rule ids:
 | `chen.relationship.cardinality-required` | error | Every incident ER edge has cardinality set. |
 | `chen.relationship.participation-required` | error | Every incident ER edge has participation set. |
 | `chen.relationship.identifying-needs-weak` | error | Identifying relationship connects ≥1 weak entity. |
-| `chen.relationship.non-identifying-not-weak` | error | Non-identifying relationship should not be marked identifying (structural placeholder — will surface when import sets identifying=true without any weak participant). |
+| `chen.relationship.non-identifying-not-weak` | error | Non-identifying relationship connecting a weak entity (user likely meant to mark it identifying). |
 | `chen.relationship.name-unique` | error | Relationship names unique (case-insensitive). |
 | `chen.relationship.recursive-roles-distinct` | error | Recursive edges have distinct non-empty roles. |
 
@@ -2503,7 +2503,7 @@ describe('relationshipMinTwoEntitiesRule', () => {
 })
 
 describe('relationshipCardinalityRequiredRule', () => {
-  it('fires when an incident ER edge has no cardinality', () => {
+  it('fires per-edge when an incident ER edge has no cardinality', () => {
     const e1 = makeEntity({ name: 'A' })
     const e2 = makeEntity({ name: 'B' })
     const r = makeRelationship({ name: 'Rel' })
@@ -2511,7 +2511,7 @@ describe('relationshipCardinalityRequiredRule', () => {
     // Force invalid (cast for test)
     ;(bad as { cardinality: unknown }).cardinality = ''
     const d = makeDiagram([e1, e2, r], [bad, makeEREdge(e2.id, r.id)])
-    expect(relationshipCardinalityRequiredRule.check(d).map((x) => x.targetId)).toContain(r.id)
+    expect(relationshipCardinalityRequiredRule.check(d).map((x) => x.targetId)).toContain(bad.id)
   })
 
   it('does not fire on healthy relationship', () => {
@@ -2520,14 +2520,14 @@ describe('relationshipCardinalityRequiredRule', () => {
 })
 
 describe('relationshipParticipationRequiredRule', () => {
-  it('fires when an incident ER edge has invalid participation', () => {
+  it('fires per-edge when an incident ER edge has invalid participation', () => {
     const e1 = makeEntity({ name: 'A' })
     const e2 = makeEntity({ name: 'B' })
     const r = makeRelationship({ name: 'Rel' })
     const bad = makeEREdge(e1.id, r.id)
     ;(bad as { participation: unknown }).participation = 'maybe'
     const d = makeDiagram([e1, e2, r], [bad, makeEREdge(e2.id, r.id)])
-    expect(relationshipParticipationRequiredRule.check(d).map((x) => x.targetId)).toContain(r.id)
+    expect(relationshipParticipationRequiredRule.check(d).map((x) => x.targetId)).toContain(bad.id)
   })
 
   it('does not fire on healthy relationship', () => {
@@ -2553,25 +2553,24 @@ describe('identifyingRelationshipNeedsWeakRule', () => {
 })
 
 describe('nonIdentifyingNotWeakRule', () => {
-  // This rule catches imported data where isIdentifying=true is set but no weak entity
-  // participates — effectively equivalent to identifyingRelationshipNeedsWeakRule, but the
-  // rule-id surfaces a different message for the inverse lens (user marked it identifying by mistake).
-  it('fires when isIdentifying=true but no weak participant', () => {
-    const a = makeEntity({ name: 'A' })
-    const b = makeEntity({ name: 'B' })
-    const r = makeRelationship({ name: 'R', isIdentifying: true })
-    const d = makeDiagram([a, b, r], [
-      makeEREdge(a.id, r.id, { cardinality: '1', participation: 'partial' }),
-      makeEREdge(b.id, r.id, { cardinality: 'N', participation: 'total' }),
+  // Fires when a non-identifying relationship connects a weak entity — the user
+  // likely meant to mark the relationship as identifying.
+  it('fires when non-identifying rel connects a weak entity', () => {
+    const strong = makeEntity({ name: 'Building' })
+    const weak = makeEntity({ name: 'Room', isWeak: true })
+    const r = makeRelationship({ name: 'R', isIdentifying: false })
+    const d = makeDiagram([strong, weak, r], [
+      makeEREdge(strong.id, r.id, { cardinality: '1', participation: 'partial' }),
+      makeEREdge(weak.id, r.id, { cardinality: 'N', participation: 'total' }),
     ])
     expect(nonIdentifyingNotWeakRule.check(d).map((x) => x.targetId)).toContain(r.id)
   })
 
-  it('does not fire for a non-identifying relationship', () => {
+  it('does not fire for a non-identifying rel with no weak participants', () => {
     expect(nonIdentifyingNotWeakRule.check(naryRelationship())).toEqual([])
   })
 
-  it('does not fire when identifying relationship has a weak participant', () => {
+  it('does not fire for an identifying rel with a weak participant', () => {
     expect(nonIdentifyingNotWeakRule.check(weakEntityWithDiscriminant())).toEqual([])
   })
 })
@@ -2689,8 +2688,7 @@ export const relationshipCardinalityRequiredRule: ValidationRule = {
     for (const r of nodesByKind(diagram, 'relationship')) {
       for (const edge of incidentERs(diagram, r.id)) {
         if (!VALID.has(String(edge.cardinality).trim())) {
-          out.push(err('chen.relationship.cardinality-required', r.id, 'validation.chen.relationship.cardinality-required'))
-          break
+          out.push(err('chen.relationship.cardinality-required', edge.id, 'validation.chen.relationship.cardinality-required'))
         }
       }
     }
@@ -2708,8 +2706,7 @@ export const relationshipParticipationRequiredRule: ValidationRule = {
     for (const r of nodesByKind(diagram, 'relationship')) {
       for (const edge of incidentERs(diagram, r.id)) {
         if (!VALID.has(String(edge.participation))) {
-          out.push(err('chen.relationship.participation-required', r.id, 'validation.chen.relationship.participation-required'))
-          break
+          out.push(err('chen.relationship.participation-required', edge.id, 'validation.chen.relationship.participation-required'))
         }
       }
     }
@@ -2743,11 +2740,11 @@ export const nonIdentifyingNotWeakRule: ValidationRule = {
   check: (diagram) => {
     const out: ValidationError[] = []
     for (const r of nodesByKind(diagram, 'relationship')) {
-      if (!r.isIdentifying) continue
+      if (r.isIdentifying) continue
       const hasWeak = connectedEntityIds(diagram, r.id)
         .map((id) => diagram.nodesById[id])
         .some((n) => n && isEntityNode(n) && n.isWeak)
-      if (!hasWeak) {
+      if (hasWeak) {
         out.push(err('chen.relationship.non-identifying-not-weak', r.id, 'validation.chen.relationship.non-identifying-not-weak'))
       }
     }

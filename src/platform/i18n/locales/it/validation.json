@@ -18,7 +18,7 @@
         "cardinality-required": "All connections on this relationship must have cardinality defined.",
         "participation-required": "All connections on this relationship must have participation defined.",
         "identifying-needs-weak": "Identifying relationship must connect at least one weak entity.",
-        "non-identifying-not-weak": "Non-identifying relationship should not be marked as identifying.",
+        "non-identifying-not-weak": "Non-identifying relationship is connected to a weak entity; it should probably be marked identifying.",
         "name-unique": "Relationship name \"{{name}}\" is already used by another relationship.",
         "recursive-roles-distinct": "Recursive relationship must have distinct, non-empty roles on both edges."
       },
