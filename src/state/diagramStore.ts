@@ -9,6 +9,93 @@ import type {
 } from '@/domain/types'
 import type { NodeInput, EdgeInput, DiagramPatch } from './types'
 
+// Writeable view over Diagram. Domain types are deeply `readonly` so consumers
+// can't mutate, but inside Immer drafts the same fields ARE mutable. Centralise
+// the cast here; store actions work against `MutableDiagram` through `asMut`.
+interface MutableDiagram {
+  schemaVersion: 1
+  nodesById: Record<NodeId, ERNode>
+  edgesById: Record<EdgeId, ERLink>
+  nodeOrder: NodeId[]
+  edgeOrder: EdgeId[]
+}
+
+const asMut = (d: Diagram): MutableDiagram => d as unknown as MutableDiagram
+
+// ——— pure-helper mutators (operate on MutableDiagram) ———
+
+const addNodeInto = (d: MutableDiagram, node: ERNode): void => {
+  d.nodesById[node.id] = node
+  d.nodeOrder.push(node.id)
+}
+
+const updateNodeInto = (d: MutableDiagram, id: NodeId, patch: Partial<ERNode>): void => {
+  const existing = d.nodesById[id]
+  if (!existing) return
+  d.nodesById[id] = { ...existing, ...patch } as ERNode
+}
+
+const addEdgeInto = (d: MutableDiagram, edge: ERLink): void => {
+  d.edgesById[edge.id] = edge
+  d.edgeOrder.push(edge.id)
+}
+
+const updateEdgeInto = (d: MutableDiagram, id: EdgeId, patch: Partial<ERLink>): void => {
+  const existing = d.edgesById[id]
+  if (!existing) return
+  d.edgesById[id] = { ...existing, ...patch } as ERLink
+}
+
+const removeEdgeFrom = (d: MutableDiagram, id: EdgeId): void => {
+  if (!d.edgesById[id]) return
+  delete d.edgesById[id]
+  d.edgeOrder = d.edgeOrder.filter((x) => x !== id)
+}
+
+const removeNodeFrom = (d: MutableDiagram, id: NodeId): void => {
+  if (!d.nodesById[id]) return
+  delete d.nodesById[id]
+  d.nodeOrder = d.nodeOrder.filter((x) => x !== id)
+  const keep: EdgeId[] = []
+  for (const edgeId of d.edgeOrder) {
+    const e = d.edgesById[edgeId]
+    if (!e) continue
+    if (e.sourceId === id || e.targetId === id) {
+      delete d.edgesById[edgeId]
+    } else {
+      keep.push(edgeId)
+    }
+  }
+  d.edgeOrder = keep
+}
+
+const applyPatchTo = (d: MutableDiagram, patch: DiagramPatch): void => {
+  for (const id of patch.removeEdges ?? []) removeEdgeFrom(d, id)
+  for (const id of patch.removeNodes ?? []) removeNodeFrom(d, id)
+  for (const node of patch.addNodes ?? []) addNodeInto(d, node)
+  for (const edge of patch.addEdges ?? []) addEdgeInto(d, edge)
+  for (const { id, patch: p } of patch.updateNodes ?? []) updateNodeInto(d, id, p)
+  for (const { id, patch: p } of patch.updateEdges ?? []) updateEdgeInto(d, id, p)
+}
+
+const reorderTo = (
+  d: MutableDiagram,
+  id: NodeId | EdgeId,
+  mode: 'front' | 'back',
+): void => {
+  if (d.nodesById[id as NodeId]) {
+    d.nodeOrder = d.nodeOrder.filter((x) => x !== id)
+    if (mode === 'front') d.nodeOrder.push(id as NodeId)
+    else d.nodeOrder.unshift(id as NodeId)
+  } else if (d.edgesById[id as EdgeId]) {
+    d.edgeOrder = d.edgeOrder.filter((x) => x !== id)
+    if (mode === 'front') d.edgeOrder.push(id as EdgeId)
+    else d.edgeOrder.unshift(id as EdgeId)
+  }
+}
+
+// ——— public store ———
+
 export interface DiagramStoreState {
   readonly diagram: Diagram
   // Node operations
@@ -40,23 +127,18 @@ export const useDiagramStore = create<DiagramStoreState>()(
           const id = newNodeId()
           set((state) => {
             const node = { ...input, id } as ERNode
-            ;(state.diagram.nodesById as Record<NodeId, ERNode>)[id] = node
-            ;(state.diagram.nodeOrder as NodeId[]).push(id)
+            addNodeInto(asMut(state.diagram), node)
           })
           return id
         },
 
         updateNode: (id, patch) => {
-          set((state) => {
-            const existing = state.diagram.nodesById[id]
-            if (!existing) return
-            ;(state.diagram.nodesById as Record<NodeId, ERNode>)[id] = { ...existing, ...patch } as ERNode
-          })
+          set((state) => { updateNodeInto(asMut(state.diagram), id, patch) })
         },
 
         moveNode: (id, to) => {
           set((state) => {
-            const n = (state.diagram.nodesById as Record<NodeId, ERNode>)[id]
+            const n = asMut(state.diagram).nodesById[id]
             if (!n) return
             ;(n as { position: Point }).position = to
           })
@@ -64,108 +146,43 @@ export const useDiagramStore = create<DiagramStoreState>()(
 
         resizeNode: (id, to) => {
           set((state) => {
-            const n = (state.diagram.nodesById as Record<NodeId, ERNode>)[id]
+            const n = asMut(state.diagram).nodesById[id]
             if (!n) return
             ;(n as { size: Size }).size = to
           })
         },
 
         removeNode: (id) => {
-          set((state) => {
-            if (!state.diagram.nodesById[id]) return
-            delete (state.diagram.nodesById as Record<NodeId, ERNode>)[id]
-            ;(state.diagram as { nodeOrder: NodeId[] }).nodeOrder = (state.diagram.nodeOrder as NodeId[]).filter((x) => x !== id)
-            const keepEdges: EdgeId[] = []
-            for (const edgeId of state.diagram.edgeOrder) {
-              const e = state.diagram.edgesById[edgeId]
-              if (!e) continue
-              if (e.sourceId === id || e.targetId === id) {
-                delete (state.diagram.edgesById as Record<EdgeId, ERLink>)[edgeId]
-              } else {
-                keepEdges.push(edgeId)
-              }
-            }
-            ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder = keepEdges
-          })
+          set((state) => { removeNodeFrom(asMut(state.diagram), id) })
         },
 
         addEdge: (input) => {
           const id = newEdgeId()
           set((state) => {
             const edge = { ...input, id } as ERLink
-            ;(state.diagram.edgesById as Record<EdgeId, ERLink>)[id] = edge
-            ;(state.diagram.edgeOrder as EdgeId[]).push(id)
+            addEdgeInto(asMut(state.diagram), edge)
           })
           return id
         },
 
         updateEdge: (id, patch) => {
-          set((state) => {
-            const existing = state.diagram.edgesById[id]
-            if (!existing) return
-            ;(state.diagram.edgesById as Record<EdgeId, ERLink>)[id] = { ...existing, ...patch } as ERLink
-          })
+          set((state) => { updateEdgeInto(asMut(state.diagram), id, patch) })
         },
 
         setWaypoints: (id, waypoints) => {
           set((state) => {
-            const e = (state.diagram.edgesById as Record<EdgeId, ERLink>)[id]
+            const e = asMut(state.diagram).edgesById[id]
             if (!e) return
             ;(e as unknown as { waypoints: Point[] }).waypoints = [...waypoints]
           })
         },
 
         removeEdge: (id) => {
-          set((state) => {
-            if (!state.diagram.edgesById[id]) return
-            delete (state.diagram.edgesById as Record<EdgeId, ERLink>)[id]
-            ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder = (state.diagram.edgeOrder as EdgeId[]).filter((x) => x !== id)
-          })
+          set((state) => { removeEdgeFrom(asMut(state.diagram), id) })
         },
 
         applyPatch: (patch) => {
-          set((state) => {
-            for (const id of patch.removeEdges ?? []) {
-              delete (state.diagram.edgesById as Record<EdgeId, ERLink>)[id]
-              ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder =
-                (state.diagram.edgeOrder as EdgeId[]).filter((x) => x !== id)
-            }
-            for (const id of patch.removeNodes ?? []) {
-              if (!state.diagram.nodesById[id]) continue
-              delete (state.diagram.nodesById as Record<NodeId, ERNode>)[id]
-              ;(state.diagram as { nodeOrder: NodeId[] }).nodeOrder =
-                (state.diagram.nodeOrder as NodeId[]).filter((x) => x !== id)
-              const keep: EdgeId[] = []
-              for (const edgeId of state.diagram.edgeOrder) {
-                const e = state.diagram.edgesById[edgeId]
-                if (!e) continue
-                if (e.sourceId === id || e.targetId === id) {
-                  delete (state.diagram.edgesById as Record<EdgeId, ERLink>)[edgeId]
-                } else {
-                  keep.push(edgeId)
-                }
-              }
-              ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder = keep
-            }
-            for (const node of patch.addNodes ?? []) {
-              ;(state.diagram.nodesById as Record<NodeId, ERNode>)[node.id] = node
-              ;(state.diagram.nodeOrder as NodeId[]).push(node.id)
-            }
-            for (const edge of patch.addEdges ?? []) {
-              ;(state.diagram.edgesById as Record<EdgeId, ERLink>)[edge.id] = edge
-              ;(state.diagram.edgeOrder as EdgeId[]).push(edge.id)
-            }
-            for (const { id, patch: p } of patch.updateNodes ?? []) {
-              const existing = state.diagram.nodesById[id]
-              if (!existing) continue
-              ;(state.diagram.nodesById as Record<NodeId, ERNode>)[id] = { ...existing, ...p } as ERNode
-            }
-            for (const { id, patch: p } of patch.updateEdges ?? []) {
-              const existing = state.diagram.edgesById[id]
-              if (!existing) continue
-              ;(state.diagram.edgesById as Record<EdgeId, ERLink>)[id] = { ...existing, ...p } as ERLink
-            }
-          })
+          set((state) => { applyPatchTo(asMut(state.diagram), patch) })
         },
 
         replaceDiagram: (next) => {
@@ -176,31 +193,11 @@ export const useDiagramStore = create<DiagramStoreState>()(
         },
 
         bringToFront: (id) => {
-          set((state) => {
-            if (state.diagram.nodesById[id as NodeId]) {
-              ;(state.diagram as { nodeOrder: NodeId[] }).nodeOrder =
-                (state.diagram.nodeOrder as NodeId[]).filter((x) => x !== id)
-              ;(state.diagram.nodeOrder as NodeId[]).push(id as NodeId)
-            } else if (state.diagram.edgesById[id as EdgeId]) {
-              ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder =
-                (state.diagram.edgeOrder as EdgeId[]).filter((x) => x !== id)
-              ;(state.diagram.edgeOrder as EdgeId[]).push(id as EdgeId)
-            }
-          })
+          set((state) => { reorderTo(asMut(state.diagram), id, 'front') })
         },
 
         sendToBack: (id) => {
-          set((state) => {
-            if (state.diagram.nodesById[id as NodeId]) {
-              ;(state.diagram as { nodeOrder: NodeId[] }).nodeOrder =
-                (state.diagram.nodeOrder as NodeId[]).filter((x) => x !== id)
-              ;(state.diagram.nodeOrder as NodeId[]).unshift(id as NodeId)
-            } else if (state.diagram.edgesById[id as EdgeId]) {
-              ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder =
-                (state.diagram.edgeOrder as EdgeId[]).filter((x) => x !== id)
-              ;(state.diagram.edgeOrder as EdgeId[]).unshift(id as EdgeId)
-            }
-          })
+          set((state) => { reorderTo(asMut(state.diagram), id, 'back') })
         },
       })),
       {
