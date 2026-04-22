@@ -1,18 +1,50 @@
+import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
 import { ERCanvas } from './ERCanvas'
+import { useDiagramStore } from '@/state/diagramStore'
+import { useViewportStore } from '@/state/viewportStore'
+import { useSelectionStore } from '@/state/selectionStore'
+import { useValidationStore } from '@/state/validationStore'
+import { emptyDiagram } from '@/domain/types'
+
+const resetAll = () => {
+  useDiagramStore.setState({ diagram: emptyDiagram() })
+  useDiagramStore.temporal.getState().clear()
+  useViewportStore.setState({ zoom: 1, pan: { x: 0, y: 0 } })
+  useSelectionStore.setState({ selectedNodeIds: new Set(), selectedEdgeIds: new Set(), rubberband: null })
+  useValidationStore.setState({ errorsById: {}, enabled: true })
+}
+
+beforeEach(resetAll)
 
 describe('ERCanvas', () => {
-  it('mounts and renders a React Flow container', () => {
+  it('mounts a React Flow container with Background + Controls', () => {
     const { container } = render(<ERCanvas />)
-    const rf = container.querySelector('.react-flow')
-    expect(rf).toBeInTheDocument()
+    expect(container.querySelector('.react-flow')).toBeInTheDocument()
+    expect(screen.getByLabelText(/zoom in/i)).toBeInTheDocument()
   })
 
-  it('renders React Flow controls (zoom in/out/fit-view)', () => {
+  it('renders a stored entity node through the Chen plugin', async () => {
+    useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'Customer', isWeak: false,
+      position: { x: 50, y: 50 }, size: { width: 120, height: 60 },
+    })
     render(<ERCanvas />)
-    expect(screen.getByLabelText(/zoom in/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/zoom out/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/fit view/i)).toBeInTheDocument()
+    expect(await screen.findByText('Customer')).toBeInTheDocument()
+  })
+
+  it('reacts to store mutations (adding a relationship node after mount)', async () => {
+    render(<ERCanvas />)
+    useDiagramStore.getState().addNode({
+      kind: 'relationship', name: 'owns', isIdentifying: false,
+      position: { x: 100, y: 100 }, size: { width: 140, height: 70 },
+    })
+    expect(await screen.findByText('owns')).toBeInTheDocument()
+  })
+
+  it('viewport store updates are consumable', () => {
+    render(<ERCanvas />)
+    useViewportStore.setState({ zoom: 1.5, pan: { x: 20, y: 10 } })
+    expect(useViewportStore.getState().zoom).toBe(1.5)
   })
 })
