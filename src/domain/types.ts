@@ -103,3 +103,15 @@ export interface InvariantViolation {
   readonly targetId: NodeId | EdgeId
   readonly detail: string
 }
+
+// ——— Validation primitives (used by both notation and state layers) ———
+
+export type ValidationSeverity = 'error' | 'warning'
+
+export interface ValidationError {
+  readonly ruleId: string
+  readonly severity: ValidationSeverity
+  readonly targetId: NodeId | EdgeId
+  readonly messageKey: string
+  readonly messageParams?: Readonly<Record<string, string>>
+}

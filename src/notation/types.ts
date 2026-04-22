@@ -1,6 +1,6 @@
-import type { Diagram, NodeId, EdgeId } from '@/domain/types'
+import type { Diagram, ValidationSeverity, ValidationError } from '@/domain/types'
 
-export type ValidationSeverity = 'error' | 'warning'
+export type { ValidationSeverity, ValidationError } from '@/domain/types'
 
 export type ValidationCategory =
   | 'entity'
@@ -8,14 +8,6 @@ export type ValidationCategory =
   | 'attribute'
   | 'generalization'
   | 'structural'
-
-export interface ValidationError {
-  readonly ruleId: string
-  readonly severity: ValidationSeverity
-  readonly targetId: NodeId | EdgeId
-  readonly messageKey: string
-  readonly messageParams?: Readonly<Record<string, string>>
-}
 
 export interface ValidationRule {
   readonly id: string
