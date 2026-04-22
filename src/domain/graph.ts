@@ -13,7 +13,7 @@ export const neighbors = (
   diagram: Diagram,
   nodeId: NodeId,
   opts?: { edgeKind?: EdgeKind },
-): NodeId[] => {
+): readonly NodeId[] => {
   const out: NodeId[] = []
   for (const edge of incidentEdges(diagram, nodeId)) {
     if (opts?.edgeKind && edge.kind !== opts.edgeKind) continue

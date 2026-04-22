@@ -766,7 +766,7 @@ describe('incidentEdges', () => {
 
 describe('neighbors', () => {
   it('returns both endpoints of incident edges excluding self', () => {
-    const ns = neighbors(diagram, r1).sort()
+    const ns = [...neighbors(diagram, r1)].sort()
     expect(ns).toEqual([e1, e2].sort())
   })
   it('filters by edge kind', () => {
