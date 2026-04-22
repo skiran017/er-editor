@@ -1466,14 +1466,14 @@ export { emptyDiagram }
 Create `tests/fixtures/diagrams/makeNode.ts`:
 
 ```ts
-import { asNodeId } from '@/domain/id'
+import { asNodeId, ID_LENGTH } from '@/domain/id'
 import type {
   EntityNode, RelationshipNode, AttributeNode, ISANode, NodeId,
 } from '@/domain/types'
 
 let counter = 0
 const nextId = (prefix: string): NodeId =>
-  asNodeId(`${prefix}${String(++counter).padStart(10 - prefix.length, '0')}`.slice(0, 10))
+  asNodeId(`${prefix}${String(++counter).padStart(ID_LENGTH - prefix.length, '0')}`.slice(0, ID_LENGTH))
 
 export const resetIdCounter = (): void => { counter = 0 }
 
@@ -1524,13 +1524,13 @@ export const makeIsa = (overrides: Partial<ISANode> = {}): ISANode => ({
 Create `tests/fixtures/diagrams/makeEdge.ts`:
 
 ```ts
-import { asEdgeId } from '@/domain/id'
+import { asEdgeId, ID_LENGTH } from '@/domain/id'
 import type {
   EntityRelationshipEdge, AttributeEdge, ISAEdge, EdgeId, NodeId,
 } from '@/domain/types'
 
 let counter = 0
-const nextId = (): EdgeId => asEdgeId(`x${String(++counter).padStart(9, '0')}`)
+const nextId = (): EdgeId => asEdgeId(`x${String(++counter).padStart(ID_LENGTH - 1, '0')}`)
 
 export const resetEdgeIdCounter = (): void => { counter = 0 }
 

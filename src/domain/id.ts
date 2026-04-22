@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid'
 import type { NodeId, EdgeId } from './types'
 
-const ID_LENGTH = 10
+export const ID_LENGTH = 10
 
 export const newNodeId = (): NodeId => nanoid(ID_LENGTH) as NodeId
 export const newEdgeId = (): EdgeId => nanoid(ID_LENGTH) as EdgeId
