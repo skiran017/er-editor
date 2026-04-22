@@ -1,0 +1,40 @@
+{
+  "file": {
+    "title": "File",
+    "new": "New diagram",
+    "open": "Open…",
+    "save": "Save",
+    "saveAs": "Save as…",
+    "export": "Export",
+    "exportPng": "Export PNG",
+    "exportSvg": "Export SVG",
+    "exportMermaid": "Export Mermaid"
+  },
+  "edit": {
+    "title": "Edit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "selectAll": "Select all",
+    "invertSelection": "Invert selection"
+  },
+  "view": {
+    "title": "View",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitView": "Fit to view",
+    "grid": "Grid",
+    "alignment": "Alignment guides",
+    "properties": "Properties panel"
+  },
+  "help": {
+    "title": "Help",
+    "cheatsheet": "Keyboard shortcuts",
+    "about": "About"
+  },
+  "notYetAvailable": "Available in Phase 5 (I/O codecs)."
+}

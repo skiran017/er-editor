@@ -1,0 +1,18 @@
+{
+  "cheatsheet": {
+    "title": "Keyboard shortcuts",
+    "category": {
+      "tool": "Tools",
+      "operation": "Operations",
+      "contextual": "Contextual",
+      "navigation": "Navigation"
+    }
+  },
+  "confirm": {
+    "title": "Please confirm"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "dismiss": "Dismiss"
+  }
+}

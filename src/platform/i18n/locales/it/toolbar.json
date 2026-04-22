@@ -1,0 +1,18 @@
+{
+  "group": {
+    "select": "Select",
+    "elements": "Elements",
+    "connections": "Connections"
+  },
+  "tool": {
+    "select": "Select",
+    "pan": "Pan",
+    "entity": "Entity",
+    "relationship": "Relationship",
+    "attribute": "Attribute",
+    "isa": "Generalization",
+    "connect": "Connect",
+    "quickRelationship": "Quick relationship",
+    "quickGeneralization": "Quick generalization"
+  }
+}

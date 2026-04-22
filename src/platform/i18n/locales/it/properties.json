@@ -1,0 +1,28 @@
+{
+  "empty": "Select a node or edge to see its properties.",
+  "multi": "{{count}} items selected",
+  "kind": {
+    "entity": "Entity",
+    "relationship": "Relationship",
+    "attribute": "Attribute",
+    "isa": "Generalization",
+    "entity-relationship": "Entity-Relationship edge",
+    "attribute-of": "Attribute-of edge",
+    "isa-link": "ISA link"
+  },
+  "name": "Name",
+  "isWeak": "Weak entity",
+  "isIdentifying": "Identifying relationship",
+  "isKey": "Key attribute",
+  "isDiscriminant": "Discriminant (partial key)",
+  "isMultivalued": "Multivalued",
+  "isDerived": "Derived",
+  "isComposite": "Composite",
+  "isTotal": "Total generalization",
+  "cardinality": "Cardinality",
+  "participation": "Participation",
+  "participationTotal": "Total",
+  "participationPartial": "Partial",
+  "role": "Role",
+  "rolePlaceholder": "e.g. parent, child, manages"
+}
