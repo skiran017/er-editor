@@ -28,6 +28,17 @@ describe('attributeSingleParentRule', () => {
     expect(attributeSingleParentRule.check(d).map((e) => e.targetId)).toContain(a.id)
   })
 
+  it('fires for attribute with two outbound parent edges', () => {
+    const e1 = makeEntity({ name: 'A' })
+    const e2 = makeEntity({ name: 'B' })
+    const a = makeAttribute({ name: 'x' })
+    const d = makeDiagram([e1, e2, a], [
+      makeAttrEdge(a.id, e1.id),
+      makeAttrEdge(a.id, e2.id),
+    ])
+    expect(attributeSingleParentRule.check(d).map((e) => e.targetId)).toContain(a.id)
+  })
+
   it('does not fire for attribute with one parent edge', () => {
     expect(attributeSingleParentRule.check(strongEntityWithKey())).toEqual([])
   })
