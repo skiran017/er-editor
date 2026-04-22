@@ -77,6 +77,9 @@ describe('useMouse', () => {
     })
   })
 
+})
+
+describe('useMouse — wheel', () => {
   it('onWheel with ctrl pressed → WHEEL_ZOOM', () => {
     const { result } = renderHook(() => useMouse())
     result.current.onWheel({

@@ -123,6 +123,32 @@ export const zoomAtPointAction = (_context: EditorContext, event: EditorEvent): 
   useViewportStore.getState().zoomAt(event.anchor, event.delta)
 }
 
+const KEYBOARD_ZOOM_STEP = 0.5
+
+export const zoomInAction = (_context: EditorContext, _event: EditorEvent): void => {
+  const { zoom } = useViewportStore.getState()
+  useViewportStore.getState().setViewport({
+    zoom: zoom + KEYBOARD_ZOOM_STEP,
+    pan: useViewportStore.getState().pan,
+  })
+}
+
+export const zoomOutAction = (_context: EditorContext, _event: EditorEvent): void => {
+  const { zoom } = useViewportStore.getState()
+  useViewportStore.getState().setViewport({
+    zoom: zoom - KEYBOARD_ZOOM_STEP,
+    pan: useViewportStore.getState().pan,
+  })
+}
+
+// FIT needs the live viewport size, which only the canvas has. Phase 4 wires
+// this by computing the bbox of nodes + the canvas's DOMRect and calling
+// viewportStore.fit directly. Keep as a no-op dispatch here so the
+// keybinding doesn't silently drop.
+export const fitAction = (_context: EditorContext, _event: EditorEvent): void => {
+  // Phase 4 will compute bbox + viewport size and call viewportStore.fit.
+}
+
 // ——— selection ops ———
 
 export const nudgeSelection = (_context: EditorContext, event: EditorEvent): void => {

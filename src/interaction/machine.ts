@@ -1,10 +1,11 @@
 import { assign, setup } from 'xstate'
 import {
   beginRubberband, clearSelectionAction, commitRubberbandAction,
-  connectNodes, deleteSelectionAction, duplicateSelectionAction, moveDraggedNode,
-  nudgeSelection, panViewportAction, placeNode, redoAction, selectAllAction,
-  selectNodeFromEvent, stubCopy, stubCut, stubPaste, toggleCheatsheetAction,
-  undoAction, updateRubberbandAction, zoomAtPointAction,
+  connectNodes, deleteSelectionAction, duplicateSelectionAction, fitAction,
+  moveDraggedNode, nudgeSelection, panViewportAction, placeNode, redoAction,
+  selectAllAction, selectNodeFromEvent, stubCopy, stubCut, stubPaste,
+  toggleCheatsheetAction, undoAction, updateRubberbandAction, zoomAtPointAction,
+  zoomInAction, zoomOutAction,
 } from './actions'
 import { initialContext, type EditorContext } from './context'
 import type { EditorEvent, Tool } from './events'
@@ -94,6 +95,9 @@ export const editorMachine = setup({
     toggleCheatsheetAction: ({ context, event }) => toggleCheatsheetAction(context, event),
     placeNodeAction: ({ context, event }) => placeNode(context, event),
     connectNodesAction: ({ context, event }) => connectNodes(context, event),
+    zoomIn: ({ context, event }) => zoomInAction(context, event),
+    zoomOut: ({ context, event }) => zoomOutAction(context, event),
+    fit: ({ context, event }) => fitAction(context, event),
   },
 }).createMachine({
   id: 'editor',
@@ -132,6 +136,20 @@ export const editorMachine = setup({
     CUT: { actions: 'stubCut' },
     PASTE: { actions: 'stubPaste' },
     TOGGLE_CHEATSHEET: { actions: 'toggleCheatsheetAction' },
+    // Viewport shortcuts (keyboard dispatches these via keybindings).
+    FIT: { actions: 'fit' },
+    ZOOM_IN: { actions: 'zoomIn' },
+    ZOOM_OUT: { actions: 'zoomOut' },
+    // Events declared in EditorEvent but whose behaviour lands in later phases.
+    // Kept as explicit no-ops so the machine acknowledges the event type and
+    // the keybindings registry never silently drops a user shortcut.
+    RENAME: {},               // Phase 6: inline rename UI
+    CYCLE_SELECTION: {},      // Phase 6: Tab / Shift+Tab selection cycle
+    INVERT_SELECTION: {},     // Phase 6: Shift+Alt+A
+    CONFIRM: {},              // Phase 6: modal-level confirm
+    CANCEL: {},               // Phase 6: modal-level cancel
+    HANDLE_POINTER_DOWN: {},  // Phase 4: React Flow handles
+    EDGE_POINTER_DOWN: {},    // Phase 4: edge interactions
   },
   states: {
     selecting: {
@@ -308,19 +326,9 @@ export const editorMachine = setup({
         },
       },
     },
-    connectToGeneralization: {
-      initial: 'waitingForChild',
-      states: {
-        waitingForChild: {
-          on: {
-            NODE_POINTER_DOWN: {
-              guard: 'isLeftButton',
-              target: '#editor.selecting',
-              actions: ['connectNodesAction', 'resetContext'],
-            },
-          },
-        },
-      },
-    },
+    // connectToGeneralization was scaffolded per spec §4.6 but has no PICK_TOOL
+    // route in Phase 3 — it's driven by a right-click-on-ISA UI action that
+    // lands in Phase 6. Reintroduce the state and add an INITIATE_ISA_CHILD
+    // event when that UI is wired.
   },
 })

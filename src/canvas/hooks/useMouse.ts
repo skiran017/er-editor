@@ -46,6 +46,7 @@ export const useMouse = (): MouseHandlers => ({
   },
   onWheel: (e) => {
     if (!e.ctrlKey && !e.metaKey) return  // Ctrl/Meta+wheel = zoom; plain wheel = native scroll (or future horizontal pan)
+    e.preventDefault()  // stop the browser's pinch-to-zoom / page-scroll
     const delta = e.deltaY < 0 ? WHEEL_ZOOM_STEP : -WHEEL_ZOOM_STEP
     useInteractionStore.getState().send({
       type: 'WHEEL_ZOOM',

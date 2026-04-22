@@ -28,9 +28,12 @@ All notable changes to this project will be documented in this file.
 
 ### Notes
 
-- 100% FSM transition coverage achieved across `machine.test.ts` + `machine.drawing.test.ts` — every state-event pair declared in spec §4.6 is tested.
+- Every state in the machine is reachable, every declared `EditorEvent` has an explicit handler (including Phase-4/6 no-ops with TODO comments), and the `event exhaustiveness` suite in `machine.misc.test.ts` iterates all deferred events to prove the machine accepts them without throwing. The `connectToGeneralization` state from spec §4.6 was scaffolded in the plan but removed during final-review cleanup because it had no `PICK_TOOL` route — it re-enters in Phase 6 when the right-click-on-ISA UI is wired.
+- Machine handles `FIT` / `ZOOM_IN` / `ZOOM_OUT` directly (viewport actions); `RENAME` / `CYCLE_SELECTION` / `INVERT_SELECTION` / `CONFIRM` / `CANCEL` / `HANDLE_POINTER_DOWN` / `EDGE_POINTER_DOWN` are acknowledged-but-deferred events with inline comments naming the phase that implements them.
+- Keybindings added post-review: `Space` as pan-tool shortcut (spec §7.2), `Shift+Alt+A` for invert-selection (spec §7.6).
+- `useMouse.onWheel` calls `e.preventDefault()` on zoom events to stop the browser's pinch-to-zoom / page-scroll.
 - `src/canvas/ERCanvas.tsx` still renders a blank React Flow canvas. Phase 4 will mount the new hooks onto it and plug in the Chen glyph components.
-- 360 unit tests passing; build, typecheck, and lint clean.
+- 372 unit tests passing; build, typecheck, and lint clean.
 
 ## [v2 / Phase 2] — 2026-04-22
 

@@ -45,7 +45,7 @@ const ctx = (id: string, keys: string[], event: EditorEvent, when: KeybindingCon
 export const keybindings: readonly Keybinding[] = Object.freeze([
   // Tools
   tool('tool.select',                    ['V'],                 { type: 'PICK_TOOL', tool: 'select' }),
-  tool('tool.pan',                       ['H'],                 { type: 'PICK_TOOL', tool: 'pan' }),
+  tool('tool.pan',                       ['H', 'Space'],        { type: 'PICK_TOOL', tool: 'pan' }),
   tool('tool.entity',                    ['E'],                 { type: 'PICK_TOOL', tool: 'entity' }),
   tool('tool.relationship',              ['R'],                 { type: 'PICK_TOOL', tool: 'relationship' }),
   tool('tool.attribute',                 ['A'],                 { type: 'PICK_TOOL', tool: 'attribute' }),
@@ -79,6 +79,7 @@ export const keybindings: readonly Keybinding[] = Object.freeze([
   ctx('ctx.nudgeRightBig',               ['Shift+ArrowRight'],  { type: 'NUDGE', dx: 10, dy: 0 }, 'hasSelection'),
   ctx('ctx.cycleForward',                ['Tab'],               { type: 'CYCLE_SELECTION', direction: 'forward' }, 'always'),
   ctx('ctx.cycleBackward',               ['Shift+Tab'],         { type: 'CYCLE_SELECTION', direction: 'backward' }, 'always'),
+  ctx('ctx.invertSelection',             ['Shift+Alt+A'],       { type: 'INVERT_SELECTION' }, 'always'),
 ])
 
 // Build an O(1) lookup: combo string → binding.
