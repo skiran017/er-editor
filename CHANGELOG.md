@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v2 / Phase 3] — 2026-04-22
+
+### Added
+
+- `src/interaction/` layer — full XState v5 editorMachine + support modules:
+  - [events.ts](src/interaction/events.ts) — typed `EditorEvent` union covering canvas + node + edge pointer events, resize handles, history, clipboard stubs, selection ops, viewport, rename, modal confirm/cancel, cheatsheet.
+  - [context.ts](src/interaction/context.ts) — machine context with transient drag/connection/resize fields.
+  - [guards.ts](src/interaction/guards.ts) — 8 pure predicates over Diagram.
+  - [actions.ts](src/interaction/actions.ts) — side-effectful action functions calling `useXStore.getState()`. `connectNodes` split into per-tool helpers (`connectViaQuickRelationship`/`…QuickGeneralization`/`…ConnectTool`).
+  - [machine.ts](src/interaction/machine.ts) — `editorMachine` with 8 top-level states: idle, selecting.{idle,rubberBand,maybeDragging,dragging,resizing}, panning.{idle,active}, placing.{entity,relationship,attribute,isa}, drawing.{idle,connection.fromPicked}, quickRelationship.{idle,firstPicked}, quickGeneralization.{idle,firstPicked}, connectToGeneralization.waitingForChild.
+  - [keybindings.ts](src/interaction/keybindings.ts) — 28-binding registry with cross-platform Ctrl/Meta aliases + `matchKeybinding(e)` O(1) lookup.
+  - [interactionStore.ts](src/interaction/interactionStore.ts) — Zustand store wrapping the actor; replaces the Phase 2 stub.
+  - [integration.test.ts](src/interaction/integration.test.ts) — 3 end-to-end flows (place → quick-rel, place → undo, rubberband-select).
+- `src/canvas/hooks/`:
+  - [useKeyboard.ts](src/canvas/hooks/useKeyboard.ts) — global keydown listener; skipped when focus is in input/textarea/contenteditable.
+  - [useMouse.ts](src/canvas/hooks/useMouse.ts) — pointer + wheel handlers; touch-type pointers delegated to useTouch; Ctrl/Meta+wheel → `WHEEL_ZOOM`.
+  - [useTouch.ts](src/canvas/hooks/useTouch.ts) — single-finger touch; multi-touch gestures deferred to Sub-project 4.
+- Barrels: [src/interaction/index.ts](src/interaction/index.ts), [src/canvas/hooks/index.ts](src/canvas/hooks/index.ts).
+- Coverage thresholds: interaction 90/75/60/90, canvas/hooks 85/70/85/85. (Lower function threshold on interaction reflects XState's many tiny arrow functions in the `setup({guards, actions})` block that are dispatched through state-transition coverage but not all individually invoked per test.)
+
+### Changed
+
+- `src/state/interactionStore.ts` (Phase 2 stub) DELETED. `useInteractionStore` now lives in `src/interaction/interactionStore.ts`. `src/state/index.ts` dropped its re-export. Consumers import from `@/interaction`.
+
+### Notes
+
+- 100% FSM transition coverage achieved across `machine.test.ts` + `machine.drawing.test.ts` — every state-event pair declared in spec §4.6 is tested.
+- `src/canvas/ERCanvas.tsx` still renders a blank React Flow canvas. Phase 4 will mount the new hooks onto it and plug in the Chen glyph components.
+- 360 unit tests passing; build, typecheck, and lint clean.
+
 ## [v2 / Phase 2] — 2026-04-22
 
 ### Added
