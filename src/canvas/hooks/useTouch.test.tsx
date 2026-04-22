@@ -67,4 +67,20 @@ describe('useTouch', () => {
     result.current.onPointerDown(makePointerEvent({ clientX: 100, clientY: 100, pointerId: 2 }))
     expect(sendSpy).not.toHaveBeenCalled()
   })
+
+  it('mouse-type pointer move and up are ignored', () => {
+    const { result } = renderHook(() => useTouch())
+    result.current.onPointerMove(makePointerEvent({ clientX: 0, clientY: 0, pointerType: 'mouse' }))
+    result.current.onPointerUp(makePointerEvent({ clientX: 0, clientY: 0, pointerType: 'mouse' }))
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
+  it('touch move/up with a different pointerId than the active one are ignored', () => {
+    const { result } = renderHook(() => useTouch())
+    result.current.onPointerDown(makePointerEvent({ clientX: 0, clientY: 0, pointerId: 1 }))
+    sendSpy.mockClear()
+    result.current.onPointerMove(makePointerEvent({ clientX: 50, clientY: 50, pointerId: 2 }))
+    result.current.onPointerUp(makePointerEvent({ clientX: 50, clientY: 50, pointerId: 2 }))
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
 })

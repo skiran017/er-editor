@@ -101,4 +101,37 @@ describe('useMouse', () => {
     } as unknown as React.PointerEvent<HTMLElement>)
     expect(sendSpy).not.toHaveBeenCalled()
   })
+
+  it('touch-type pointer move and up are ignored', () => {
+    const { result } = renderHook(() => useMouse())
+    const touchMove = {
+      clientX: 0, clientY: 0, pointerType: 'touch', preventDefault: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>
+    const touchUp = {
+      clientX: 0, clientY: 0, pointerType: 'touch', preventDefault: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>
+    result.current.onPointerMove(touchMove)
+    result.current.onPointerUp(touchUp)
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
+  it('plain wheel (no ctrl/meta) is ignored — reserved for native scroll', () => {
+    const { result } = renderHook(() => useMouse())
+    result.current.onWheel({
+      clientX: 0, clientY: 0, deltaY: -100,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      preventDefault: vi.fn(),
+    } as unknown as React.WheelEvent<HTMLElement>)
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
+  it('wheel with meta (Mac) also triggers WHEEL_ZOOM', () => {
+    const { result } = renderHook(() => useMouse())
+    result.current.onWheel({
+      clientX: 0, clientY: 0, deltaY: 100,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: true,
+      preventDefault: vi.fn(),
+    } as unknown as React.WheelEvent<HTMLElement>)
+    expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'WHEEL_ZOOM' }))
+  })
 })

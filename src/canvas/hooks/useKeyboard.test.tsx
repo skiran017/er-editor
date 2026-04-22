@@ -51,4 +51,21 @@ describe('useKeyboard', () => {
     fireKey({ key: 'e' })
     expect(sendSpy).not.toHaveBeenCalled()
   })
+
+  it('ignores unbound keys (no matching keybinding)', () => {
+    renderHook(() => useKeyboard())
+    fireKey({ key: 'F12' })
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not dispatch when focus is in a <textarea>', () => {
+    const ta = document.createElement('textarea')
+    document.body.appendChild(ta)
+    Object.defineProperty(document, 'activeElement', { value: ta, configurable: true })
+    renderHook(() => useKeyboard())
+    fireKey({ key: 'e' })
+    expect(sendSpy).not.toHaveBeenCalled()
+    document.body.removeChild(ta)
+    Object.defineProperty(document, 'activeElement', { value: document.body, configurable: true })
+  })
 })
