@@ -14,5 +14,45 @@
   "error": {
     "title": "Something went wrong",
     "dismiss": "Dismiss"
+  },
+  "keybinding": {
+    "tool": {
+      "select": "Select tool",
+      "pan": "Pan tool",
+      "entity": "Entity tool",
+      "relationship": "Relationship tool",
+      "attribute": "Attribute tool",
+      "isa": "Generalization tool",
+      "connect": "Connect tool"
+    },
+    "op": {
+      "undo": "Undo",
+      "redo": "Redo",
+      "copy": "Copy",
+      "cut": "Cut",
+      "paste": "Paste",
+      "duplicate": "Duplicate",
+      "selectAll": "Select all",
+      "fit": "Fit to view",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out"
+    },
+    "ctx": {
+      "delete": "Delete selection",
+      "escape": "Clear selection / cancel",
+      "rename": "Rename",
+      "cheatsheet": "Show keyboard shortcuts",
+      "nudgeUp": "Nudge up",
+      "nudgeDown": "Nudge down",
+      "nudgeLeft": "Nudge left",
+      "nudgeRight": "Nudge right",
+      "nudgeUpBig": "Nudge up (large)",
+      "nudgeDownBig": "Nudge down (large)",
+      "nudgeLeftBig": "Nudge left (large)",
+      "nudgeRightBig": "Nudge right (large)",
+      "cycleForward": "Cycle selection forward",
+      "cycleBackward": "Cycle selection backward",
+      "invertSelection": "Invert selection"
+    }
   }
 }

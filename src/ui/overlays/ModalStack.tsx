@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useUiStore, type Modal } from '@/state/uiStore'
 import { ConfirmModal, type ConfirmModalProps } from './ConfirmModal'
 import { ErrorModal, type ErrorModalProps } from './ErrorModal'
+import { CheatsheetModal } from './CheatsheetModal'
 
 const renderModal = (m: Modal): ReactNode => {
   const common = { modalId: m.id }
@@ -22,6 +23,8 @@ const renderModal = (m: Modal): ReactNode => {
           {...common}
         />
       )
+    case 'cheatsheet':
+      return <CheatsheetModal key={m.id} {...common} />
     default:
       return null
   }

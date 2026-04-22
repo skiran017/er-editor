@@ -44,6 +44,12 @@ describe('ModalStack', () => {
     expect(screen.getByRole('alertdialog')).toHaveAttribute('data-kind', 'error')
   })
 
+  it('renders CheatsheetModal when topmost is kind=cheatsheet', () => {
+    useUiStore.setState({ modals: [{ id: 'm1', kind: 'cheatsheet', props: {} }] })
+    render(<ModalStack />)
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-kind', 'cheatsheet')
+  })
+
   it('shows only the topmost modal when stacked', () => {
     useUiStore.setState({
       modals: [
