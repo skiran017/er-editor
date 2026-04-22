@@ -132,3 +132,24 @@
 		height: 100vh;
 	}
 }
+
+@layer utilities {
+	.bg-grid-pattern {
+		background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+			linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+		background-size: 20px 20px;
+	}
+
+	.dark .bg-grid-pattern {
+		background-image: linear-gradient(to right, #374151 1px, transparent 1px),
+			linear-gradient(to bottom, #374151 1px, transparent 1px);
+	}
+
+	.scrollbar-hide {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+	.scrollbar-hide::-webkit-scrollbar {
+		display: none;
+	}
+}

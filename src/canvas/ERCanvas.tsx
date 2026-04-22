@@ -4,10 +4,12 @@ import '@xyflow/react/dist/style.css'
 export const ERCanvas = () => {
   return (
     <ReactFlowProvider>
-      <ReactFlow nodes={[]} edges={[]} fitView>
-        <Background />
-        <Controls />
-      </ReactFlow>
+      <div className="h-full w-full flex-1">
+        <ReactFlow nodes={[]} edges={[]} fitView>
+          <Background />
+          <Controls />
+        </ReactFlow>
+      </div>
     </ReactFlowProvider>
   )
 }
