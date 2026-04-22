@@ -5,10 +5,55 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
+/** Layer-dependency table — negated list per layer (forbidden imports). */
+const forbiddenByLayer = {
+  domain: [
+    '@/state/**', '@/state', '@/interaction/**', '@/interaction',
+    '@/notation/**', '@/notation', '@/canvas/**', '@/canvas',
+    '@/ui/**', '@/ui', '@/platform/**', '@/platform', '@/app/**', '@/app',
+  ],
+  platform: [
+    '@/state/**', '@/state', '@/interaction/**', '@/interaction',
+    '@/notation/**', '@/notation', '@/canvas/**', '@/canvas',
+    '@/ui/**', '@/ui', '@/app/**', '@/app',
+  ],
+  state: [
+    '@/interaction/**', '@/interaction', '@/notation/**', '@/notation',
+    '@/canvas/**', '@/canvas', '@/ui/**', '@/ui',
+    '@/platform/**', '@/platform', '@/app/**', '@/app',
+  ],
+  interaction: [
+    '@/notation/**', '@/notation', '@/canvas/**', '@/canvas',
+    '@/ui/**', '@/ui', '@/platform/**', '@/platform', '@/app/**', '@/app',
+  ],
+  notation: [
+    '@/state/**', '@/state', '@/interaction/**', '@/interaction',
+    '@/canvas/**', '@/canvas', '@/ui/**', '@/ui',
+    '@/platform/**', '@/platform', '@/app/**', '@/app',
+  ],
+  canvas: [
+    '@/ui/**', '@/ui', '@/platform/**', '@/platform', '@/app/**', '@/app',
+  ],
+  ui: [
+    '@/app/**', '@/app',
+  ],
+}
+
+const layerRule = (forbidden) => ({
+  'no-restricted-imports': ['error', {
+    patterns: [
+      ...forbidden.map((p) => ({ group: [p], message: 'Layer-boundary violation — see spec §2.2.' })),
+      { group: ['**/legacy/**', '*/legacy/*'], message: 'legacy/ is reference-only.' },
+    ],
+  }],
+})
+
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'src/legacy/**', 'playwright-report', 'test-results', 'coverage']),
+
+  // Base config for all TS/TSX files in src/ and tests/.
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,
@@ -16,8 +61,45 @@ export default defineConfig([
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 2022,
       globals: globals.browser,
     },
+    rules: {
+      'max-lines': ['warn', { max: 350, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 100, skipBlankLines: true, skipComments: true }],
+      complexity: ['warn', 15],
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'ExportDefaultDeclaration', message: 'Use named exports (see spec §8.3).' },
+      ],
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: ['**/legacy/**', '*/legacy/*'], message: 'legacy/ is reference-only.' },
+        ],
+      }],
+    },
+  },
+
+  // Layer-boundary overrides. Each layer's forbidden imports are declared above.
+  { files: ['src/domain/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.domain) },
+  { files: ['src/platform/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.platform) },
+  { files: ['src/state/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.state) },
+  { files: ['src/interaction/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.interaction) },
+  { files: ['src/notation/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.notation) },
+  { files: ['src/canvas/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.canvas) },
+  { files: ['src/ui/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.ui) },
+
+  // src/App.tsx and src/main.tsx are the composition root — relax the layer rule.
+  {
+    files: ['src/App.tsx', 'src/main.tsx'],
+    rules: { 'no-restricted-imports': ['error', {
+      patterns: [{ group: ['**/legacy/**', '*/legacy/*'], message: 'legacy/ is reference-only.' }],
+    }] },
+  },
+
+  // Config files can use default exports.
+  {
+    files: ['*.config.{js,ts}', 'vite.config.ts', 'vitest.config.ts', 'playwright.config.ts', 'tailwind.config.js', 'eslint.config.js'],
+    rules: { 'no-restricted-syntax': 'off' },
   },
 ])
