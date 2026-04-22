@@ -540,9 +540,9 @@ Expected: FAIL — module not found.
 Create `src/domain/geometry.ts`:
 
 ```ts
-import type { BBox, Point } from './types'
+import type { BBox, Point, Size } from './types'
 
-type Positioned = { readonly position: Point; readonly size: { readonly width: number; readonly height: number } }
+type Positioned = { readonly position: Point; readonly size: Size }
 
 export const pointDistance = (a: Point, b: Point): number => {
   const dx = a.x - b.x
