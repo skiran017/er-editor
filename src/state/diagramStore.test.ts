@@ -342,3 +342,29 @@ describe('diagramStore — undo/redo', () => {
     expect(useDiagramStore.temporal.getState().pastStates.length).toBeLessThanOrEqual(100)
   })
 })
+
+describe('diagramStore — undo scoping (spec §4.4 bug fix)', () => {
+  beforeEach(() => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it('viewport and selection mutations do not push onto the diagram undo stack', async () => {
+    const { useViewportStore } = await import('./viewportStore')
+    const { useSelectionStore } = await import('./selectionStore')
+
+    // Baseline: empty past.
+    expect(useDiagramStore.temporal.getState().pastStates).toHaveLength(0)
+
+    // Mutate viewport + selection in isolation.
+    useViewportStore.getState().setViewport({ zoom: 2, pan: { x: 10, y: 20 } })
+    useSelectionStore.getState().select({ nodes: [], edges: [] })
+
+    // Diagram history must still be empty — those mutations live in other stores.
+    expect(useDiagramStore.temporal.getState().pastStates).toHaveLength(0)
+
+    // Sanity: a diagram mutation DOES land on the stack.
+    useDiagramStore.getState().addNode(baseEntityInput('X'))
+    expect(useDiagramStore.temporal.getState().pastStates.length).toBeGreaterThan(0)
+  })
+})
