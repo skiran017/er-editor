@@ -9,3 +9,4 @@ export {
   type FloatingAttachment,
   type EdgePosition,
 } from './useFloatingEdge'
+export { useSnapping, type SnappingApi } from './useSnapping'

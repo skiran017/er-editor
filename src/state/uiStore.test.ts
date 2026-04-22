@@ -7,6 +7,12 @@ const reset = () => useUiStore.setState({
   panels: { properties: true, minimap: false },
   modals: [],
   toasts: [],
+  snap: {
+    gridEnabled: false,
+    gridSize: 10,
+    alignmentEnabled: true,
+    alignmentThreshold: 4,
+  },
 })
 
 describe('uiStore — theme + language', () => {
@@ -54,5 +60,22 @@ describe('uiStore — toasts', () => {
     useUiStore.getState().pushToast({ id: 't2', kind: 'info', messageKey: 'b' })
     useUiStore.getState().dismissToast('t1')
     expect(useUiStore.getState().toasts.map((t) => t.id)).toEqual(['t2'])
+  })
+})
+
+describe('uiStore — snap config', () => {
+  beforeEach(reset)
+  it('setSnap updates the snap config slice', () => {
+    useUiStore.getState().setSnap({ gridEnabled: true, gridSize: 20 })
+    const s = useUiStore.getState().snap
+    expect(s.gridEnabled).toBe(true)
+    expect(s.gridSize).toBe(20)
+    expect(s.alignmentEnabled).toBe(true)   // untouched
+  })
+
+  it('snap config defaults: grid off, alignment on', () => {
+    useUiStore.setState({ snap: { gridEnabled: false, gridSize: 10, alignmentEnabled: true, alignmentThreshold: 4 } })
+    const s = useUiStore.getState().snap
+    expect(s).toEqual({ gridEnabled: false, gridSize: 10, alignmentEnabled: true, alignmentThreshold: 4 })
   })
 })

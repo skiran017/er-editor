@@ -18,12 +18,20 @@ export interface Toast {
   readonly messageParams?: Readonly<Record<string, string>>
 }
 
+export interface UiSnapConfig {
+  readonly gridEnabled: boolean
+  readonly gridSize: number
+  readonly alignmentEnabled: boolean
+  readonly alignmentThreshold: number
+}
+
 export interface UiStoreState {
   readonly theme: Theme
   readonly language: Language
   readonly panels: Readonly<Record<string, boolean>>
   readonly modals: readonly Modal[]
   readonly toasts: readonly Toast[]
+  readonly snap: UiSnapConfig
   setTheme: (t: Theme) => void
   setLanguage: (l: Language) => void
   togglePanel: (id: string) => void
@@ -31,6 +39,7 @@ export interface UiStoreState {
   popModal: () => void
   pushToast: (t: Toast) => void
   dismissToast: (id: string) => void
+  setSnap: (patch: Partial<UiSnapConfig>) => void
 }
 
 export const useUiStore = create<UiStoreState>()(
@@ -42,6 +51,12 @@ export const useUiStore = create<UiStoreState>()(
         panels: { properties: true, minimap: false },
         modals: [],
         toasts: [],
+        snap: {
+          gridEnabled: false,
+          gridSize: 10,
+          alignmentEnabled: true,
+          alignmentThreshold: 4,
+        },
 
         setTheme: (t) => set((state) => { state.theme = t }),
         setLanguage: (l) => set((state) => { state.language = l }),
@@ -67,6 +82,8 @@ export const useUiStore = create<UiStoreState>()(
         dismissToast: (id) => set((state) => {
           state.toasts = state.toasts.filter((t) => t.id !== id)
         }),
+
+        setSnap: (patch) => set((state) => { Object.assign(state.snap, patch) }),
       })),
       {
         name: 'er-editor:ui',
@@ -74,6 +91,7 @@ export const useUiStore = create<UiStoreState>()(
           theme: state.theme,
           language: state.language,
           panels: state.panels,
+          snap: state.snap,
         }),
       },
     ),
