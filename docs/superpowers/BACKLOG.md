@@ -61,6 +61,13 @@ Tooling decision (VitePress / Docusaurus / Astro Starlight), information archite
 - **Dual Zustand versions** in the runtime bundle: `@xyflow/react@12` bundles its own internal `zustand@4.x` while our stores use `zustand@5.x`. Both land in production unless tree-shaking eliminates one — verify during the Phase 8 <500 KB gzip target check.
 - **Dual nanoid versions**: `nanoid@3` (transitive via `postcss`) vs our declared `nanoid@5`. Tiny package, but note during the same audit.
 
+## Phase 0 follow-ups (track for Phase 1 or later)
+
+- **`eslint-plugin-import/order`** — spec §8.6 item 8 lists it as a required rule; Phase 0 did not install it. Revisit when Phase 1 lands the first domain files; if import ordering is intentionally deferred, update the spec to match.
+- **E2E "no console errors" assertion fragility** — [tests/e2e/smoke.spec.ts](tests/e2e/smoke.spec.ts) may flap once Phase 4 adds React Flow custom nodes that log dev-mode warnings. When that happens, filter to a known-harmless allowlist or narrow the assertion to `[Error]` severity.
+- **Vitest coverage thresholds** — spec §8.8 sets per-layer coverage targets (domain ≥95 %, rules ≥90 %, state ≥85 %, etc.). Add to `vitest.config.ts` `coverage.thresholds` as each phase lands its layer.
+- **ESLint layer rules only catch `@/…` alias imports** — relative-parent `../state/foo` imports slip through. Acceptable today because a consistent codebase convention catches this in code review. Revisit if violations sneak in.
+
 ## Deferred / removed from v1 scope (revisit when relevant)
 
 - **Free-form lines & arrows** (removed) — revisit only if students/profs request annotation capabilities.

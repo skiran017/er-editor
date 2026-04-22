@@ -80,7 +80,10 @@ export default defineConfig([
     },
   },
 
-  // Layer-boundary overrides. Each layer's forbidden imports are declared above.
+  // Layer-boundary overrides. Each layer's forbidden imports are declared in forbiddenByLayer above.
+  // src/app/ is intentionally absent here — it is the composition root and may import any layer (spec §2.2).
+  // Layer rules only catch imports via the '@/' path alias; relative-parent imports like '../state/foo'
+  // slip through. Keep cross-layer imports alias-form for enforcement to apply.
   { files: ['src/domain/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.domain) },
   { files: ['src/platform/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.platform) },
   { files: ['src/state/**/*.{ts,tsx}'], rules: layerRule(forbiddenByLayer.state) },
