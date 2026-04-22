@@ -37,11 +37,11 @@ export type ParseResult =
   | {
       readonly ok: true
       readonly diagram: Diagram
-      readonly warnings: readonly ParseWarning[] | readonly string[]
+      readonly warnings: readonly ParseWarning[]
     }
   | {
       readonly ok: false
-      readonly errors: readonly ParseError[] | readonly string[]
+      readonly errors: readonly ParseError[]
     }
 
 export interface Codec {

@@ -42,7 +42,7 @@ describe('notation/types contract', () => {
 
   it('ParseResult is a discriminated union on ok', () => {
     const ok: ParseResult = { ok: true, diagram: {} as Diagram, warnings: [] }
-    const err: ParseResult = { ok: false, errors: ['bad xml'] }
+    const err: ParseResult = { ok: false, errors: [{ code: 'bad-xml', message: 'malformed input' }] }
     expect(ok.ok).toBe(true)
     expect(err.ok).toBe(false)
   })
