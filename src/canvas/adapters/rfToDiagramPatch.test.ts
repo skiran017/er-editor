@@ -35,6 +35,14 @@ describe('rfToDiagramPatch', () => {
     expect(patch.updateNodes).toEqual([{ id: nid('n1'), patch: { size: { width: 140, height: 80 } } }])
   })
 
+  it('dimensions change without dimensions field (mid-resize frame) is skipped', () => {
+    const changes: NodeChange[] = [
+      { type: 'dimensions', id: 'n1', resizing: true } as NodeChange,
+    ]
+    const patch = rfToDiagramPatch(changes, [])
+    expect(patch.updateNodes).toBeUndefined()
+  })
+
   it('remove node change → removeNodes', () => {
     const changes: NodeChange[] = [{ type: 'remove', id: 'n1' }]
     const patch = rfToDiagramPatch(changes, [])

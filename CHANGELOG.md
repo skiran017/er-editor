@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v2 / Phase 4] — 2026-04-22
+
+### Added
+
+- Rendering layer under [src/canvas/](src/canvas/) + [src/notation/chen/](src/notation/chen/):
+  - [adapters/diagramToRf.ts](src/canvas/adapters/diagramToRf.ts), [adapters/rfToDiagramPatch.ts](src/canvas/adapters/rfToDiagramPatch.ts) — pure Diagram ↔ React Flow bridge, 100% covered.
+  - [hooks/useFloatingEdge.ts](src/canvas/hooks/useFloatingEdge.ts) — intersection math (ported from RF's floating-edges example) + live node-lookup hook.
+  - [hooks/useSnapping.ts](src/canvas/hooks/useSnapping.ts) — hook wrapper around `domain/snap.ts`; reads `uiStore.snap` config reactively.
+  - [domain/snap.ts](src/domain/snap.ts) — pure grid + centre-alignment snap; guides (horizontal/vertical) returned for overlay rendering.
+  - [notation-adapters/](src/canvas/notation-adapters/) — store-aware containers (`EntityNode`, `RelationshipNode`, `AttributeNode`, `ISANode`, `EntityRelationshipEdge`, `AttributeEdge`, `ISAEdge`) + `chenBindings.ts` assembling `nodeTypes`/`edgeTypes` for React Flow. Kept canvas-side because `notation/**` is domain-only per layer rules.
+  - Pure glyphs under [notation/chen/nodes/](src/notation/chen/nodes/) + [notation/chen/edges/](src/notation/chen/edges/) — SVG, prop-driven, snapshot-stable.
+  - [notation/chen/cardinality.tsx](src/notation/chen/cardinality.tsx) — Chen cardinality label + participation marker (filled for total, hollow for partial).
+  - [notation/chen/toolbar.ts](src/notation/chen/toolbar.ts), [notation/chen/index.ts](src/notation/chen/index.ts) — `chenPlugin` with defaults (entity 120×60, relationship 140×70, attribute 90×50, ISA 100×60) matching spec §5.7.
+- `NotationPlugin` / `Codec` / `ToolbarConfig` contracts in [notation/types.ts](src/notation/types.ts) (spec §5.6, §6.5).
+- `uiStore.snap` config slice (grid off + 10 px, alignment on + 4 px by default), persisted under `er-editor:ui`.
+- Shared `pickSeverity(errors)` selector in [state/selectors.ts](src/state/selectors.ts) — used by all four node containers.
+- [canvas/ERCanvas.tsx](src/canvas/ERCanvas.tsx) — controlled React Flow wired to `diagramStore`, `viewportStore`, Phase 3 input hooks (`useMouse`/`useKeyboard`/`useTouch`), `useSnapping`, and the Chen plugin bindings. Renders an SVG guide overlay on top of the flow during drags.
+- `installSubscribers()` from [app/bootstrap.ts](src/app/bootstrap.ts) finally called from [main.tsx](src/main.tsx) — Phase 2's debounced Chen validation + dev invariants now fire in production.
+- Coverage thresholds:
+  - `src/canvas/adapters/**` — 100/90/100/100 (spec §8.8).
+  - `src/canvas/notation-adapters/**` — 80/70/80/80.
+  - `src/canvas/**` — 80/70/80/80.
+  - `src/notation/chen/nodes/**`, `src/notation/chen/edges/**` — 90/80/90/90.
+  - `src/notation/chen/**` — 85/75/85/85.
+
+### Changed
+
+- `src/notation/types.ts` gained `NotationPlugin` + `Codec` + `ToolbarConfig` types. Existing `ValidationRule` / `ValidationCategory` exports unchanged. Dropped `string[]` fallback arm from `ParseResult` (tightened after Task 3 code review).
+- `NotationNodeData` / `NotationEdgeData` converted from `interface` to intersection type with `Record<string, unknown>` — required to satisfy `@xyflow/react` v12's `Node<Data>` constraint (discovered during Task 4 follow-up).
+
+### Notes
+
+- `chenPlugin.nodeTypes` / `edgeTypes` are **empty placeholders** at the notation layer (domain-only). `canvas/notation-adapters/chenBindings.ts` holds the real React components; `ERCanvas` wires them into `<ReactFlow>` directly. Spec §5.6 is satisfied in shape — the plugin-contract surface is whole.
+- Grid snap defaults to **off**; alignment guides default to **on** (§7.5). Equal-spacing guides are deferred (Sub-project 4).
+- `nodesConnectable={false}` + `panOnDrag={false}` on `<ReactFlow>` — the Phase 3 FSM owns connection drawing and panning. React Flow only handles node-drag + zoom.
+- Edge-container tests use a jsdom fixture shim: synthetic `handles` on `Node` objects to force RF v12's `EdgeWrapper` to mount (real DOM measurement doesn't happen in jsdom).
+- Phase 4 exit (spec §10.6): every glyph renders (composite flagged, N-ary supported via multi-edge relationship nodes, recursive via role labels, ISA via triangle); placement/drag/resize/connect all go through the FSM; grid snap and smart alignment guides work. ✅
+- Codec `parse`/`serialize` for `nativeJson` remain undefined — Phase 5 fills them after the SUPSI XML sample lands.
+- 498 unit tests passing; build, typecheck, and lint clean.
+
 ## [v2 / Phase 3] — 2026-04-22
 
 ### Added
