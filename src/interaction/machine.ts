@@ -2,7 +2,7 @@ import { assign, setup } from 'xstate'
 import {
   beginRubberband, clearSelectionAction, commitRubberbandAction,
   deleteSelectionAction, duplicateSelectionAction, moveDraggedNode,
-  nudgeSelection, panViewportAction, redoAction, selectAllAction,
+  nudgeSelection, panViewportAction, placeNode, redoAction, selectAllAction,
   selectNodeFromEvent, stubCopy, stubCut, stubPaste, toggleCheatsheetAction,
   undoAction, updateRubberbandAction, zoomAtPointAction,
 } from './actions'
@@ -92,6 +92,7 @@ export const editorMachine = setup({
     stubCut: ({ context, event }) => stubCut(context, event),
     stubPaste: ({ context, event }) => stubPaste(context, event),
     toggleCheatsheetAction: ({ context, event }) => toggleCheatsheetAction(context, event),
+    placeNodeAction: ({ context, event }) => placeNode(context, event),
   },
 }).createMachine({
   id: 'editor',
@@ -187,8 +188,39 @@ export const editorMachine = setup({
     // Phase 5 adds: panning (Task 6), placing (Task 6), drawing (Task 7),
     // quickRelationship (Task 7), quickGeneralization (Task 7),
     // connectToGeneralization (Task 7).
-    panning: { on: { ESCAPE: { target: 'selecting' } } },
-    placing: { initial: 'entity', states: { entity: {}, relationship: {}, attribute: {}, isa: {} } },
+    panning: {
+      initial: 'idle',
+      states: {
+        idle: {
+          on: {
+            CANVAS_POINTER_DOWN: { target: 'active', actions: 'beginPan' },
+          },
+        },
+        active: {
+          on: {
+            CANVAS_POINTER_MOVE: { actions: 'panViewportAction' },
+            CANVAS_POINTER_UP: { target: 'idle', actions: 'resetContext' },
+          },
+        },
+      },
+    },
+    placing: {
+      initial: 'entity',
+      states: {
+        entity: {
+          on: { CANVAS_POINTER_UP: { actions: 'placeNodeAction' } },
+        },
+        relationship: {
+          on: { CANVAS_POINTER_UP: { actions: 'placeNodeAction' } },
+        },
+        attribute: {
+          on: { CANVAS_POINTER_UP: { actions: 'placeNodeAction' } },
+        },
+        isa: {
+          on: { CANVAS_POINTER_UP: { actions: 'placeNodeAction' } },
+        },
+      },
+    },
     drawing: { on: {} },
     quickRelationship: { on: {} },
     quickGeneralization: { on: {} },

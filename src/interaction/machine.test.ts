@@ -242,3 +242,79 @@ describe('machine — top-level transitions from any state', () => {
     actor.stop()
   })
 })
+
+describe('machine — panning', () => {
+  beforeEach(resetStores)
+
+  it('PICK_TOOL pan → panning.idle', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'pan' })
+    expect(actor.getSnapshot().matches({ panning: 'idle' })).toBe(true)
+    actor.stop()
+  })
+
+  it('CANVAS_POINTER_DOWN (any button) → panning.active', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'pan' })
+    actor.send({
+      type: 'CANVAS_POINTER_DOWN', point: { x: 0, y: 0 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    expect(actor.getSnapshot().matches({ panning: 'active' })).toBe(true)
+    actor.stop()
+  })
+
+  it('CANVAS_POINTER_MOVE while panning.active shifts viewport', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'pan' })
+    actor.send({
+      type: 'CANVAS_POINTER_DOWN', point: { x: 0, y: 0 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    actor.send({ type: 'CANVAS_POINTER_MOVE', point: { x: 20, y: 30 } })
+    const { pan } = useViewportStore.getState()
+    expect(pan).toEqual({ x: 20, y: 30 })
+    actor.stop()
+  })
+
+  it('CANVAS_POINTER_UP → panning.idle', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'pan' })
+    actor.send({
+      type: 'CANVAS_POINTER_DOWN', point: { x: 0, y: 0 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 0, y: 0 } })
+    expect(actor.getSnapshot().matches({ panning: 'idle' })).toBe(true)
+    actor.stop()
+  })
+})
+
+describe('machine — placing', () => {
+  beforeEach(resetStores)
+
+  it.each([
+    ['entity' as const, { placing: 'entity' as const }],
+    ['relationship' as const, { placing: 'relationship' as const }],
+    ['attribute' as const, { placing: 'attribute' as const }],
+    ['isa' as const, { placing: 'isa' as const }],
+  ])('PICK_TOOL %s targets matching placing state and CANVAS_POINTER_UP adds a node', (tool, state) => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool })
+    expect(actor.getSnapshot().matches(state)).toBe(true)
+    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 42, y: 24 } })
+    const d = useDiagramStore.getState().diagram
+    expect(d.nodeOrder).toHaveLength(1)
+    expect(d.nodesById[d.nodeOrder[0]!]!.kind).toBe(tool)
+    expect(d.nodesById[d.nodeOrder[0]!]!.position).toEqual({ x: 42, y: 24 })
+    actor.stop()
+  })
+
+  it('stays in placing state after a place for repeat-placement', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'entity' })
+    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 0, y: 0 } })
+    expect(actor.getSnapshot().matches({ placing: 'entity' })).toBe(true)
+    actor.stop()
+  })
+})
