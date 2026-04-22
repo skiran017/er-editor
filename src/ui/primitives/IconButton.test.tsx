@@ -48,4 +48,9 @@ describe('IconButton', () => {
     await userEvent.click(screen.getByRole('button'))
     expect(onClick).not.toHaveBeenCalled()
   })
+
+  it('defaults to type="button"', () => {
+    render(<IconButton aria-label="go" icon={<span>x</span>} />)
+    expect(screen.getByRole('button')).toHaveAttribute('type', 'button')
+  })
 })

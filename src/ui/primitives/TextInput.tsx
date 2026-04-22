@@ -14,19 +14,14 @@ const SIZES: Record<NonNullable<TextInputProps['size']>, string> = {
 export const TextInput = ({
   label,
   size = 'md',
-  id,
   className = '',
   ...rest
-}: TextInputProps) => {
-  const inputId = id ?? rest.name
-  return (
-    <label className="flex flex-col gap-1 text-xs text-slate-700">
-      {label && <span>{label}</span>}
-      <input
-        {...rest}
-        id={inputId}
-        className={`rounded border border-slate-300 px-2 ${SIZES[size]} focus:border-blue-500 focus:outline-none ${className}`}
-      />
-    </label>
-  )
-}
+}: TextInputProps) => (
+  <label className="flex flex-col gap-1 text-xs text-slate-700">
+    {label && <span>{label}</span>}
+    <input
+      {...rest}
+      className={`rounded border border-slate-300 px-2 ${SIZES[size]} focus:border-blue-500 focus:outline-none ${className}`}
+    />
+  </label>
+)

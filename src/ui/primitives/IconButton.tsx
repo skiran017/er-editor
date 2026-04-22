@@ -17,11 +17,13 @@ export const IconButton = ({
   icon,
   active = false,
   size = 'md',
+  type = 'button',
   className = '',
   ...rest
 }: IconButtonProps) => (
   <button
     {...rest}
+    type={type}
     aria-pressed={active || undefined}
     className={`inline-flex items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
       active

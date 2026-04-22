@@ -36,4 +36,14 @@ describe('Button', () => {
     render(<Button size="sm">Small</Button>)
     expect(screen.getByRole('button').className).toContain('h-7')
   })
+
+  it('defaults to type="button" so it does not submit a surrounding form', () => {
+    render(<Button>Click me</Button>)
+    expect(screen.getByRole('button')).toHaveAttribute('type', 'button')
+  })
+
+  it('respects explicit type="submit"', () => {
+    render(<Button type="submit">Submit</Button>)
+    expect(screen.getByRole('button')).toHaveAttribute('type', 'submit')
+  })
 })

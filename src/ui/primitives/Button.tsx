@@ -21,12 +21,14 @@ const SIZES: Record<NonNullable<ButtonProps['size']>, string> = {
 export const Button = ({
   variant = 'secondary',
   size = 'md',
+  type = 'button',
   className = '',
   children,
   ...rest
 }: ButtonProps) => (
   <button
     {...rest}
+    type={type}
     className={`inline-flex items-center justify-center gap-1.5 rounded font-medium transition-colors disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
   >
     {children}
