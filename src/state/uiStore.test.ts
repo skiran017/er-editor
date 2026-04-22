@@ -13,6 +13,7 @@ const reset = () => useUiStore.setState({
     alignmentEnabled: true,
     alignmentThreshold: 4,
   },
+  contextMenu: null,
 })
 
 describe('uiStore — theme + language', () => {
@@ -77,5 +78,23 @@ describe('uiStore — snap config', () => {
     useUiStore.setState({ snap: { gridEnabled: false, gridSize: 10, alignmentEnabled: true, alignmentThreshold: 4 } })
     const s = useUiStore.getState().snap
     expect(s).toEqual({ gridEnabled: false, gridSize: 10, alignmentEnabled: true, alignmentThreshold: 4 })
+  })
+})
+
+describe('uiStore — contextMenu', () => {
+  beforeEach(reset)
+
+  it('openContextMenu sets the contextMenu state', () => {
+    useUiStore.getState().openContextMenu({
+      at: { x: 10, y: 20 },
+      items: [{ id: 'a', labelKey: 'common:ok', onSelect: () => {} }],
+    })
+    expect(useUiStore.getState().contextMenu?.at).toEqual({ x: 10, y: 20 })
+  })
+
+  it('closeContextMenu clears the state', () => {
+    useUiStore.getState().openContextMenu({ at: { x: 0, y: 0 }, items: [] })
+    useUiStore.getState().closeContextMenu()
+    expect(useUiStore.getState().contextMenu).toBeNull()
   })
 })

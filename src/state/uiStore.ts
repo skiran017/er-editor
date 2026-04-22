@@ -25,6 +25,20 @@ export interface UiSnapConfig {
   readonly alignmentThreshold: number
 }
 
+export interface ContextMenuItem {
+  readonly id: string
+  readonly labelKey: string
+  readonly shortcut?: string
+  readonly danger?: boolean
+  readonly disabled?: boolean
+  readonly onSelect: () => void
+}
+
+export interface ContextMenuState {
+  readonly at: { readonly x: number; readonly y: number }
+  readonly items: readonly ContextMenuItem[]
+}
+
 export interface UiStoreState {
   readonly theme: Theme
   readonly language: Language
@@ -32,6 +46,7 @@ export interface UiStoreState {
   readonly modals: readonly Modal[]
   readonly toasts: readonly Toast[]
   readonly snap: UiSnapConfig
+  readonly contextMenu: ContextMenuState | null
   setTheme: (t: Theme) => void
   setLanguage: (l: Language) => void
   togglePanel: (id: string) => void
@@ -40,6 +55,8 @@ export interface UiStoreState {
   pushToast: (t: Toast) => void
   dismissToast: (id: string) => void
   setSnap: (patch: Partial<UiSnapConfig>) => void
+  openContextMenu: (state: ContextMenuState) => void
+  closeContextMenu: () => void
 }
 
 export const useUiStore = create<UiStoreState>()(
@@ -57,6 +74,7 @@ export const useUiStore = create<UiStoreState>()(
           alignmentEnabled: true,
           alignmentThreshold: 4,
         },
+        contextMenu: null,
 
         setTheme: (t) => set((state) => { state.theme = t }),
         setLanguage: (l) => set((state) => { state.language = l }),
@@ -84,6 +102,12 @@ export const useUiStore = create<UiStoreState>()(
         }),
 
         setSnap: (patch) => set((state) => { Object.assign(state.snap, patch) }),
+
+        openContextMenu: (s) => set((state) => {
+          // Immer's WritableDraft strips readonly; cast through unknown to bridge the shape.
+          state.contextMenu = s as unknown as typeof state.contextMenu
+        }),
+        closeContextMenu: () => set((state) => { state.contextMenu = null }),
       })),
       {
         name: 'er-editor:ui',
