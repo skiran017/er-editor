@@ -10,7 +10,7 @@ import {
 } from '@/state/commands'
 import { bboxFromNodeLike, bboxIntersects } from '@/domain/geometry'
 import { isEntityNode } from '@/domain/graph'
-import type { BBox, EntityRelationshipEdge, ISAEdge } from '@/domain/types'
+import type { BBox, ERNode, EntityRelationshipEdge, ISAEdge, NodeId } from '@/domain/types'
 import type { EditorContext } from './context'
 import type { EditorEvent } from './events'
 
@@ -162,7 +162,69 @@ export const duplicateSelectionAction = (_c: EditorContext, _e: EditorEvent) => 
 export const selectAllAction = (_c: EditorContext, _e: EditorEvent) => selectAllCmd()
 export const clearSelectionAction = (_c: EditorContext, _e: EditorEvent) => clearSelectionCmd()
 
-// ——— connect ———
+// ——— connect — per-tool helpers ———
+
+const midpoint = (a: { position: { x: number; y: number } }, b: { position: { x: number; y: number } }) => ({
+  x: (a.position.x + b.position.x) / 2,
+  y: (a.position.y + b.position.y) / 2,
+})
+
+const connectViaQuickRelationship = (source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId): void => {
+  if (!isEntityNode(source) || !isEntityNode(target)) return
+  const store = useDiagramStore.getState()
+  const relId = store.addNode({
+    kind: 'relationship', name: 'Relationship', isIdentifying: false,
+    position: midpoint(source, target),
+    size: { width: 140, height: 70 },
+  })
+  const e1: Omit<EntityRelationshipEdge, 'id'> = {
+    kind: 'entity-relationship', sourceId, targetId: relId,
+    cardinality: '1', participation: 'partial', waypoints: [],
+  }
+  const e2: Omit<EntityRelationshipEdge, 'id'> = {
+    kind: 'entity-relationship', sourceId: targetId, targetId: relId,
+    cardinality: 'N', participation: 'partial', waypoints: [],
+  }
+  store.addEdge(e1)
+  store.addEdge(e2)
+}
+
+const connectViaQuickGeneralization = (source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId): void => {
+  if (!isEntityNode(source) || !isEntityNode(target)) return
+  const store = useDiagramStore.getState()
+  const isaId = store.addNode({
+    kind: 'isa', isTotal: false,
+    position: midpoint(source, target),
+    size: { width: 100, height: 60 },
+  })
+  const parentEdge: Omit<ISAEdge, 'id'> = {
+    kind: 'isa-link', sourceId, targetId: isaId, role: 'parent', waypoints: [],
+  }
+  const childEdge: Omit<ISAEdge, 'id'> = {
+    kind: 'isa-link', sourceId: isaId, targetId, role: 'child', waypoints: [],
+  }
+  store.addEdge(parentEdge)
+  store.addEdge(childEdge)
+}
+
+const connectViaConnectTool = (source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId): void => {
+  const store = useDiagramStore.getState()
+  if (source.kind === 'entity' && target.kind === 'relationship') {
+    store.addEdge({
+      kind: 'entity-relationship', sourceId, targetId,
+      cardinality: '1', participation: 'partial', waypoints: [],
+    })
+  } else if (source.kind === 'relationship' && target.kind === 'entity') {
+    store.addEdge({
+      kind: 'entity-relationship', sourceId: targetId, targetId: sourceId,
+      cardinality: '1', participation: 'partial', waypoints: [],
+    })
+  } else if (source.kind === 'attribute' && (target.kind === 'entity' || target.kind === 'relationship' || (target.kind === 'attribute' && target.isComposite))) {
+    store.addEdge({
+      kind: 'attribute-of', sourceId, targetId, waypoints: [],
+    })
+  }
+}
 
 export const connectNodes = (context: EditorContext, event: EditorEvent): void => {
   if (event.type !== 'NODE_POINTER_DOWN' && event.type !== 'NODE_POINTER_UP') return
@@ -170,71 +232,17 @@ export const connectNodes = (context: EditorContext, event: EditorEvent): void =
   const sourceId = context.connectionFromId ?? context.quickFirstId
   if (!sourceId) return
 
-  const store = useDiagramStore.getState()
-  const diagram = store.diagram
+  const diagram = useDiagramStore.getState().diagram
   const source = diagram.nodesById[sourceId]
   const target = diagram.nodesById[targetId]
   if (!source || !target) return
 
   if (context.tool === 'quickRelationship') {
-    if (!isEntityNode(source) || !isEntityNode(target)) return
-    // Create a relationship node midway, then two ER edges connecting both entities.
-    const relId = store.addNode({
-      kind: 'relationship', name: 'Relationship', isIdentifying: false,
-      position: {
-        x: (source.position.x + target.position.x) / 2,
-        y: (source.position.y + target.position.y) / 2,
-      },
-      size: { width: 140, height: 70 },
-    })
-    const e1: Omit<EntityRelationshipEdge, 'id'> = {
-      kind: 'entity-relationship', sourceId, targetId: relId,
-      cardinality: '1', participation: 'partial', waypoints: [],
-    }
-    const e2: Omit<EntityRelationshipEdge, 'id'> = {
-      kind: 'entity-relationship', sourceId: targetId, targetId: relId,
-      cardinality: 'N', participation: 'partial', waypoints: [],
-    }
-    store.addEdge(e1)
-    store.addEdge(e2)
+    connectViaQuickRelationship(source, target, sourceId, targetId)
   } else if (context.tool === 'quickGeneralization') {
-    if (!isEntityNode(source) || !isEntityNode(target)) return
-    // Create an ISA node between parent (source) and child (target); two ISA edges.
-    const isaId = store.addNode({
-      kind: 'isa', isTotal: false,
-      position: {
-        x: (source.position.x + target.position.x) / 2,
-        y: (source.position.y + target.position.y) / 2,
-      },
-      size: { width: 100, height: 60 },
-    })
-    const parentEdge: Omit<ISAEdge, 'id'> = {
-      kind: 'isa-link', sourceId, targetId: isaId, role: 'parent', waypoints: [],
-    }
-    const childEdge: Omit<ISAEdge, 'id'> = {
-      kind: 'isa-link', sourceId: isaId, targetId, role: 'child', waypoints: [],
-    }
-    store.addEdge(parentEdge)
-    store.addEdge(childEdge)
+    connectViaQuickGeneralization(source, target, sourceId, targetId)
   } else if (context.tool === 'connect') {
-    // Pair-specific edge kind selection:
-    // entity → relationship / relationship → entity: entity-relationship
-    // attribute → entity or attribute → relationship: attribute-of
-    if (source.kind === 'entity' && target.kind === 'relationship') {
-      store.addEdge({
-        kind: 'entity-relationship', sourceId, targetId,
-        cardinality: '1', participation: 'partial', waypoints: [],
-      })
-    } else if (source.kind === 'relationship' && target.kind === 'entity') {
-      store.addEdge({
-        kind: 'entity-relationship', sourceId: targetId, targetId: sourceId,
-        cardinality: '1', participation: 'partial', waypoints: [],
-      })
-    } else if (source.kind === 'attribute' && (target.kind === 'entity' || target.kind === 'relationship' || (target.kind === 'attribute' && target.isComposite))) {
-      store.addEdge({
-        kind: 'attribute-of', sourceId, targetId, waypoints: [],
-      })
-    }
+    connectViaConnectTool(source, target, sourceId, targetId)
   }
 }
 
