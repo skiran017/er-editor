@@ -45,6 +45,18 @@ export default defineConfig({
           functions: 85,
           lines: 85,
         },
+        'src/interaction/**': {
+          statements: 90,
+          branches: 85,
+          functions: 90,
+          lines: 90,
+        },
+        'src/canvas/hooks/**': {
+          statements: 85,
+          branches: 80,
+          functions: 85,
+          lines: 85,
+        },
       },
     },
   },
