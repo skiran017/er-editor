@@ -61,6 +61,25 @@ Tooling decision (VitePress / Docusaurus / Astro Starlight), information archite
 - **Dual Zustand versions** in the runtime bundle: `@xyflow/react@12` bundles its own internal `zustand@4.x` while our stores use `zustand@5.x`. Both land in production unless tree-shaking eliminates one — verify during the Phase 8 <500 KB gzip target check.
 - **Dual nanoid versions**: `nanoid@3` (transitive via `postcss`) vs our declared `nanoid@5`. Tiny package, but note during the same audit.
 
+## ISA disjoint/overlapping constraint (pre-Phase-4 spec addendum)
+
+Chen EER notation supports a **disjoint (d) vs overlapping (o)** constraint on generalization hierarchies, in addition to the already-modeled total/partial. Academic sources (Elmasri & Navathe, UCT lecture notes, TutorialsPoint EER guide) treat this as canonical EER. Not in the current spec §3.2 data model (`ISANode` has only `isTotal`).
+
+**Required before Phase 4 (ISA glyph rendering):**
+- Spec amendment: add `readonly isDisjoint: boolean` to `ISANode`.
+- Two new validation rules:
+  - **G-disjoint:** if `isDisjoint=true`, runtime semantics note (soft reminder, not a structural check — inheritance constraint enforced at instance-level, not diagram-level).
+  - **G-overlap-impl:** flag composite-constraint conflicts (e.g., total+disjoint is the most-constrained; partial+overlapping is least).
+- Phase 4 rendering: add "d" or "o" marker inside/next to the ISA triangle.
+- Phase 5 Java XML codec: map the Java ERDesigner's disjoint/overlap tags if present; otherwise default to disjoint.
+
+## Additional validation rules deferred to Sub-project 4
+
+- **Diagram connectivity warning** — flag isolated subgraphs (no path between two entity clusters). Soft warning.
+- **1:1 asymmetric total participation** — flag 1:1 relationships where one side is total and the other is partial. Stylistic warning (still semantically valid).
+- **M:N with relationship attributes → associative entity hint** — soft hint suggesting the M:N should be decomposed into a new associative entity + two 1:N relationships.
+- **A7 "simple attribute must not be subdivided"** — currently covered obliquely by rule 3.12 (sub-attributes cannot be composite); re-evaluate if an explicit rule adds value.
+
 ## Phase 0 follow-ups (track for Phase 1 or later)
 
 - **`eslint-plugin-import/order`** — spec §8.6 item 8 lists it as a required rule; Phase 0 did not install it. Revisit when Phase 1 lands the first domain files; if import ordering is intentionally deferred, update the spec to match.
