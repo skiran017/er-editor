@@ -1,7 +1,7 @@
 import { assign, setup } from 'xstate'
 import {
   beginRubberband, clearSelectionAction, commitRubberbandAction,
-  deleteSelectionAction, duplicateSelectionAction, moveDraggedNode,
+  connectNodes, deleteSelectionAction, duplicateSelectionAction, moveDraggedNode,
   nudgeSelection, panViewportAction, placeNode, redoAction, selectAllAction,
   selectNodeFromEvent, stubCopy, stubCut, stubPaste, toggleCheatsheetAction,
   undoAction, updateRubberbandAction, zoomAtPointAction,
@@ -93,6 +93,7 @@ export const editorMachine = setup({
     stubPaste: ({ context, event }) => stubPaste(context, event),
     toggleCheatsheetAction: ({ context, event }) => toggleCheatsheetAction(context, event),
     placeNodeAction: ({ context, event }) => placeNode(context, event),
+    connectNodesAction: ({ context, event }) => connectNodes(context, event),
   },
 }).createMachine({
   id: 'editor',
@@ -221,9 +222,105 @@ export const editorMachine = setup({
         },
       },
     },
-    drawing: { on: {} },
-    quickRelationship: { on: {} },
-    quickGeneralization: { on: {} },
-    connectToGeneralization: { on: {} },
+    drawing: {
+      initial: 'idle',
+      states: {
+        idle: {
+          on: {
+            NODE_POINTER_DOWN: [
+              { guard: 'isLeftButton', target: 'connection.fromPicked',
+                actions: assign({
+                  connectionFromId: ({ event }) =>
+                    event.type === 'NODE_POINTER_DOWN' ? event.nodeId : null,
+                }) },
+            ],
+          },
+        },
+        connection: {
+          initial: 'fromPicked',
+          states: {
+            fromPicked: {
+              on: {
+                NODE_POINTER_UP: {
+                  target: '#editor.drawing.idle',
+                  actions: ['connectNodesAction', 'resetContext'],
+                },
+                CANVAS_POINTER_UP: { target: '#editor.drawing.idle', actions: 'resetContext' },
+              },
+            },
+          },
+        },
+      },
+    },
+    quickRelationship: {
+      initial: 'idle',
+      states: {
+        idle: {
+          on: {
+            NODE_POINTER_DOWN: {
+              guard: 'isLeftButton',
+              target: 'firstPicked',
+              actions: assign({
+                quickFirstId: ({ event }) =>
+                  event.type === 'NODE_POINTER_DOWN' ? event.nodeId : null,
+              }),
+            },
+          },
+        },
+        firstPicked: {
+          on: {
+            NODE_POINTER_DOWN: {
+              guard: ({ context, event }) =>
+                event.type === 'NODE_POINTER_DOWN' && event.button === 'left'
+                  && context.quickFirstId !== null && event.nodeId !== context.quickFirstId,
+              target: '#editor.quickRelationship.idle',
+              actions: ['connectNodesAction', 'resetContext'],
+            },
+          },
+        },
+      },
+    },
+    quickGeneralization: {
+      initial: 'idle',
+      states: {
+        idle: {
+          on: {
+            NODE_POINTER_DOWN: {
+              guard: 'isLeftButton',
+              target: 'firstPicked',
+              actions: assign({
+                quickFirstId: ({ event }) =>
+                  event.type === 'NODE_POINTER_DOWN' ? event.nodeId : null,
+              }),
+            },
+          },
+        },
+        firstPicked: {
+          on: {
+            NODE_POINTER_DOWN: {
+              guard: ({ context, event }) =>
+                event.type === 'NODE_POINTER_DOWN' && event.button === 'left'
+                  && context.quickFirstId !== null && event.nodeId !== context.quickFirstId,
+              target: '#editor.quickGeneralization.idle',
+              actions: ['connectNodesAction', 'resetContext'],
+            },
+          },
+        },
+      },
+    },
+    connectToGeneralization: {
+      initial: 'waitingForChild',
+      states: {
+        waitingForChild: {
+          on: {
+            NODE_POINTER_DOWN: {
+              guard: 'isLeftButton',
+              target: '#editor.selecting',
+              actions: ['connectNodesAction', 'resetContext'],
+            },
+          },
+        },
+      },
+    },
   },
 })
