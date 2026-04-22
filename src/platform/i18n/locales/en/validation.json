@@ -1,0 +1,49 @@
+{
+  "validation": {
+    "chen": {
+      "entity": {
+        "must-have-key": "Strong entity must have at least one key attribute.",
+        "weak-missing-discriminant": "Weak entity must have a discriminant attribute.",
+        "must-have-attribute": "Entity must have at least one attribute.",
+        "weak-total-participation": "Weak entity must have total participation in the identifying relationship.",
+        "weak-not-on-1-side": "Weak entity cannot be on the 1-side of the identifying relationship (must be N-side).",
+        "weak-single-identifying": "Weak entity must connect to exactly one identifying relationship (currently {{count}}).",
+        "name-unique": "Entity name \"{{name}}\" is already used by another entity.",
+        "name-non-empty": "Entity name must not be empty.",
+        "orphan-warning": "Entity has no relationships (may be incomplete).",
+        "weak-no-key": "Weak entity must not have a key attribute; use a discriminant (partial key) instead."
+      },
+      "relationship": {
+        "min-two-entities": "Relationship must connect at least 2 entities (or be a recursive relationship).",
+        "cardinality-required": "All connections on this relationship must have cardinality defined.",
+        "participation-required": "All connections on this relationship must have participation defined.",
+        "identifying-needs-weak": "Identifying relationship must connect at least one weak entity.",
+        "non-identifying-not-weak": "Non-identifying relationship should not be marked as identifying.",
+        "name-unique": "Relationship name \"{{name}}\" is already used by another relationship.",
+        "recursive-roles-distinct": "Recursive relationship must have distinct, non-empty roles on both edges."
+      },
+      "attribute": {
+        "single-parent": "Attribute must connect to exactly one parent (entity, relationship, or composite attribute).",
+        "no-dual-parent": "Attribute cannot connect to both an entity and a relationship.",
+        "discriminant-weak-only": "Discriminant is only valid on attributes of a weak entity.",
+        "not-key-and-derived": "Attribute cannot be both key and derived.",
+        "key-not-multivalued": "Key attribute cannot be multivalued.",
+        "discriminant-not-multivalued": "Discriminant cannot be multivalued.",
+        "relationship-not-key": "Attributes of a relationship cannot be key attributes.",
+        "name-unique": "Attribute name \"{{name}}\" is already used by another attribute on the same parent.",
+        "composite-needs-sub": "Composite attribute should have at least one sub-attribute.",
+        "sub-not-key": "Sub-attribute cannot be a key attribute.",
+        "sub-not-discriminant": "Sub-attribute cannot be a discriminant.",
+        "sub-not-composite": "Sub-attribute cannot itself be composite (only one level of nesting)."
+      },
+      "generalization": {
+        "parent-exists": "ISA generalization must have a parent entity.",
+        "has-children": "ISA generalization must have at least one child.",
+        "single-child-warning": "ISA with a single child is semantically weak — consider whether specialization is meaningful."
+      },
+      "structural": {
+        "dangling-edge": "Edge references a node that does not exist."
+      }
+    }
+  }
+}
