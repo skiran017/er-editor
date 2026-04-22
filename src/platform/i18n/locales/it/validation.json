@@ -1,4 +1,5 @@
 {
+  "_note": "Italian translations are deferred to Phase 7; this bundle intentionally duplicates the EN fallback so i18next resolution does not break when ?lang=it is requested.",
   "validation": {
     "chen": {
       "entity": {
