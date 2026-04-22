@@ -95,3 +95,11 @@ export const emptyDiagram = (): Diagram => ({
   nodeOrder: [],
   edgeOrder: [],
 })
+
+// ——— Invariants (runtime checks against malformed state) ———
+
+export interface InvariantViolation {
+  readonly invariantId: string
+  readonly targetId: NodeId | EdgeId
+  readonly detail: string
+}
