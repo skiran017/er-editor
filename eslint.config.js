@@ -68,6 +68,7 @@ export default defineConfig([
       'max-lines': ['warn', { max: 350, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['warn', { max: 100, skipBlankLines: true, skipComments: true }],
       complexity: ['warn', 15],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-restricted-syntax': [
         'error',
         { selector: 'ExportDefaultDeclaration', message: 'Use named exports (see spec §8.3).' },
