@@ -7,13 +7,14 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@fixtures': path.resolve(__dirname, './tests/fixtures'),
     },
   },
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/fixtures/**/*.test.{ts,tsx}'],
     exclude: ['src/legacy/**', 'tests/e2e/**', 'node_modules/**'],
     coverage: {
       provider: 'v8',

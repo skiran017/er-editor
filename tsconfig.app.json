@@ -11,6 +11,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@fixtures/*": [
+        "./tests/fixtures/*"
       ]
     },
 
@@ -30,6 +33,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"],
+  "include": ["src", "tests/fixtures"],
   "exclude": ["src/legacy"]
 }
