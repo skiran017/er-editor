@@ -1,26 +1,22 @@
 import { memo } from 'react'
-import type { NodeProps } from '@xyflow/react'
+import type { Node, NodeProps } from '@xyflow/react'
 import { EntityGlyph } from '@/notation/chen/nodes/EntityGlyph'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
 import { useValidationStore } from '@/state/validationStore'
-import type { EntityNode as EntityNodeModel, NodeId } from '@/domain/types'
+import { pickSeverity } from '@/state/selectors'
+import type { EntityNode as EntityNodeModel } from '@/domain/types'
 import type { NotationNodeData } from '@/notation/types'
 
-const pickSeverity = (
-  errors?: readonly { severity: 'error' | 'warning' }[],
-): 'none' | 'warning' | 'error' => {
-  if (!errors || errors.length === 0) return 'none'
-  return errors.some((e) => e.severity === 'error') ? 'error' : 'warning'
-}
+type EntityRfNode = Node<NotationNodeData, 'entity'>
 
-export const EntityNode = memo(({ data }: NodeProps) => {
-  const nodeId = (data as unknown as NotationNodeData).nodeId
+export const EntityNode = memo(({ data }: NodeProps<EntityRfNode>) => {
+  const nodeId = data.nodeId
   const node = useDiagramStore((s) => s.diagram.nodesById[nodeId]) as
     | EntityNodeModel
     | undefined
   const isSelected = useSelectionStore((s) => s.selectedNodeIds.has(nodeId))
-  const warnings = useValidationStore((s) => s.errorsById[nodeId as NodeId])
+  const warnings = useValidationStore((s) => s.errorsById[nodeId])
   if (!node || node.kind !== 'entity') return null
   return (
     <svg width={node.size.width} height={node.size.height} overflow="visible">

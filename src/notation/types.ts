@@ -78,11 +78,11 @@ export interface NotationDefaults {
 
 // ——— React-Flow data payloads (shared by all plugins) ———
 
-export interface NotationNodeData {
+export type NotationNodeData = Record<string, unknown> & {
   readonly nodeId: NodeId
 }
 
-export interface NotationEdgeData {
+export type NotationEdgeData = Record<string, unknown> & {
   readonly edgeId: EdgeId
 }
 

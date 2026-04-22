@@ -30,3 +30,10 @@ export const selectErrorsForId =
   (id: NodeId | string) =>
   (state: ValidationStoreState): readonly ValidationError[] =>
     state.errorsById[id as NodeId] ?? []
+
+export const pickSeverity = (
+  errors?: readonly ValidationError[],
+): 'none' | 'warning' | 'error' => {
+  if (!errors || errors.length === 0) return 'none'
+  return errors.some((e) => e.severity === 'error') ? 'error' : 'warning'
+}

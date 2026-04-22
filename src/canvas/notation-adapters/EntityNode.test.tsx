@@ -1,12 +1,15 @@
 import type { ReactElement } from 'react'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
-import { ReactFlowProvider, type NodeProps } from '@xyflow/react'
+import { ReactFlowProvider, type Node, type NodeProps } from '@xyflow/react'
 import { EntityNode } from './EntityNode'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
 import { useValidationStore } from '@/state/validationStore'
 import { emptyDiagram, type NodeId } from '@/domain/types'
+import type { NotationNodeData } from '@/notation/types'
+
+type EntityRfNode = Node<NotationNodeData, 'entity'>
 
 const resetStores = () => {
   useDiagramStore.setState({ diagram: emptyDiagram() })
@@ -20,7 +23,7 @@ const resetStores = () => {
 }
 
 const mkNodeProps = (id: NodeId) =>
-  ({ id, data: { nodeId: id }, type: 'entity' }) as unknown as NodeProps
+  ({ id, data: { nodeId: id }, type: 'entity' }) as unknown as NodeProps<EntityRfNode>
 
 const renderWithProvider = (ui: ReactElement) =>
   render(

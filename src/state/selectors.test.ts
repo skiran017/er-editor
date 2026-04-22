@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
-  selectNodeById, selectIncidentEdges, selectSelectedNodes, selectErrorsForId,
+  selectNodeById, selectIncidentEdges, selectSelectedNodes, selectErrorsForId, pickSeverity,
 } from './selectors'
 import { useDiagramStore } from './diagramStore'
 import { useSelectionStore } from './selectionStore'
 import { useValidationStore } from './validationStore'
 import { emptyDiagram } from '@/domain/types'
+import type { ValidationError } from '@/domain/types'
 import type { NodeInput } from './types'
 import { asNodeId } from '@/domain/id'
 
@@ -96,5 +97,31 @@ describe('selectors — memoisation', () => {
     expect(before).not.toBe(after)
     // But length stays 0 (node has no edges).
     expect(after).toEqual([])
+  })
+})
+
+describe('pickSeverity', () => {
+  const mkErr = (severity: 'error' | 'warning'): ValidationError => ({
+    ruleId: 'r', severity, targetId: asNodeId('n000000001'), messageKey: 'm',
+  })
+
+  it('returns "none" for undefined input', () => {
+    expect(pickSeverity(undefined)).toBe('none')
+  })
+
+  it('returns "none" for an empty array', () => {
+    expect(pickSeverity([])).toBe('none')
+  })
+
+  it('returns "warning" when only warnings are present', () => {
+    expect(pickSeverity([mkErr('warning'), mkErr('warning')])).toBe('warning')
+  })
+
+  it('returns "error" for a mix of warnings and errors', () => {
+    expect(pickSeverity([mkErr('warning'), mkErr('error')])).toBe('error')
+  })
+
+  it('returns "error" when only errors are present', () => {
+    expect(pickSeverity([mkErr('error')])).toBe('error')
   })
 })
