@@ -124,3 +124,99 @@ describe('diagramStore — removeNode', () => {
     expect(d.edgeOrder).not.toContain(edgeId)
   })
 })
+
+describe('diagramStore — addEdge', () => {
+  beforeEach(() => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it('appends to edgesById + edgeOrder and returns id', () => {
+    const store = useDiagramStore.getState()
+    const a = store.addNode(baseEntityInput('A'))
+    const b = store.addNode(baseEntityInput('B'))
+    const rel = store.addNode({
+      kind: 'relationship', name: 'R', isIdentifying: false,
+      position: { x: 0, y: 0 }, size: { width: 140, height: 70 },
+    })
+    const id = store.addEdge({
+      kind: 'entity-relationship',
+      sourceId: a, targetId: rel,
+      cardinality: '1', participation: 'partial',
+      waypoints: [],
+    })
+    const d = useDiagramStore.getState().diagram
+    expect(d.edgeOrder).toContain(id)
+    expect(d.edgesById[id]).toMatchObject({ sourceId: a, targetId: rel })
+    store.addEdge({
+      kind: 'entity-relationship', sourceId: b, targetId: rel,
+      cardinality: 'N', participation: 'total', waypoints: [],
+    })
+    expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(2)
+  })
+})
+
+describe('diagramStore — updateEdge / setWaypoints', () => {
+  beforeEach(() => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it('updateEdge merges patch', () => {
+    const store = useDiagramStore.getState()
+    const a = store.addNode(baseEntityInput('A'))
+    const b = store.addNode(baseEntityInput('B'))
+    const r = store.addNode({
+      kind: 'relationship', name: 'R', isIdentifying: false,
+      position: { x: 0, y: 0 }, size: { width: 140, height: 70 },
+    })
+    const id = store.addEdge({
+      kind: 'entity-relationship', sourceId: a, targetId: r,
+      cardinality: '1', participation: 'partial', waypoints: [],
+    })
+    store.updateEdge(id, { cardinality: 'N' } as Partial<import('@/domain/types').ERLink>)
+    expect(useDiagramStore.getState().diagram.edgesById[id]).toMatchObject({ cardinality: 'N' })
+    void b
+  })
+
+  it('setWaypoints replaces the array', () => {
+    const store = useDiagramStore.getState()
+    const a = store.addNode(baseEntityInput('A'))
+    const r = store.addNode({
+      kind: 'relationship', name: 'R', isIdentifying: false,
+      position: { x: 0, y: 0 }, size: { width: 140, height: 70 },
+    })
+    const id = store.addEdge({
+      kind: 'entity-relationship', sourceId: a, targetId: r,
+      cardinality: '1', participation: 'partial', waypoints: [],
+    })
+    store.setWaypoints(id, [{ x: 10, y: 10 }, { x: 20, y: 20 }])
+    expect(useDiagramStore.getState().diagram.edgesById[id]!.waypoints).toEqual([
+      { x: 10, y: 10 }, { x: 20, y: 20 },
+    ])
+  })
+})
+
+describe('diagramStore — removeEdge', () => {
+  beforeEach(() => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it('removes from edgesById and edgeOrder', () => {
+    const store = useDiagramStore.getState()
+    const a = store.addNode(baseEntityInput('A'))
+    const r = store.addNode({
+      kind: 'relationship', name: 'R', isIdentifying: false,
+      position: { x: 0, y: 0 }, size: { width: 140, height: 70 },
+    })
+    const id = store.addEdge({
+      kind: 'entity-relationship', sourceId: a, targetId: r,
+      cardinality: '1', participation: 'partial', waypoints: [],
+    })
+    store.removeEdge(id)
+    const d = useDiagramStore.getState().diagram
+    expect(d.edgesById[id]).toBeUndefined()
+    expect(d.edgeOrder).not.toContain(id)
+  })
+})
