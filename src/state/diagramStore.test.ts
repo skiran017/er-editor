@@ -220,3 +220,125 @@ describe('diagramStore — removeEdge', () => {
     expect(d.edgeOrder).not.toContain(id)
   })
 })
+
+describe('diagramStore — applyPatch', () => {
+  beforeEach(() => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it('adds nodes and edges in one step', () => {
+    const store = useDiagramStore.getState()
+    const a = store.addNode(baseEntityInput('Keep'))
+    useDiagramStore.temporal.getState().clear()
+
+    // Build a patch manually
+    const newEntity: import('@/domain/types').EntityNode = {
+      id: 'fromPatch1' as never,
+      kind: 'entity', name: 'Patched', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    }
+    store.applyPatch({ addNodes: [newEntity] })
+
+    const d = useDiagramStore.getState().diagram
+    expect(d.nodeOrder).toEqual([a, 'fromPatch1'])
+    expect(d.nodesById['fromPatch1' as never]).toBeDefined()
+  })
+
+  it('applyPatch is a single undo step regardless of mutation count', () => {
+    const store = useDiagramStore.getState()
+    const a = store.addNode(baseEntityInput('A'))
+    useDiagramStore.temporal.getState().clear()
+
+    const e1: import('@/domain/types').EntityNode = {
+      id: 'id________1' as never, kind: 'entity', name: 'X1', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    }
+    const e2: import('@/domain/types').EntityNode = {
+      id: 'id________2' as never, kind: 'entity', name: 'X2', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    }
+    store.applyPatch({ addNodes: [e1, e2] })
+    expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(3)
+
+    useDiagramStore.temporal.getState().undo()
+    expect(useDiagramStore.getState().diagram.nodeOrder).toEqual([a])
+  })
+})
+
+describe('diagramStore — replaceDiagram', () => {
+  beforeEach(() => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it('replaces the entire diagram', () => {
+    const store = useDiagramStore.getState()
+    store.addNode(baseEntityInput('A'))
+    const fresh = emptyDiagram()
+    store.replaceDiagram(fresh)
+    expect(useDiagramStore.getState().diagram).toBe(fresh)
+  })
+
+  it('clears the undo stack', () => {
+    const store = useDiagramStore.getState()
+    store.addNode(baseEntityInput('A'))
+    store.addNode(baseEntityInput('B'))
+    expect(useDiagramStore.temporal.getState().pastStates.length).toBeGreaterThan(0)
+
+    store.replaceDiagram(emptyDiagram())
+    expect(useDiagramStore.temporal.getState().pastStates).toHaveLength(0)
+  })
+})
+
+describe('diagramStore — z-order', () => {
+  beforeEach(() => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it('bringToFront moves node id to the end of nodeOrder', () => {
+    const store = useDiagramStore.getState()
+    const a = store.addNode(baseEntityInput('A'))
+    const b = store.addNode(baseEntityInput('B'))
+    store.bringToFront(a)
+    expect(useDiagramStore.getState().diagram.nodeOrder).toEqual([b, a])
+  })
+
+  it('sendToBack moves node id to the front of nodeOrder', () => {
+    const store = useDiagramStore.getState()
+    const a = store.addNode(baseEntityInput('A'))
+    const b = store.addNode(baseEntityInput('B'))
+    store.sendToBack(b)
+    expect(useDiagramStore.getState().diagram.nodeOrder).toEqual([b, a])
+  })
+})
+
+describe('diagramStore — undo/redo', () => {
+  beforeEach(() => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it('undo reverts a single action', () => {
+    const store = useDiagramStore.getState()
+    const id = store.addNode(baseEntityInput('A'))
+    expect(useDiagramStore.getState().diagram.nodeOrder).toEqual([id])
+    useDiagramStore.temporal.getState().undo()
+    expect(useDiagramStore.getState().diagram.nodeOrder).toEqual([])
+  })
+
+  it('redo re-applies after undo', () => {
+    const store = useDiagramStore.getState()
+    const id = store.addNode(baseEntityInput('A'))
+    useDiagramStore.temporal.getState().undo()
+    useDiagramStore.temporal.getState().redo()
+    expect(useDiagramStore.getState().diagram.nodeOrder).toEqual([id])
+  })
+
+  it('caps history at 100 entries', () => {
+    const store = useDiagramStore.getState()
+    for (let i = 0; i < 120; i++) store.addNode(baseEntityInput(`E${i}`))
+    expect(useDiagramStore.temporal.getState().pastStates.length).toBeLessThanOrEqual(100)
+  })
+})

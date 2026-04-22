@@ -89,8 +89,6 @@ export const useDiagramStore = create<DiagramStoreState>()(
           })
         },
 
-        // ——— edge operations, bulk, z-order: added in Tasks 4 + 5 ———
-
         addEdge: (input) => {
           const id = newEdgeId()
           set((state) => {
@@ -125,24 +123,84 @@ export const useDiagramStore = create<DiagramStoreState>()(
           })
         },
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        applyPatch: (_patch) => {
-          // Implemented in Task 5.
+        applyPatch: (patch) => {
+          set((state) => {
+            for (const id of patch.removeEdges ?? []) {
+              delete (state.diagram.edgesById as Record<EdgeId, ERLink>)[id]
+              ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder =
+                (state.diagram.edgeOrder as EdgeId[]).filter((x) => x !== id)
+            }
+            for (const id of patch.removeNodes ?? []) {
+              if (!state.diagram.nodesById[id]) continue
+              delete (state.diagram.nodesById as Record<NodeId, ERNode>)[id]
+              ;(state.diagram as { nodeOrder: NodeId[] }).nodeOrder =
+                (state.diagram.nodeOrder as NodeId[]).filter((x) => x !== id)
+              const keep: EdgeId[] = []
+              for (const edgeId of state.diagram.edgeOrder) {
+                const e = state.diagram.edgesById[edgeId]
+                if (!e) continue
+                if (e.sourceId === id || e.targetId === id) {
+                  delete (state.diagram.edgesById as Record<EdgeId, ERLink>)[edgeId]
+                } else {
+                  keep.push(edgeId)
+                }
+              }
+              ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder = keep
+            }
+            for (const node of patch.addNodes ?? []) {
+              ;(state.diagram.nodesById as Record<NodeId, ERNode>)[node.id] = node
+              ;(state.diagram.nodeOrder as NodeId[]).push(node.id)
+            }
+            for (const edge of patch.addEdges ?? []) {
+              ;(state.diagram.edgesById as Record<EdgeId, ERLink>)[edge.id] = edge
+              ;(state.diagram.edgeOrder as EdgeId[]).push(edge.id)
+            }
+            for (const { id, patch: p } of patch.updateNodes ?? []) {
+              const existing = state.diagram.nodesById[id]
+              if (!existing) continue
+              ;(state.diagram.nodesById as Record<NodeId, ERNode>)[id] = { ...existing, ...p } as ERNode
+            }
+            for (const { id, patch: p } of patch.updateEdges ?? []) {
+              const existing = state.diagram.edgesById[id]
+              if (!existing) continue
+              ;(state.diagram.edgesById as Record<EdgeId, ERLink>)[id] = { ...existing, ...p } as ERLink
+            }
+          })
         },
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        replaceDiagram: (_next) => {
-          // Implemented in Task 5.
+        replaceDiagram: (next) => {
+          set((state) => {
+            ;(state as { diagram: Diagram }).diagram = next
+          })
+          useDiagramStore.temporal.getState().clear()
         },
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        bringToFront: (_id) => {
-          // Implemented in Task 5.
+        bringToFront: (id) => {
+          set((state) => {
+            if (state.diagram.nodesById[id as NodeId]) {
+              ;(state.diagram as { nodeOrder: NodeId[] }).nodeOrder =
+                (state.diagram.nodeOrder as NodeId[]).filter((x) => x !== id)
+              ;(state.diagram.nodeOrder as NodeId[]).push(id as NodeId)
+            } else if (state.diagram.edgesById[id as EdgeId]) {
+              ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder =
+                (state.diagram.edgeOrder as EdgeId[]).filter((x) => x !== id)
+              ;(state.diagram.edgeOrder as EdgeId[]).push(id as EdgeId)
+            }
+          })
         },
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        sendToBack: (_id) => {
-          // Implemented in Task 5.
+        sendToBack: (id) => {
+          set((state) => {
+            if (state.diagram.nodesById[id as NodeId]) {
+              ;(state.diagram as { nodeOrder: NodeId[] }).nodeOrder =
+                (state.diagram.nodeOrder as NodeId[]).filter((x) => x !== id)
+              ;(state.diagram.nodeOrder as NodeId[]).unshift(id as NodeId)
+            } else if (state.diagram.edgesById[id as EdgeId]) {
+              ;(state.diagram as { edgeOrder: EdgeId[] }).edgeOrder =
+                (state.diagram.edgeOrder as EdgeId[]).filter((x) => x !== id)
+              ;(state.diagram.edgeOrder as EdgeId[]).unshift(id as EdgeId)
+            }
+          })
         },
       })),
       {
