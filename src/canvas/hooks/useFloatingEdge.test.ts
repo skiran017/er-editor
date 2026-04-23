@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { chooseSide, sidePort, getNodeIntersection } from './useFloatingEdge'
+import { chooseSide, sidePort, getNodeIntersection, assignNodePorts } from './useFloatingEdge'
 
 // Minimal RF-node shape for the pure helpers. Real RF nodes have more
 // fields but the helpers only read these.
@@ -101,5 +101,71 @@ describe('getNodeIntersection (back-compat: now returns a cardinal midpoint)', (
     ]
     const hit = midpoints.some((m) => m.x === p.x && m.y === p.y)
     expect(hit).toBe(true)
+  })
+})
+
+describe('assignNodePorts (collision-aware distribution across 4 cardinal ports)', () => {
+  it('no collision: every edge keeps its preferred side', () => {
+    const hub = mkNode(0, 0, 100, 50)
+    const right = mkNode(300, 0)
+    const below = mkNode(0, 300)
+    const map = assignNodePorts(hub, [
+      { edgeId: 'e1', other: right },
+      { edgeId: 'e2', other: below },
+    ])
+    expect(map.get('e1')).toBe('right')
+    expect(map.get('e2')).toBe('bottom')
+  })
+
+  it("two edges both preferring 'right' → primary keeps right, secondary rotates to nearest unused side", () => {
+    const hub = mkNode(0, 0, 100, 50) // centre (50, 25)
+    // Both to the right, but one slightly above, one slightly below.
+    const upperRight = mkNode(300, -120) // centre (350, -95) → angle ≈ -0.33 rad
+    const lowerRight = mkNode(300, 100)  // centre (350, 125) → angle ≈ 0.34 rad (slightly below horizontal)
+    const map = assignNodePorts(hub, [
+      { edgeId: 'upper', other: upperRight },
+      { edgeId: 'lower', other: lowerRight },
+    ])
+    // `lower` is slightly closer to the RIGHT central angle (0 rad) because
+    // its angle magnitude is 0.34 vs upper's 0.33 — tied in practice, but
+    // the algorithm's tie-breaker picks one. The key invariant is that
+    // both edges get DIFFERENT sides.
+    const upperSide = map.get('upper')!
+    const lowerSide = map.get('lower')!
+    expect(upperSide).not.toBe(lowerSide)
+    // And one of them still gets RIGHT (the primary).
+    expect(new Set([upperSide, lowerSide]).has('right')).toBe(true)
+    // The displaced edge lands on top or bottom (nearest unused cardinal
+    // from the angle).
+    const displaced = upperSide === 'right' ? lowerSide : upperSide
+    expect(['top', 'bottom']).toContain(displaced)
+  })
+
+  it('four edges covering all four directions → each gets a distinct side', () => {
+    const hub = mkNode(0, 0, 100, 50)
+    const map = assignNodePorts(hub, [
+      { edgeId: 'e-right', other: mkNode(300, 0) },
+      { edgeId: 'e-left', other: mkNode(-300, 0) },
+      { edgeId: 'e-top', other: mkNode(0, -300) },
+      { edgeId: 'e-bottom', other: mkNode(0, 300) },
+    ])
+    const sides = new Set(map.values())
+    expect(sides.size).toBe(4)
+  })
+
+  it('five edges all wanting the same side → first four spread across four cardinals, fifth stacks on the preferred', () => {
+    const hub = mkNode(0, 0, 100, 50)
+    // All five targets are to the right, at increasing vertical spread.
+    const map = assignNodePorts(hub, [
+      { edgeId: 'e1', other: mkNode(300, -50) },
+      { edgeId: 'e2', other: mkNode(300, 0) },
+      { edgeId: 'e3', other: mkNode(300, 50) },
+      { edgeId: 'e4', other: mkNode(300, 100) },
+      { edgeId: 'e5', other: mkNode(300, 150) },
+    ])
+    // At least four distinct sides are used (stacking only starts at edge 5).
+    expect(new Set(map.values()).size).toBeGreaterThanOrEqual(4)
+    // Every edge has been assigned some side.
+    expect(map.size).toBe(5)
   })
 })

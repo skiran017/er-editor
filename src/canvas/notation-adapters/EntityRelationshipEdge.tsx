@@ -77,7 +77,7 @@ export const EntityRelationshipEdge = memo(
     const edge = useDiagramStore((s) => s.diagram.edgesById[edgeId]) as
       | EREdgeModel
       | undefined
-    const float = useFloatingEdge(source, target)
+    const float = useFloatingEdge(source, target, edgeId)
     if (!edge || edge.kind !== 'entity-relationship') return null
 
     const sx = float ? float.sx : sourceX

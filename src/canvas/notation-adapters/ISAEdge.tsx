@@ -11,7 +11,7 @@ export const ISAEdge = memo(
     const edge = useDiagramStore((s) => s.diagram.edgesById[edgeId]) as
       | ISAEdgeModel
       | undefined
-    const float = useFloatingEdge(source, target)
+    const float = useFloatingEdge(source, target, edgeId)
     if (!edge || edge.kind !== 'isa-link') return null
 
     const [path] = float

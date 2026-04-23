@@ -15,7 +15,7 @@ export const AttributeEdge = memo(
     // each node's boundary, computed from the line between centres. This is
     // what makes the edge visibly rotate as either node moves, instead of
     // being locked to a fixed right/left handle.
-    const float = useFloatingEdge(source, target)
+    const float = useFloatingEdge(source, target, edgeId)
     if (!edge || edge.kind !== 'attribute-of') return null
 
     const [path] = float
