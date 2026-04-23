@@ -4,6 +4,9 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { Edge as RfEdge, Node as RfNode } from '@xyflow/react'
 import { useRfEvents } from './useRfEvents'
 import { useInteractionStore } from '@/interaction/interactionStore'
+import { useDiagramStore } from '@/state/diagramStore'
+import { useUiStore } from '@/state/uiStore'
+import { emptyDiagram } from '@/domain/types'
 
 const mkMouseEvent = (overrides: Partial<MouseEvent> = {}): ReactMouseEvent => ({
   clientX: 10, clientY: 20,
@@ -91,5 +94,39 @@ describe('useRfEvents', () => {
     const call = sendSpy.mock.calls.find(([ev]) => ev.type === 'NODE_POINTER_DOWN')
     expect((call![0] as { button: string }).button).toBe('right')
     sendSpy.mockRestore()
+  })
+
+  it('onNodeDoubleClick opens the inline rename overlay with the node name (Bug 4)', () => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useUiStore.getState().cancelInlineRename()
+    const id = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'Customer', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const { result } = renderHook(() => useRfEvents())
+    result.current.onNodeDoubleClick(mkMouseEvent(), { id } as unknown as RfNode)
+    expect(useUiStore.getState().inlineRename).toEqual({
+      nodeId: id, initialValue: 'Customer',
+    })
+  })
+
+  it('onNodeDoubleClick is a no-op for ISA nodes (they have no name)', () => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useUiStore.getState().cancelInlineRename()
+    const id = useDiagramStore.getState().addNode({
+      kind: 'isa', isTotal: false,
+      position: { x: 0, y: 0 }, size: { width: 100, height: 60 },
+    })
+    const { result } = renderHook(() => useRfEvents())
+    result.current.onNodeDoubleClick(mkMouseEvent(), { id } as unknown as RfNode)
+    expect(useUiStore.getState().inlineRename).toBeNull()
+  })
+
+  it('onNodeDoubleClick is a no-op for an unknown node id', () => {
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useUiStore.getState().cancelInlineRename()
+    const { result } = renderHook(() => useRfEvents())
+    result.current.onNodeDoubleClick(mkMouseEvent(), { id: 'does-not-exist' } as RfNode)
+    expect(useUiStore.getState().inlineRename).toBeNull()
   })
 })

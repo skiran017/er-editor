@@ -6,6 +6,7 @@ import {
   undoAction, redoAction, deleteSelectionAction, duplicateSelectionAction,
   selectAllAction, clearSelectionAction,
   stubCopy, stubCut, stubPaste, toggleCheatsheetAction,
+  placeAttributeOnParent,
 } from './actions'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useViewportStore } from '@/state/viewportStore'
@@ -320,6 +321,78 @@ describe('actions — selection ops', () => {
 
     clearSelectionAction(initialContext, { type: 'ESCAPE' })
     expect(useSelectionStore.getState().selectedNodeIds.size).toBe(0)
+  })
+})
+
+describe('actions — placeAttributeOnParent (per-parent counter, Bug 3)', () => {
+  beforeEach(resetStores)
+
+  it('names the first attribute of a parent "attribute 1" even when another parent already has attributes', () => {
+    const store = useDiagramStore.getState()
+    const entity = store.addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const relationship = store.addNode({
+      kind: 'relationship', name: 'R', isIdentifying: false,
+      position: { x: 400, y: 0 }, size: { width: 140, height: 70 },
+    })
+    // Give the entity two attributes (counter-intuitive case).
+    placeAttributeOnParent({
+      type: 'NODE_POINTER_DOWN', nodeId: entity,
+      point: { x: 0, y: 0 }, modifiers: NO_MODIFIERS, button: 'left',
+    })
+    placeAttributeOnParent({
+      type: 'NODE_POINTER_DOWN', nodeId: entity,
+      point: { x: 0, y: 0 }, modifiers: NO_MODIFIERS, button: 'left',
+    })
+    // Now place the first attribute on the relationship.
+    placeAttributeOnParent({
+      type: 'NODE_POINTER_DOWN', nodeId: relationship,
+      point: { x: 400, y: 0 }, modifiers: NO_MODIFIERS, button: 'left',
+    })
+    const d = useDiagramStore.getState().diagram
+    const relChildEdge = Object.values(d.edgesById).find(
+      (e) => e.kind === 'attribute-of' && e.targetId === relationship,
+    )
+    expect(relChildEdge).toBeDefined()
+    const firstRelAttr = d.nodesById[relChildEdge!.sourceId] as { name: string }
+    expect(firstRelAttr.name).toBe('attribute 1')
+  })
+
+  it('increments per-parent: first child → "attribute 1", second child → "attribute 2", independently per parent', () => {
+    const store = useDiagramStore.getState()
+    const p1 = store.addNode({
+      kind: 'entity', name: 'P1', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const p2 = store.addNode({
+      kind: 'entity', name: 'P2', isWeak: false,
+      position: { x: 500, y: 0 }, size: { width: 120, height: 60 },
+    })
+    for (let i = 0; i < 3; i++) {
+      placeAttributeOnParent({
+        type: 'NODE_POINTER_DOWN', nodeId: p1,
+        point: { x: 0, y: 0 }, modifiers: NO_MODIFIERS, button: 'left',
+      })
+    }
+    for (let i = 0; i < 2; i++) {
+      placeAttributeOnParent({
+        type: 'NODE_POINTER_DOWN', nodeId: p2,
+        point: { x: 500, y: 0 }, modifiers: NO_MODIFIERS, button: 'left',
+      })
+    }
+    const d = useDiagramStore.getState().diagram
+    const p1Names = Object.values(d.edgesById)
+      .filter((e) => e.kind === 'attribute-of' && e.targetId === p1)
+      .map((e) => (d.nodesById[e.sourceId] as { name: string }).name)
+      .sort()
+    const p2Names = Object.values(d.edgesById)
+      .filter((e) => e.kind === 'attribute-of' && e.targetId === p2)
+      .map((e) => (d.nodesById[e.sourceId] as { name: string }).name)
+      .sort()
+    expect(p1Names).toEqual(['attribute 1', 'attribute 2', 'attribute 3'])
+    expect(p2Names).toEqual(['attribute 1', 'attribute 2'])
   })
 })
 

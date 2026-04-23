@@ -16,8 +16,11 @@ export const useKeyboard = (): void => {
     const onKeyDown = (event: KeyboardEvent) => {
       const binding = matchKeybinding(event)
       if (!binding) return
-      if (binding.when === 'notInTextField' && isInTextField()) return
-      // 'always' bindings skip the text-field check; 'hasSelection' is evaluated in actions.
+      // Skip the text-field check ONLY for bindings explicitly marked 'always'
+      // (e.g. the cheatsheet toggle). 'hasSelection' bindings used to fall
+      // through this filter, causing Delete/Backspace to delete the selected
+      // node while the user was typing in the property panel (Bug 2).
+      if (binding.when !== 'always' && isInTextField()) return
       event.preventDefault()
       useInteractionStore.getState().send(binding.event)
     }

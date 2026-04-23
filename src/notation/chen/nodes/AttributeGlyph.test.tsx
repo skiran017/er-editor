@@ -56,15 +56,41 @@ describe('AttributeGlyph', () => {
     expect(text?.getAttribute('data-discriminant')).toBeNull()
   })
 
-  it('discriminant attribute underlines with dashed style', () => {
+  it('discriminant attribute renders an explicit dashed <line> under the text (Bug 6)', () => {
+    // Previously used CSS `text-decoration-style: dashed` which SVG <text>
+    // doesn't honour reliably (Safari in particular). Now we draw an explicit
+    // dashed line.
     const { container } = render(
       <svg>
         <AttributeGlyph {...base} isDiscriminant />
       </svg>,
     )
     const text = container.querySelector('text')
-    expect(text?.getAttribute('text-decoration')).toContain('underline')
     expect(text?.getAttribute('data-discriminant')).toBe('true')
+    // Discriminant no longer uses the CSS underline — only an explicit line.
+    const td = text?.getAttribute('text-decoration')
+    expect(td ?? '').not.toContain('underline')
+    const underline = container.querySelector('[data-role="discriminant-underline"]')
+    expect(underline).toBeInTheDocument()
+    expect(underline?.getAttribute('stroke-dasharray')).toBe('3 2')
+  })
+
+  it('non-discriminant attribute has no discriminant-underline line', () => {
+    const { container } = render(
+      <svg>
+        <AttributeGlyph {...base} />
+      </svg>,
+    )
+    expect(container.querySelector('[data-role="discriminant-underline"]')).not.toBeInTheDocument()
+  })
+
+  it('key attribute does NOT render the dashed discriminant line', () => {
+    const { container } = render(
+      <svg>
+        <AttributeGlyph {...base} isKey />
+      </svg>,
+    )
+    expect(container.querySelector('[data-role="discriminant-underline"]')).not.toBeInTheDocument()
   })
 
   it('composite attribute renders a composite marker', () => {

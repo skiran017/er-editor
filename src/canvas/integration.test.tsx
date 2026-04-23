@@ -230,6 +230,32 @@ describe('rendering integration — edges actually render (handles regression gu
   })
 })
 
+describe('rendering integration — multi-select mirrored into RF (Bug 5)', () => {
+  it('selectionStore.selectedNodeIds is mirrored onto RF node DOM as data-selected/selected', async () => {
+    // Regression: when the user rubber-band-selects, our selectionStore is
+    // updated but RF's internal `selected` flag on each node was not, so
+    // dragging any selected node moved only that one node. We now mirror
+    // selectionStore into the `selected` prop passed to <ReactFlow>.
+    const a = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const b = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'B', isWeak: false,
+      position: { x: 300, y: 0 }, size: { width: 120, height: 60 },
+    })
+    render(<ERCanvas />)
+    act(() => {
+      useSelectionStore.getState().select({ nodes: [a, b], edges: [] })
+    })
+    // RF stamps `.selected` on the node wrapper it renders (CSS-class:
+    // `react-flow__node selected`). Look for the two selected wrappers.
+    await new Promise((r) => setTimeout(r, 50))
+    const selectedNodes = document.querySelectorAll('.react-flow__node.selected')
+    expect(selectedNodes.length).toBe(2)
+  })
+})
+
 describe('rendering integration — drag-follow regression (Bug 1)', () => {
   it('clicking a node then moving the mouse does NOT drag the node (synthetic UP exits maybeDragging)', () => {
     // Models what useRfEvents.onNodeClick now does: NODE_POINTER_DOWN +

@@ -2,6 +2,8 @@ import { useCallback } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { Node as RfNode, Edge as RfEdge } from '@xyflow/react'
 import { useInteractionStore } from '@/interaction/interactionStore'
+import { useDiagramStore } from '@/state/diagramStore'
+import { useUiStore } from '@/state/uiStore'
 import type { Modifiers, PointerButton } from '@/interaction/events'
 import type { NodeId, EdgeId } from '@/domain/types'
 
@@ -17,6 +19,7 @@ const readButton = (button: number): PointerButton =>
 export interface RfEventHandlers {
   readonly onNodeClick: (e: ReactMouseEvent, node: RfNode) => void
   readonly onEdgeClick: (e: ReactMouseEvent, edge: RfEdge) => void
+  readonly onNodeDoubleClick: (e: ReactMouseEvent, node: RfNode) => void
 }
 
 /**
@@ -70,5 +73,18 @@ export const useRfEvents = (): RfEventHandlers => {
     send({ type: 'CANVAS_POINTER_UP', point })
   }, [])
 
-  return { onNodeClick, onEdgeClick }
+  // Bug 4 — double-click a node opens the inline rename overlay directly.
+  // ISA nodes have no name (see src/domain/types.ts) so skip them.
+  const onNodeDoubleClick = useCallback((_e: ReactMouseEvent, node: RfNode) => {
+    const nodeId = node.id as NodeId
+    const domainNode = useDiagramStore.getState().diagram.nodesById[nodeId]
+    if (!domainNode) return
+    if (domainNode.kind === 'isa') return
+    useUiStore.getState().startInlineRename({
+      nodeId,
+      initialValue: (domainNode as { name: string }).name,
+    })
+  }, [])
+
+  return { onNodeClick, onEdgeClick, onNodeDoubleClick }
 }

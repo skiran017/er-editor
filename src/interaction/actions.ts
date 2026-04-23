@@ -351,7 +351,17 @@ export const placeAttributeOnParent = (event: EditorEvent): void => {
   if (!parent) return
   if (parent.kind !== 'entity' && parent.kind !== 'relationship' && parent.kind !== 'attribute') return
 
-  const name = `attribute ${countOfKind(diagram, 'attribute') + 1}`
+  // Per-parent counter: count attributes whose `attribute-of` edge points
+  // at THIS parent. Using the global kind count was wrong because e.g. the
+  // first attribute of a new relationship would be named "attribute 2" if
+  // an attribute already existed on some other parent (Bug 3).
+  let existingChildren = 0
+  for (const eid of diagram.edgeOrder) {
+    const edge = diagram.edgesById[eid]
+    if (!edge) continue
+    if (edge.kind === 'attribute-of' && edge.targetId === parent.id) existingChildren += 1
+  }
+  const name = `attribute ${existingChildren + 1}`
   const size = { width: 90, height: 50 }
   // Offset 30 px to the right of the parent's right edge, vertically centred
   // on the parent's top-edge reference so the new attribute sits visually

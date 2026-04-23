@@ -13,6 +13,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useViewportStore } from '@/state/viewportStore'
+import { useSelectionStore } from '@/state/selectionStore'
 import { diagramToRf } from './adapters/diagramToRf'
 import { rfToDiagramPatch } from './adapters/rfToDiagramPatch'
 import { useKeyboard, useMouse, useTouch, useSnapping, useToolbarDrop, useRfEvents } from './hooks'
@@ -73,6 +74,9 @@ const ERCanvasInner = () => {
   const diagram = useDiagramStore((s) => s.diagram)
   const zoom = useViewportStore((s) => s.zoom)
   const pan = useViewportStore((s) => s.pan)
+  // Bug 5 — mirror our selectionStore into RF's per-node `selected` flag so
+  // RF's native multi-drag moves all selected nodes together.
+  const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds)
   const { applySnap } = useSnapping()
 
   useKeyboard()
@@ -83,7 +87,16 @@ const ERCanvasInner = () => {
   const [activeGuides, setActiveGuides] = useState<readonly SnapGuide[]>([])
   const dragging = useRef(false)
 
-  const { nodes, edges } = useMemo(() => diagramToRf(diagram), [diagram])
+  const { nodes, edges } = useMemo(() => {
+    const result = diagramToRf(diagram)
+    return {
+      nodes: result.nodes.map((n) => ({
+        ...n,
+        selected: selectedNodeIds.has(n.id as NodeId),
+      })),
+      edges: result.edges,
+    }
+  }, [diagram, selectedNodeIds])
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -162,6 +175,7 @@ const ERCanvasInner = () => {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onNodeClick={rfEvents.onNodeClick}
+        onNodeDoubleClick={rfEvents.onNodeDoubleClick}
         onEdgeClick={rfEvents.onEdgeClick}
         viewport={{ x: pan.x, y: pan.y, zoom }}
         onViewportChange={handleViewportChange}

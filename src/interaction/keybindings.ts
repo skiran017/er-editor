@@ -77,9 +77,11 @@ export const keybindings: readonly Keybinding[] = Object.freeze([
   ctx('ctx.nudgeDownBig',                ['Shift+ArrowDown'],   { type: 'NUDGE', dx: 0, dy: 10 }, 'hasSelection'),
   ctx('ctx.nudgeLeftBig',                ['Shift+ArrowLeft'],   { type: 'NUDGE', dx: -10, dy: 0 }, 'hasSelection'),
   ctx('ctx.nudgeRightBig',               ['Shift+ArrowRight'],  { type: 'NUDGE', dx: 10, dy: 0 }, 'hasSelection'),
-  ctx('ctx.cycleForward',                ['Tab'],               { type: 'CYCLE_SELECTION', direction: 'forward' }, 'always'),
-  ctx('ctx.cycleBackward',               ['Shift+Tab'],         { type: 'CYCLE_SELECTION', direction: 'backward' }, 'always'),
-  ctx('ctx.invertSelection',             ['Shift+Alt+A'],       { type: 'INVERT_SELECTION' }, 'always'),
+  // Tab / Shift+Tab do native focus traversal in text fields — keep them
+  // scoped to 'notInTextField' so typing in the property panel behaves.
+  ctx('ctx.cycleForward',                ['Tab'],               { type: 'CYCLE_SELECTION', direction: 'forward' }, 'notInTextField'),
+  ctx('ctx.cycleBackward',               ['Shift+Tab'],         { type: 'CYCLE_SELECTION', direction: 'backward' }, 'notInTextField'),
+  ctx('ctx.invertSelection',             ['Shift+Alt+A'],       { type: 'INVERT_SELECTION' }, 'notInTextField'),
 ])
 
 // Build an O(1) lookup: combo string → binding.

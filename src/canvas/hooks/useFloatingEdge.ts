@@ -1,14 +1,20 @@
-import { useStore, type Node as RfNode } from '@xyflow/react'
+import { useInternalNode } from '@xyflow/react'
 import { useMemo } from 'react'
 import type { Point } from '@/domain/types'
 
-// Minimal shape the pure helpers read from. RfNode is a superset.
+// Minimal shape the pure helpers read from. RfNode / InternalNode are supersets.
 export interface FloatableNode {
   readonly id: string
   readonly position: { x: number; y: number }
   readonly measured?: { width?: number; height?: number }
   readonly width?: number
   readonly height?: number
+}
+
+const hasDimensions = (n: FloatableNode): boolean => {
+  const w = n.measured?.width ?? n.width ?? 0
+  const h = n.measured?.height ?? n.height ?? 0
+  return w > 0 && h > 0
 }
 
 const centre = (n: FloatableNode): Point => {
@@ -62,19 +68,28 @@ export interface FloatingAttachment {
   readonly targetPosition: EdgePosition
 }
 
-// React-Flow hook: resolves source + target nodes from the live RF store, then
-// computes the float-attachment points. Returns null while either node is
-// still unmeasured (first frame).
+// React-Flow hook: subscribes to the source + target InternalNodes (v12's
+// per-node subscription that correctly re-renders on measurement updates),
+// then computes the float-attachment points. Returns null while either node
+// is unresolved or unmeasured (first frame). Using `useStore` + `nodeLookup`
+// here does NOT re-run when RF measures nodes, so edges stayed invisible in
+// real browsers even after their handles existed — Bug 1 fix.
 export const useFloatingEdge = (
   sourceId: string,
   targetId: string,
 ): FloatingAttachment | null => {
-  const sourceNode = useStore((s) => s.nodeLookup.get(sourceId) as RfNode | undefined)
-  const targetNode = useStore((s) => s.nodeLookup.get(targetId) as RfNode | undefined)
+  const sourceNode = useInternalNode(sourceId)
+  const targetNode = useInternalNode(targetId)
   return useMemo(() => {
     if (!sourceNode || !targetNode) return null
     const s = sourceNode as unknown as FloatableNode
     const t = targetNode as unknown as FloatableNode
+    // Need dimensions from either RF's measurement pass (`measured`) or the
+    // adapter-supplied `width`/`height` fallback. The v11 `useStore` pattern
+    // did not re-subscribe when `measured` got populated; `useInternalNode`
+    // does — that's the Bug 1 fix. Guard here so we don't compute geometry
+    // with zero-width bboxes on the first frame.
+    if (!hasDimensions(s) || !hasDimensions(t)) return null
     const sp = getNodeIntersection(s, t)
     const tp = getNodeIntersection(t, s)
     return {
