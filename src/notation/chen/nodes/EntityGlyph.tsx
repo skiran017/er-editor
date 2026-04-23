@@ -41,7 +41,7 @@ export const EntityGlyph = ({
         height={height - INNER_OFFSET * 2}
         rx={2}
         ry={2}
-        className={`fill-none ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800'}`}
+        className={`fill-none ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800 dark:stroke-slate-200'}`}
         strokeWidth={OUTER_STROKE}
       />
     )}
