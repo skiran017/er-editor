@@ -107,11 +107,23 @@ interface IncidentEdge {
   readonly other: FloatableNode
 }
 
+// Parallel edges (two or more edges between the SAME pair of nodes — e.g. a
+// recursive relationship where the same entity plays two roles) would normally
+// all prefer the same side and collide. Forcing the 2nd / 3rd / ... parallel
+// edge onto a perpendicular cardinal (top, then bottom) on BOTH ends produces
+// a clean "bridge" loop over (or under) the primary edge. Because the same
+// deterministic rule is applied per-node, both endpoints of the same edge
+// end up on the SAME cardinal → getSmoothStepPath routes it symmetrically.
+const PARALLEL_OVERRIDES: readonly EdgePosition[] = ['top', 'bottom']
+
 /**
  * For a single node, decide which cardinal side each incident edge should
  * attach to. Collision-aware: if `n` of its edges all prefer the same side,
  * the best-aligned one keeps it and the rest rotate to the nearest unused
  * sides (round-robin around the 4 cardinals). Returns a map keyed by edge id.
+ *
+ * Parallel edges (multiple edges to the same neighbour) get priority overrides
+ * onto top/bottom so a recursive pair doesn't overlap into the same port.
  */
 export const assignNodePorts = (
   node: FloatableNode,
@@ -122,19 +134,44 @@ export const assignNodePorts = (
     const side = chooseSide(node, other)
     const oc = centreOf(other)
     const angle = Math.atan2(oc.y - nodeCentre.y, oc.x - nodeCentre.x)
-    return { edgeId, side, angle }
+    return { edgeId, otherId: other.id, side, angle }
   })
-
-  // Group by preferred side.
-  const bySide: Record<EdgePosition, typeof entries> = { top: [], right: [], bottom: [], left: [] }
-  for (const e of entries) bySide[e.side].push(e)
 
   const assignment = new Map<string, EdgePosition>()
   const used = new Set<EdgePosition>()
 
-  // First pass: every side group assigns its "primary" edge (best-aligned
-  // with the side's central angle).
+  // Step 1 — parallel-edge overrides. Group by neighbour; for every group of
+  // 2+, sort by edgeId (stable, deterministic across both endpoints) and force
+  // the 2nd, 3rd, ... edges to top/bottom cardinals. This claims those sides
+  // before the regular primary/displaced logic runs.
+  const byOther = new Map<string, typeof entries>()
+  for (const e of entries) {
+    const arr = byOther.get(e.otherId) ?? []
+    arr.push(e)
+    byOther.set(e.otherId, arr)
+  }
+  for (const group of byOther.values()) {
+    if (group.length < 2) continue
+    const sorted = [...group].sort((a, b) => a.edgeId.localeCompare(b.edgeId))
+    for (let i = 1; i < sorted.length; i++) {
+      const override = PARALLEL_OVERRIDES[(i - 1) % PARALLEL_OVERRIDES.length]!
+      if (used.has(override)) continue // another parallel pair already claimed it
+      assignment.set(sorted[i]!.edgeId, override)
+      used.add(override)
+    }
+  }
+
+  // Group remaining (unassigned) entries by preferred side.
+  const bySide: Record<EdgePosition, typeof entries> = { top: [], right: [], bottom: [], left: [] }
+  for (const e of entries) {
+    if (assignment.has(e.edgeId)) continue
+    bySide[e.side].push(e)
+  }
+
+  // Step 2 — primary pass: every side group (for sides NOT already taken by
+  // a parallel override) assigns its best-aligned edge to that side.
   for (const side of ALL_SIDES) {
+    if (used.has(side)) continue
     const group = bySide[side]
     if (group.length === 0) continue
     const primary = [...group].sort(
@@ -144,9 +181,9 @@ export const assignNodePorts = (
     used.add(side)
   }
 
-  // Second pass: displaced edges (those that weren't primary) go to the
-  // nearest UNUSED cardinal side based on their angle. If every side is
-  // taken, fall back to the original preference (stack).
+  // Step 3 — displaced pass: edges still unassigned rotate to the nearest
+  // UNUSED cardinal based on their angle; falls back to the original preference
+  // (stacking) only when every side is taken.
   for (const e of entries) {
     if (assignment.has(e.edgeId)) continue
     const candidates = ALL_SIDES

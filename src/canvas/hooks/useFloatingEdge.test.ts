@@ -153,6 +153,61 @@ describe('assignNodePorts (collision-aware distribution across 4 cardinal ports)
     expect(sides.size).toBe(4)
   })
 
+  it('recursive relationship: two edges between SAME pair of nodes land on different sides', () => {
+    // Two edges with the same neighbour would both prefer 'right' and stack
+    // onto the same port. Parallel-edge overrides force the 2nd edge (by
+    // edgeId) onto 'top', leaving the primary on 'right'.
+    const hub = mkNode(0, 0, 100, 50)
+    const partner = mkNode(300, 0, 140, 70)
+    const map = assignNodePorts(hub, [
+      { edgeId: 'e-aaa', other: partner },
+      { edgeId: 'e-bbb', other: partner },
+    ])
+    const first = map.get('e-aaa')!
+    const second = map.get('e-bbb')!
+    expect(first).not.toBe(second)
+    expect(new Set([first, second]).has('right')).toBe(true)
+    expect(new Set([first, second]).has('top')).toBe(true)
+  })
+
+  it('recursive relationship: BOTH ends of the 2nd parallel edge pick the SAME cardinal (top) — route is symmetric', () => {
+    // The override rule is deterministic across endpoints (sort by edgeId).
+    // Computing the per-node assignment from each endpoint's perspective gives
+    // the 2nd parallel edge 'top' on BOTH nodes → getSmoothStepPath routes
+    // the edge symmetrically over the top of both nodes.
+    const entity = mkNode(0, 0, 100, 40)
+    const relationship = mkNode(300, 0, 140, 70)
+
+    const entitySides = assignNodePorts(entity, [
+      { edgeId: 'e-aaa', other: relationship },
+      { edgeId: 'e-bbb', other: relationship },
+    ])
+    const relSides = assignNodePorts(relationship, [
+      { edgeId: 'e-aaa', other: entity },
+      { edgeId: 'e-bbb', other: entity },
+    ])
+
+    // Both endpoints of e-bbb (the 2nd in edgeId-sorted order) must resolve
+    // to 'top' — that's the symmetry guarantee the recursive fix relies on.
+    expect(entitySides.get('e-bbb')).toBe('top')
+    expect(relSides.get('e-bbb')).toBe('top')
+  })
+
+  it('three parallel edges to the same neighbour spread across right, top, bottom', () => {
+    const hub = mkNode(0, 0, 100, 50)
+    const partner = mkNode(300, 0, 140, 70)
+    const map = assignNodePorts(hub, [
+      { edgeId: 'e-a', other: partner },
+      { edgeId: 'e-b', other: partner },
+      { edgeId: 'e-c', other: partner },
+    ])
+    const sides = new Set(map.values())
+    expect(sides.size).toBe(3)
+    expect(sides.has('right')).toBe(true)
+    expect(sides.has('top')).toBe(true)
+    expect(sides.has('bottom')).toBe(true)
+  })
+
   it('five edges all wanting the same side → first four spread across four cardinals, fifth stacks on the preferred', () => {
     const hub = mkNode(0, 0, 100, 50)
     // All five targets are to the right, at increasing vertical spread.
