@@ -28,15 +28,31 @@ describe('viewportStore — setViewport', () => {
 
 describe('viewportStore — zoomAt', () => {
   beforeEach(reset)
-  it('keeps the anchor point fixed in screen space', () => {
-    // Before: zoom=1, pan=(0,0). The screen point (100,50) corresponds to
-    // world (100,50). After zooming to 2x anchored at that screen point,
-    // (100,50) in screen space must still map to (100,50) in world space:
-    //   world = (screen - pan) / zoom  →  pan = screen - world * zoom
-    useViewportStore.getState().zoomAt({ x: 100, y: 50 }, 2 - 1) // delta = 1 → target zoom 2
+  it('keeps the world anchor point fixed on screen through the zoom change', () => {
+    // Contract (post world-coord refactor): `anchor` is in world space, same
+    // coordinate system every `Point` in the FSM uses. The invariant is that
+    // the SCREEN pixel rendering that world point before the zoom keeps
+    // rendering it after: `screen = world * zoom + pan` is preserved.
+    // Starting from identity (zoom=1, pan=0), world (100,50) maps to screen
+    // (100,50). Zooming to 2x must leave that mapping unchanged:
+    //   nextPan = pan + anchor * (zoom - nextZoom) = 0 + 100*(1-2) = -100
+    useViewportStore.getState().zoomAt({ x: 100, y: 50 }, 2 - 1)
     const { zoom, pan } = useViewportStore.getState()
     expect(zoom).toBe(2)
     expect(pan).toEqual({ x: -100, y: -50 })
+  })
+
+  it('works from a non-identity viewport (non-zero pan)', () => {
+    // Start at zoom=2, pan=(30, -10). World (100, 50) renders at
+    // screen = 100*2 + 30 = 230, 50*2 + (-10) = 90.
+    // Zoom up to 3x anchored at world (100, 50): screen must stay (230, 90).
+    //   nextPan = (30, -10) + (100, 50) * (2 - 3) = (30 - 100, -10 - 50) = (-70, -60)
+    //   check: 100*3 + (-70) = 230 ✓ ; 50*3 + (-60) = 90 ✓
+    useViewportStore.setState({ zoom: 2, pan: { x: 30, y: -10 } })
+    useViewportStore.getState().zoomAt({ x: 100, y: 50 }, 1)
+    const { zoom, pan } = useViewportStore.getState()
+    expect(zoom).toBe(3)
+    expect(pan).toEqual({ x: -70, y: -60 })
   })
 })
 

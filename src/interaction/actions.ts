@@ -9,7 +9,7 @@ import {
   selectAll as selectAllCmd,
   clearSelection as clearSelectionCmd,
 } from '@/state/commands'
-import { bboxFromNodeLike, bboxIntersects } from '@/domain/geometry'
+import { bboxFromNodeLike, bboxIntersects, findNonOverlappingOrigin } from '@/domain/geometry'
 import { isEntityNode } from '@/domain/graph'
 import { newNodeId, newEdgeId } from '@/domain/id'
 import type { BBox, Diagram, ERNode, EntityRelationshipEdge, ISAEdge, NodeId } from '@/domain/types'
@@ -54,26 +54,37 @@ export const placeNode = (context: EditorContext, event: EditorEvent): void => {
   if (tool !== 'entity' && tool !== 'relationship' && tool !== 'attribute' && tool !== 'isa') return
   const size = DEFAULT_SIZES[tool]
   const diagram = useDiagramStore.getState().diagram
+  // Centre the bbox on the cursor (click = middle of node, not top-left)
+  // and then nudge off existing nodes so the newcomer doesn't overlap a
+  // sibling. bbox-centred origin is also what makes the "fan" of attributes
+  // around a parent feel right — the user aims at where they want the
+  // centre of the new shape.
+  const desiredOrigin = {
+    x: event.point.x - size.width / 2,
+    y: event.point.y - size.height / 2,
+  }
+  const obstacles: BBox[] = diagram.nodeOrder.map((id) => bboxFromNodeLike(diagram.nodesById[id]))
+  const position = findNonOverlappingOrigin(desiredOrigin, size, obstacles)
   if (tool === 'entity') {
     useDiagramStore.getState().addNode({
       kind: 'entity', name: `Entity ${countOfKind(diagram, 'entity') + 1}`, isWeak: false,
-      position: event.point, size,
+      position, size,
     })
   } else if (tool === 'relationship') {
     useDiagramStore.getState().addNode({
       kind: 'relationship', name: `Relationship ${countOfKind(diagram, 'relationship') + 1}`, isIdentifying: false,
-      position: event.point, size,
+      position, size,
     })
   } else if (tool === 'attribute') {
     useDiagramStore.getState().addNode({
       kind: 'attribute', name: `attribute ${countOfKind(diagram, 'attribute') + 1}`,
       isKey: false, isDiscriminant: false, isMultivalued: false, isDerived: false, isComposite: false,
-      position: event.point, size,
+      position, size,
     })
   } else {
     useDiagramStore.getState().addNode({
       kind: 'isa', isTotal: false,
-      position: event.point, size,
+      position, size,
     })
   }
 }
@@ -389,10 +400,14 @@ export const placeAttributeOnParent = (event: EditorEvent): void => {
   const step = 14
   const gap = 40
   const dist = diag + gap + existingChildren * step
-  const position = {
+  const desiredOrigin = {
     x: cx + ux * dist - size.width / 2,
     y: cy + uy * dist - size.height / 2,
   }
+  // Same overlap guard as placeNode — if the fanned-out spot happens to
+  // land on another unrelated node, spiral outward until clear.
+  const obstacles: BBox[] = diagram.nodeOrder.map((id) => bboxFromNodeLike(diagram.nodesById[id]))
+  const position = findNonOverlappingOrigin(desiredOrigin, size, obstacles)
 
   // Apply node + edge in a single applyPatch so the invariant subscriber
   // (src/app/bootstrap.ts) doesn't see a transient state where the new

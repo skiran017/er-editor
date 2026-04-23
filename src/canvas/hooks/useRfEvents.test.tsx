@@ -1,12 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
-import type { Edge as RfEdge, Node as RfNode } from '@xyflow/react'
+import { ReactFlowProvider, type Edge as RfEdge, type Node as RfNode } from '@xyflow/react'
 import { useRfEvents } from './useRfEvents'
 import { useInteractionStore } from '@/interaction/interactionStore'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useUiStore } from '@/state/uiStore'
 import { emptyDiagram } from '@/domain/types'
+
+// useRfEvents calls useReactFlow(); with no <ReactFlow> mounted,
+// screenToFlowPosition returns the input unchanged, so assertions that
+// expect the raw clientX/clientY are still correct.
+const RF_OPTS = { wrapper: ReactFlowProvider } as const
 
 const mkMouseEvent = (overrides: Partial<MouseEvent> = {}): ReactMouseEvent => ({
   clientX: 10, clientY: 20,
@@ -23,7 +28,7 @@ beforeEach(reset)
 
 describe('useRfEvents', () => {
   it('onNodeClick dispatches NODE_POINTER_DOWN with the node id, point, button, modifiers', () => {
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
     const fakeNode = { id: 'node-1' } as RfNode
     result.current.onNodeClick(mkMouseEvent({ clientX: 100, clientY: 200, shiftKey: true }), fakeNode)
@@ -45,7 +50,7 @@ describe('useRfEvents', () => {
     // expects a matching UP after every DOWN to leave `maybeDragging`.
     // Without the synthetic UP the next mouse move crossed the drag
     // threshold and the node tracked the cursor (drag-follow bug).
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
     const fakeNode = { id: 'node-1' } as RfNode
     result.current.onNodeClick(mkMouseEvent({ clientX: 42, clientY: 84 }), fakeNode)
@@ -59,7 +64,7 @@ describe('useRfEvents', () => {
   })
 
   it('onEdgeClick dispatches EDGE_POINTER_DOWN with the edge id', () => {
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
     const fakeEdge = { id: 'edge-1' } as RfEdge
     result.current.onEdgeClick(mkMouseEvent(), fakeEdge)
@@ -70,7 +75,7 @@ describe('useRfEvents', () => {
   })
 
   it('onEdgeClick also dispatches EXACTLY two events in order: EDGE_POINTER_DOWN then CANVAS_POINTER_UP', () => {
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
     result.current.onEdgeClick(mkMouseEvent({ clientX: 7, clientY: 11 }), { id: 'edge-1' } as RfEdge)
     expect(sendSpy).toHaveBeenCalledTimes(2)
@@ -80,7 +85,7 @@ describe('useRfEvents', () => {
   })
 
   it('does NOT expose onPaneClick (pane events bubble to the wrapper div where useMouse handles them)', () => {
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     // Guards against a regression where onPaneClick gets re-added and
     // double-fires CANVAS_POINTER_* alongside the outer-wrapper useMouse
     // handler (caused the "two stacked entities" bug).
@@ -88,7 +93,7 @@ describe('useRfEvents', () => {
   })
 
   it('onNodeClick maps middle/right mouse buttons to PointerButton', () => {
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
     result.current.onNodeClick(mkMouseEvent({ button: 2 }), { id: 'n' } as RfNode)
     const call = sendSpy.mock.calls.find(([ev]) => ev.type === 'NODE_POINTER_DOWN')
@@ -103,7 +108,7 @@ describe('useRfEvents', () => {
       kind: 'entity', name: 'Customer', isWeak: false,
       position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
     })
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     result.current.onNodeDoubleClick(mkMouseEvent(), { id } as unknown as RfNode)
     expect(useUiStore.getState().inlineRename).toEqual({
       nodeId: id, initialValue: 'Customer',
@@ -117,7 +122,7 @@ describe('useRfEvents', () => {
       kind: 'isa', isTotal: false,
       position: { x: 0, y: 0 }, size: { width: 100, height: 60 },
     })
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     result.current.onNodeDoubleClick(mkMouseEvent(), { id } as unknown as RfNode)
     expect(useUiStore.getState().inlineRename).toBeNull()
   })
@@ -125,7 +130,7 @@ describe('useRfEvents', () => {
   it('onNodeDoubleClick is a no-op for an unknown node id', () => {
     useDiagramStore.setState({ diagram: emptyDiagram() })
     useUiStore.getState().cancelInlineRename()
-    const { result } = renderHook(() => useRfEvents())
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     result.current.onNodeDoubleClick(mkMouseEvent(), { id: 'does-not-exist' } as RfNode)
     expect(useUiStore.getState().inlineRename).toBeNull()
   })

@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
+import { ReactFlowProvider } from '@xyflow/react'
 import { useMouse } from './useMouse'
 import { useInteractionStore } from '@/interaction/interactionStore'
+
+// useMouse calls useReactFlow() so it must be rendered inside a provider.
+// With no <ReactFlow> mounted, screenToFlowPosition is identity — the raw
+// clientX/clientY values are passed through unchanged, keeping existing
+// test assertions valid.
+const RF_OPTS = { wrapper: ReactFlowProvider } as const
 
 let sendSpy: ReturnType<typeof vi.fn>
 
@@ -16,7 +23,7 @@ afterEach(() => { vi.restoreAllMocks() })
 
 describe('useMouse', () => {
   it('onPointerDown (left) → CANVAS_POINTER_DOWN with button=left', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     const mkEvent = (init: Partial<PointerEvent> = {}) => ({
       clientX: 10, clientY: 20,
       button: 0, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
@@ -34,7 +41,7 @@ describe('useMouse', () => {
   })
 
   it('middle-button → button=middle', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     result.current.onPointerDown({
       clientX: 0, clientY: 0, button: 1,
       shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
@@ -45,7 +52,7 @@ describe('useMouse', () => {
   })
 
   it('right-button → button=right', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     result.current.onPointerDown({
       clientX: 0, clientY: 0, button: 2,
       shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
@@ -56,7 +63,7 @@ describe('useMouse', () => {
   })
 
   it('onPointerMove → CANVAS_POINTER_MOVE', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     result.current.onPointerMove({
       clientX: 33, clientY: 44, preventDefault: vi.fn(),
     } as unknown as React.PointerEvent<HTMLElement>)
@@ -67,7 +74,7 @@ describe('useMouse', () => {
   })
 
   it('onPointerUp → CANVAS_POINTER_UP', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     result.current.onPointerUp({
       clientX: 55, clientY: 66, preventDefault: vi.fn(),
     } as unknown as React.PointerEvent<HTMLElement>)
@@ -81,7 +88,7 @@ describe('useMouse', () => {
 
 describe('useMouse — wheel', () => {
   it('onWheel with ctrl pressed → WHEEL_ZOOM', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     result.current.onWheel({
       clientX: 100, clientY: 50, deltaY: -100,
       shiftKey: false, ctrlKey: true, altKey: false, metaKey: false,
@@ -95,7 +102,7 @@ describe('useMouse — wheel', () => {
   })
 
   it('touch-type pointer events are ignored (delegated to useTouch)', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     result.current.onPointerDown({
       clientX: 0, clientY: 0, button: 0,
       shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
@@ -106,7 +113,7 @@ describe('useMouse — wheel', () => {
   })
 
   it('touch-type pointer move and up are ignored', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     const touchMove = {
       clientX: 0, clientY: 0, pointerType: 'touch', preventDefault: vi.fn(),
     } as unknown as React.PointerEvent<HTMLElement>
@@ -119,7 +126,7 @@ describe('useMouse — wheel', () => {
   })
 
   it('plain wheel (no ctrl/meta) is ignored — reserved for native scroll', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     result.current.onWheel({
       clientX: 0, clientY: 0, deltaY: -100,
       shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
@@ -129,7 +136,7 @@ describe('useMouse — wheel', () => {
   })
 
   it('wheel with meta (Mac) also triggers WHEEL_ZOOM', () => {
-    const { result } = renderHook(() => useMouse())
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
     result.current.onWheel({
       clientX: 0, clientY: 0, deltaY: 100,
       shiftKey: false, ctrlKey: false, altKey: false, metaKey: true,

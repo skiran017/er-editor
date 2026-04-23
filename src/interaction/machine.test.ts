@@ -297,21 +297,27 @@ describe('machine — placing', () => {
 
   // Attribute has separate, stricter semantics (must attach to a parent) and
   // is exercised in its own describe-block below.
+  // Expected positions derive from placeNode centring the bbox on the click:
+  //   position = (point.x - size.w/2, point.y - size.h/2)
+  // Default sizes: entity 120×60, relationship 140×70, isa 100×60.
   it.each([
-    ['entity' as const, { placing: 'entity' as const }],
-    ['relationship' as const, { placing: 'relationship' as const }],
-    ['isa' as const, { placing: 'isa' as const }],
-  ])('PICK_TOOL %s targets matching placing state and CANVAS_POINTER_UP adds a node', (tool, state) => {
-    const actor = startActor()
-    actor.send({ type: 'PICK_TOOL', tool })
-    expect(actor.getSnapshot().matches(state)).toBe(true)
-    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 42, y: 24 } })
-    const d = useDiagramStore.getState().diagram
-    expect(d.nodeOrder).toHaveLength(1)
-    expect(d.nodesById[d.nodeOrder[0]!]!.kind).toBe(tool)
-    expect(d.nodesById[d.nodeOrder[0]!]!.position).toEqual({ x: 42, y: 24 })
-    actor.stop()
-  })
+    ['entity' as const, { placing: 'entity' as const }, { x: -18, y: -6 }],
+    ['relationship' as const, { placing: 'relationship' as const }, { x: -28, y: -11 }],
+    ['isa' as const, { placing: 'isa' as const }, { x: -8, y: -6 }],
+  ])(
+    'PICK_TOOL %s targets matching placing state and CANVAS_POINTER_UP adds a node',
+    (tool, state, expectedPos) => {
+      const actor = startActor()
+      actor.send({ type: 'PICK_TOOL', tool })
+      expect(actor.getSnapshot().matches(state)).toBe(true)
+      actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 42, y: 24 } })
+      const d = useDiagramStore.getState().diagram
+      expect(d.nodeOrder).toHaveLength(1)
+      expect(d.nodesById[d.nodeOrder[0]!]!.kind).toBe(tool)
+      expect(d.nodesById[d.nodeOrder[0]!]!.position).toEqual(expectedPos)
+      actor.stop()
+    },
+  )
 
   it('stays in placing state after a place for repeat-placement', () => {
     const actor = startActor()

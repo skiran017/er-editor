@@ -107,3 +107,47 @@ export const snapToGrid = (value: number, step: number): number =>
 
 export const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max)
+
+// Spiral search for a non-overlapping spot for a new node.
+// Given a desired top-left `origin` and `size` for a candidate bbox, plus
+// a list of obstacle bboxes, returns an origin whose bbox does not intersect
+// any obstacle. Walks outward in concentric 8-neighbour rings from the
+// desired origin, returning the first clear position found.
+//
+// If the desired spot is already clear, returns it unchanged — so a click in
+// empty space places the node exactly where the user expected. Falls back
+// to the desired origin if no clear spot is found within `maxRings` rings
+// (in practice unreachable for reasonable diagrams).
+//
+// Equivalent in spirit to React Flow's `getIntersectingNodes`; we use our
+// own domain data (nodesById) so this stays a pure function with no RF
+// dependency.
+const UNIT_DIRS: ReadonlyArray<readonly [number, number]> = [
+  [1, 0], [1, 1], [0, 1], [-1, 1],
+  [-1, 0], [-1, -1], [0, -1], [1, -1],
+]
+
+export const findNonOverlappingOrigin = (
+  origin: Point,
+  size: Size,
+  obstacles: readonly BBox[],
+  step = 20,
+  maxRings = 40,
+): Point => {
+  const fits = (p: Point): boolean => {
+    const candidate: BBox = { x: p.x, y: p.y, width: size.width, height: size.height }
+    for (const o of obstacles) {
+      if (bboxIntersects(candidate, o)) return false
+    }
+    return true
+  }
+  if (fits(origin)) return origin
+  for (let ring = 1; ring <= maxRings; ring++) {
+    const r = ring * step
+    for (const [dx, dy] of UNIT_DIRS) {
+      const p = { x: origin.x + dx * r, y: origin.y + dy * r }
+      if (fits(p)) return p
+    }
+  }
+  return origin
+}

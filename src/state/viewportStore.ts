@@ -33,12 +33,15 @@ export const useViewportStore = create<ViewportState>()(
         const { zoom, pan } = get()
         const nextZoom = clamp(zoom + delta, MIN_ZOOM, MAX_ZOOM)
         if (nextZoom === zoom) return
-        // World point under anchor before zoom
-        const world = { x: (anchor.x - pan.x) / zoom, y: (anchor.y - pan.y) / zoom }
-        // After zoom, adjust pan so `anchor` still maps to `world`
+        // `anchor` is a world-space point (same coordinate system as every
+        // other `Point` the FSM handles). Keep that world point fixed on
+        // screen as we change zoom:
+        //   screen = world * zoom + pan
+        //   anchor must satisfy: anchor * zoom + pan === anchor * nextZoom + nextPan
+        //   → nextPan = pan + anchor * (zoom - nextZoom)
         const nextPan: Point = {
-          x: anchor.x - world.x * nextZoom,
-          y: anchor.y - world.y * nextZoom,
+          x: pan.x + anchor.x * (zoom - nextZoom),
+          y: pan.y + anchor.y * (zoom - nextZoom),
         }
         set((state) => {
           state.zoom = nextZoom

@@ -1,5 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useRef } from 'react'
+import { useReactFlow } from '@xyflow/react'
 import { useInteractionStore } from '@/interaction/interactionStore'
 import { NO_MODIFIERS } from '@/interaction/events'
 
@@ -9,10 +10,14 @@ export interface TouchHandlers {
   readonly onPointerUp: (e: ReactPointerEvent<HTMLElement>) => void
 }
 
-const readPoint = (e: { clientX: number; clientY: number }) => ({ x: e.clientX, y: e.clientY })
-
+// Points reported to the FSM are in WORLD / flow coordinates — see useMouse
+// for the rationale. screenToFlowPosition is an identity when no <ReactFlow>
+// is mounted, so unit tests keep working unchanged.
 export const useTouch = (): TouchHandlers => {
   const activePointerId = useRef<number | null>(null)
+  const { screenToFlowPosition } = useReactFlow()
+  const toFlow = (e: { clientX: number; clientY: number }) =>
+    screenToFlowPosition({ x: e.clientX, y: e.clientY })
 
   return {
     onPointerDown: (e) => {
@@ -21,7 +26,7 @@ export const useTouch = (): TouchHandlers => {
       activePointerId.current = e.pointerId
       useInteractionStore.getState().send({
         type: 'CANVAS_POINTER_DOWN',
-        point: readPoint(e),
+        point: toFlow(e),
         modifiers: NO_MODIFIERS,
         button: 'left',
       })
@@ -31,7 +36,7 @@ export const useTouch = (): TouchHandlers => {
       if (e.pointerId !== activePointerId.current) return
       useInteractionStore.getState().send({
         type: 'CANVAS_POINTER_MOVE',
-        point: readPoint(e),
+        point: toFlow(e),
       })
     },
     onPointerUp: (e) => {
@@ -40,7 +45,7 @@ export const useTouch = (): TouchHandlers => {
       activePointerId.current = null
       useInteractionStore.getState().send({
         type: 'CANVAS_POINTER_UP',
-        point: readPoint(e),
+        point: toFlow(e),
       })
     },
   }

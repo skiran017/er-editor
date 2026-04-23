@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
-import type { Node as RfNode, Edge as RfEdge } from '@xyflow/react'
+import { useReactFlow, type Node as RfNode, type Edge as RfEdge } from '@xyflow/react'
 import { useInteractionStore } from '@/interaction/interactionStore'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useUiStore } from '@/state/uiStore'
@@ -44,8 +44,11 @@ export interface RfEventHandlers {
  * maybeDragging → idle immediately, no stray drag.
  */
 export const useRfEvents = (): RfEventHandlers => {
+  const { screenToFlowPosition } = useReactFlow()
+
   const onNodeClick = useCallback((e: ReactMouseEvent, node: RfNode) => {
-    const point = { x: e.clientX, y: e.clientY }
+    // Every FSM Point is a world-space point. See useMouse for rationale.
+    const point = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const send = useInteractionStore.getState().send
     send({
       type: 'NODE_POINTER_DOWN',
@@ -57,10 +60,10 @@ export const useRfEvents = (): RfEventHandlers => {
     // React Flow fires onNodeClick after mouseup, so synthesize the matching
     // UP to keep the FSM out of drag-held state.
     send({ type: 'CANVAS_POINTER_UP', point })
-  }, [])
+  }, [screenToFlowPosition])
 
   const onEdgeClick = useCallback((e: ReactMouseEvent, edge: RfEdge) => {
-    const point = { x: e.clientX, y: e.clientY }
+    const point = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const send = useInteractionStore.getState().send
     send({
       type: 'EDGE_POINTER_DOWN',
@@ -71,7 +74,7 @@ export const useRfEvents = (): RfEventHandlers => {
     })
     // Same rationale as onNodeClick — complete the click atomically.
     send({ type: 'CANVAS_POINTER_UP', point })
-  }, [])
+  }, [screenToFlowPosition])
 
   // Bug 4 — double-click a node opens the inline rename overlay directly.
   // ISA nodes have no name (see src/domain/types.ts) so skip them.

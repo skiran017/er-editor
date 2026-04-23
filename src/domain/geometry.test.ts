@@ -12,6 +12,7 @@ import {
   triangleEdgeIntersection,
   snapToGrid,
   clamp,
+  findNonOverlappingOrigin,
 } from './geometry'
 import type { BBox } from './types'
 
@@ -176,5 +177,56 @@ describe('clamp', () => {
   })
   it('clamps to max', () => {
     expect(clamp(15, 0, 10)).toBe(10)
+  })
+})
+
+describe('findNonOverlappingOrigin', () => {
+  const SIZE = { width: 100, height: 50 }
+
+  it('returns the desired origin unchanged when the spot is empty', () => {
+    const out = findNonOverlappingOrigin({ x: 500, y: 500 }, SIZE, [])
+    expect(out).toEqual({ x: 500, y: 500 })
+  })
+
+  it('walks outward when the desired origin overlaps an obstacle', () => {
+    const obstacle: BBox = { x: 500, y: 500, width: 100, height: 50 }
+    // Desired origin is inside the obstacle — must shift somewhere that
+    // no longer intersects.
+    const out = findNonOverlappingOrigin({ x: 510, y: 510 }, SIZE, [obstacle], 20, 40)
+    const candidate: BBox = { ...out, width: SIZE.width, height: SIZE.height }
+    expect(bboxIntersects(candidate, obstacle)).toBe(false)
+  })
+
+  it('finds a clear slot when multiple obstacles surround the desired spot', () => {
+    const obstacles: BBox[] = [
+      { x: 0, y: 0, width: 100, height: 50 },     // collides with desired
+      { x: 110, y: 0, width: 100, height: 50 },   // blocks east
+      { x: 0, y: 60, width: 100, height: 50 },    // blocks south
+      { x: 110, y: 60, width: 100, height: 50 },  // blocks southeast
+    ]
+    const out = findNonOverlappingOrigin({ x: 0, y: 0 }, SIZE, obstacles, 10, 40)
+    const candidate: BBox = { ...out, width: SIZE.width, height: SIZE.height }
+    for (const o of obstacles) expect(bboxIntersects(candidate, o)).toBe(false)
+  })
+
+  it('falls back to the desired origin when no slot is found within maxRings', () => {
+    // Tight ring of obstacles at every ring position up to maxRings.
+    const maxRings = 2
+    const step = 10
+    const obstacles: BBox[] = []
+    for (let r = 0; r <= maxRings; r++) {
+      for (const [dx, dy] of [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]]) {
+        obstacles.push({
+          x: 0 + dx * r * step - SIZE.width / 2,
+          y: 0 + dy * r * step - SIZE.height / 2,
+          width: SIZE.width, height: SIZE.height,
+        })
+      }
+    }
+    const out = findNonOverlappingOrigin({ x: 0, y: 0 }, SIZE, obstacles, step, maxRings)
+    // Exact value isn't the point — contract is that the function returns
+    // *something* rather than looping forever.
+    expect(typeof out.x).toBe('number')
+    expect(typeof out.y).toBe('number')
   })
 })

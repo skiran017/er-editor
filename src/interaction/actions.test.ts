@@ -37,7 +37,10 @@ const resetStores = () => {
 
 describe('actions — placeNode', () => {
   beforeEach(resetStores)
-  it('places an entity at the event point when tool is entity', () => {
+  it('places an entity centred on the event point', () => {
+    // placeNode now centres the new bbox on the cursor (click = middle of
+    // node, not top-left). Entity default size 120×60, click at (50, 75):
+    //   position = (50 - 120/2, 75 - 60/2) = (-10, 45)
     const event: EditorEvent = {
       type: 'CANVAS_POINTER_UP', point: { x: 50, y: 75 },
     }
@@ -46,7 +49,7 @@ describe('actions — placeNode', () => {
     expect(d.nodeOrder).toHaveLength(1)
     const node = d.nodesById[d.nodeOrder[0]!]!
     expect(node.kind).toBe('entity')
-    expect(node.position).toEqual({ x: 50, y: 75 })
+    expect(node.position).toEqual({ x: -10, y: 45 })
   })
   it('places a relationship when tool is relationship', () => {
     placeNode(withContext({ tool: 'relationship' }), {

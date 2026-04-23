@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
+import { ReactFlowProvider } from '@xyflow/react'
 import { useTouch } from './useTouch'
 import { useInteractionStore } from '@/interaction/interactionStore'
+
+// useTouch calls useReactFlow(); with no <ReactFlow> mounted,
+// screenToFlowPosition is identity, so existing assertions still hold.
+const RF_OPTS = { wrapper: ReactFlowProvider } as const
 
 let sendSpy: ReturnType<typeof vi.fn>
 
@@ -24,7 +29,7 @@ const makePointerEvent = (init: { clientX: number; clientY: number; pointerType?
 
 describe('useTouch', () => {
   it('single touch pointer-down → CANVAS_POINTER_DOWN button=left', () => {
-    const { result } = renderHook(() => useTouch())
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
     result.current.onPointerDown(makePointerEvent({ clientX: 10, clientY: 20 }))
     expect(sendSpy).toHaveBeenCalledWith({
       type: 'CANVAS_POINTER_DOWN',
@@ -35,7 +40,7 @@ describe('useTouch', () => {
   })
 
   it('single touch move → CANVAS_POINTER_MOVE', () => {
-    const { result } = renderHook(() => useTouch())
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
     result.current.onPointerDown(makePointerEvent({ clientX: 0, clientY: 0 }))
     result.current.onPointerMove(makePointerEvent({ clientX: 20, clientY: 30 }))
     expect(sendSpy).toHaveBeenLastCalledWith({
@@ -45,7 +50,7 @@ describe('useTouch', () => {
   })
 
   it('single touch up → CANVAS_POINTER_UP', () => {
-    const { result } = renderHook(() => useTouch())
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
     result.current.onPointerDown(makePointerEvent({ clientX: 0, clientY: 0 }))
     result.current.onPointerUp(makePointerEvent({ clientX: 0, clientY: 0 }))
     expect(sendSpy).toHaveBeenLastCalledWith({
@@ -55,13 +60,13 @@ describe('useTouch', () => {
   })
 
   it('mouse-type pointer events are ignored (delegated to useMouse)', () => {
-    const { result } = renderHook(() => useTouch())
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
     result.current.onPointerDown(makePointerEvent({ clientX: 0, clientY: 0, pointerType: 'mouse' }))
     expect(sendSpy).not.toHaveBeenCalled()
   })
 
   it('second concurrent touch pointer-down is ignored (pinch/gesture = Sub-project 4)', () => {
-    const { result } = renderHook(() => useTouch())
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
     result.current.onPointerDown(makePointerEvent({ clientX: 0, clientY: 0, pointerId: 1 }))
     sendSpy.mockClear()
     result.current.onPointerDown(makePointerEvent({ clientX: 100, clientY: 100, pointerId: 2 }))
@@ -69,14 +74,14 @@ describe('useTouch', () => {
   })
 
   it('mouse-type pointer move and up are ignored', () => {
-    const { result } = renderHook(() => useTouch())
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
     result.current.onPointerMove(makePointerEvent({ clientX: 0, clientY: 0, pointerType: 'mouse' }))
     result.current.onPointerUp(makePointerEvent({ clientX: 0, clientY: 0, pointerType: 'mouse' }))
     expect(sendSpy).not.toHaveBeenCalled()
   })
 
   it('touch move/up with a different pointerId than the active one are ignored', () => {
-    const { result } = renderHook(() => useTouch())
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
     result.current.onPointerDown(makePointerEvent({ clientX: 0, clientY: 0, pointerId: 1 }))
     sendSpy.mockClear()
     result.current.onPointerMove(makePointerEvent({ clientX: 50, clientY: 50, pointerId: 2 }))
