@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
 import { useViewportStore } from '@/state/viewportStore'
@@ -336,6 +337,57 @@ export const beginRenameSelected = (): void => {
   if (!node) return
   if (node.kind === 'isa') return // ISA has no name
   useUiStore.getState().startInlineRename({ nodeId: id, initialValue: node.name })
+}
+
+// ——— attribute-tool placement (Chen semantics) ———
+
+// Attributes must hang off an entity, relationship, or another attribute
+// (composite). When the Attribute tool is active and the user clicks one of
+// those kinds, create the attribute adjacent to the parent and wire it.
+export const placeAttributeOnParent = (event: EditorEvent): void => {
+  if (event.type !== 'NODE_POINTER_DOWN') return
+  const { diagram } = useDiagramStore.getState()
+  const parent = diagram.nodesById[event.nodeId]
+  if (!parent) return
+  if (parent.kind !== 'entity' && parent.kind !== 'relationship' && parent.kind !== 'attribute') return
+
+  const name = `attribute ${countOfKind(diagram, 'attribute') + 1}`
+  const size = { width: 90, height: 50 }
+  // Offset 30 px to the right of the parent's right edge, vertically centred
+  // on the parent's top-edge reference so the new attribute sits visually
+  // next to its parent.
+  const position = {
+    x: parent.position.x + parent.size.width + 30,
+    y: parent.position.y + parent.size.height / 2 - size.height / 2,
+  }
+
+  const attrId = useDiagramStore.getState().addNode({
+    kind: 'attribute',
+    name,
+    isKey: false,
+    isDiscriminant: false,
+    isMultivalued: false,
+    isDerived: false,
+    isComposite: false,
+    position,
+    size,
+  })
+  // attribute-of edges flow FROM the attribute TO its parent (domain invariant
+  // — see src/domain/invariants.ts and connectViaConnectTool above).
+  useDiagramStore.getState().addEdge({
+    kind: 'attribute-of',
+    sourceId: attrId,
+    targetId: parent.id,
+    waypoints: [],
+  })
+}
+
+export const rejectOrphanAttributeToast = (): void => {
+  useUiStore.getState().pushToast({
+    id: `orphan-attr-${nanoid()}`,
+    kind: 'info',
+    messageKey: 'common:attributeNeedsParent',
+  })
 }
 
 // ——— cheatsheet ———

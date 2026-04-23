@@ -9,5 +9,6 @@
   "open": "Open",
   "loading": "Loading…",
   "readOnly": "Read-only",
-  "examMode": "Exam mode"
+  "examMode": "Exam mode",
+  "attributeNeedsParent": "Attributes must be attached to an entity, relationship, or composite attribute. Click a parent node."
 }

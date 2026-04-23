@@ -3,10 +3,12 @@ import {
   beginRenameSelected, beginRubberband, clearSelectionAction, commitRubberbandAction,
   connectChildToIsaAction, connectNodes, deleteSelectionAction,
   duplicateSelectionAction, fitAction, moveDraggedNode, nudgeSelection,
-  panViewportAction, placeNode, redoAction, selectAllAction, selectNodeFromEvent,
+  panViewportAction, placeAttributeOnParent, placeNode, redoAction,
+  rejectOrphanAttributeToast, selectAllAction, selectNodeFromEvent,
   stubCopy, stubCut, stubPaste, toggleCheatsheetAction, undoAction,
   updateRubberbandAction, zoomAtPointAction, zoomInAction, zoomOutAction,
 } from './actions'
+import { useDiagramStore } from '@/state/diagramStore'
 import { initialContext, type EditorContext } from './context'
 import type { EditorEvent, Tool } from './events'
 
@@ -43,6 +45,14 @@ export const editorMachine = setup({
     isMiddleOrRightButton: ({ event }) =>
       (event.type === 'CANVAS_POINTER_DOWN' || event.type === 'NODE_POINTER_DOWN' || event.type === 'EDGE_POINTER_DOWN')
       && (event.button === 'middle' || event.button === 'right'),
+    // Chen semantics: attributes may only hang off an entity, a relationship,
+    // or another (composite) attribute — NOT an ISA and NOT the canvas.
+    canHostAttribute: ({ event }) => {
+      if (event.type !== 'NODE_POINTER_DOWN') return false
+      const node = useDiagramStore.getState().diagram.nodesById[event.nodeId]
+      if (!node) return false
+      return node.kind === 'entity' || node.kind === 'relationship' || node.kind === 'attribute'
+    },
   },
   actions: {
     setTool: assign({
@@ -98,6 +108,8 @@ export const editorMachine = setup({
     stubPaste: ({ context, event }) => stubPaste(context, event),
     toggleCheatsheetAction: ({ context, event }) => toggleCheatsheetAction(context, event),
     placeNodeAction: ({ context, event }) => placeNode(context, event),
+    placeAttributeOnParentAction: ({ event }) => placeAttributeOnParent(event),
+    rejectOrphanAttributeToast: () => rejectOrphanAttributeToast(),
     connectNodesAction: ({ context, event }) => connectNodes(context, event),
     connectChildToIsaAction: ({ context, event }) => connectChildToIsaAction(context, event),
     zoomIn: ({ context, event }) => zoomInAction(context, event),
@@ -243,7 +255,20 @@ export const editorMachine = setup({
           on: { CANVAS_POINTER_UP: { actions: 'placeNodeAction' } },
         },
         attribute: {
-          on: { CANVAS_POINTER_UP: { actions: 'placeNodeAction' } },
+          on: {
+            NODE_POINTER_DOWN: [
+              {
+                // Only entity / relationship / attribute can host an attribute child.
+                // Clicking an ISA (or any other non-hosting node) — no-op, stay in placing.
+                guard: 'canHostAttribute',
+                target: '#editor.selecting.idle',
+                actions: ['placeAttributeOnParentAction', 'resetContext'],
+              },
+            ],
+            CANVAS_POINTER_UP: {
+              actions: 'rejectOrphanAttributeToast',
+            },
+          },
         },
         isa: {
           on: { CANVAS_POINTER_UP: { actions: 'placeNodeAction' } },
