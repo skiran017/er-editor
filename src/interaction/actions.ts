@@ -12,7 +12,7 @@ import {
 import { bboxContains, bboxFromNodeLike, bboxIntersects, findNonOverlappingOrigin } from '@/domain/geometry'
 import { isEntityNode } from '@/domain/graph'
 import { newNodeId, newEdgeId } from '@/domain/id'
-import type { BBox, Diagram, ERNode, EntityRelationshipEdge, ISAEdge, NodeId } from '@/domain/types'
+import type { AttributeEdge, BBox, Diagram, ERNode, EntityRelationshipEdge, ISAEdge, NodeId } from '@/domain/types'
 import type { EditorContext } from './context'
 import type { EditorEvent } from './events'
 
@@ -287,40 +287,64 @@ const connectViaQuickGeneralization = (
   store.addEdge(childEdge)
 }
 
-const connectViaConnectTool = (source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId): void => {
-  const store = useDiagramStore.getState()
+// An attribute's parent (per domain INV-2/3) is an entity, a relationship,
+// or a COMPOSITE attribute. This helper gates the attribute-of creation path.
+const isAttributeParentKind = (n: ERNode): boolean =>
+  n.kind === 'entity' || n.kind === 'relationship' ||
+  (n.kind === 'attribute' && n.isComposite)
+
+// Each factory returns the new edge spec when the (source, target) pair
+// matches its shape, or null. connectViaConnectTool walks them in order and
+// creates the first match. Keeping the branches as separate pure functions
+// keeps the orchestrator under the lint complexity cap.
+const buildEntityRelationshipEdge = (
+  source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId,
+): Omit<EntityRelationshipEdge, 'id'> | null => {
   if (source.kind === 'entity' && target.kind === 'relationship') {
-    store.addEdge({
-      kind: 'entity-relationship', sourceId, targetId,
-      cardinality: '1', participation: 'partial', waypoints: [],
-    })
-    return
+    return { kind: 'entity-relationship', sourceId, targetId, cardinality: '1', participation: 'partial', waypoints: [] }
   }
   if (source.kind === 'relationship' && target.kind === 'entity') {
-    store.addEdge({
-      kind: 'entity-relationship', sourceId: targetId, targetId: sourceId,
-      cardinality: '1', participation: 'partial', waypoints: [],
-    })
-    return
+    return { kind: 'entity-relationship', sourceId: targetId, targetId: sourceId, cardinality: '1', participation: 'partial', waypoints: [] }
   }
-  // Attribute-of: the attribute is always the edge's source (domain
-  // invariants 2/3 — see src/domain/invariants.ts). The user may click the
-  // attribute first or second; normalise by picking whichever participant
-  // is the attribute as the source.
-  if (source.kind === 'attribute' && (target.kind === 'entity' || target.kind === 'relationship' || (target.kind === 'attribute' && target.isComposite))) {
-    store.addEdge({
-      kind: 'attribute-of', sourceId, targetId, waypoints: [],
-    })
-    return
+  return null
+}
+
+const buildAttributeOfEdge = (
+  source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId,
+): Omit<AttributeEdge, 'id'> | null => {
+  // Attribute is always the edge source (INV-2/3). Flip direction if the
+  // user clicked the parent first.
+  if (source.kind === 'attribute' && isAttributeParentKind(target)) {
+    return { kind: 'attribute-of', sourceId, targetId, waypoints: [] }
   }
-  if (target.kind === 'attribute' && (source.kind === 'entity' || source.kind === 'relationship' || (source.kind === 'attribute' && source.isComposite))) {
-    // User clicked the parent first (entity/relationship/composite attribute),
-    // then the attribute. Flip so the attribute is the edge source.
-    store.addEdge({
-      kind: 'attribute-of', sourceId: targetId, targetId: sourceId, waypoints: [],
-    })
-    return
+  if (target.kind === 'attribute' && isAttributeParentKind(source)) {
+    return { kind: 'attribute-of', sourceId: targetId, targetId: sourceId, waypoints: [] }
   }
+  return null
+}
+
+const buildIsaChildEdge = (
+  source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId,
+): Omit<ISAEdge, 'id'> | null => {
+  // Connect tool entity↔ISA adds a CHILD link to an existing ISA. The parent
+  // is locked at ISA creation time via the quickGeneralization flow, so the
+  // connect tool can only extend the child list. Normalise so ISA is source.
+  if (source.kind === 'isa' && target.kind === 'entity') {
+    return { kind: 'isa-link', sourceId, targetId, role: 'child', waypoints: [] }
+  }
+  if (source.kind === 'entity' && target.kind === 'isa') {
+    return { kind: 'isa-link', sourceId: targetId, targetId: sourceId, role: 'child', waypoints: [] }
+  }
+  return null
+}
+
+const connectViaConnectTool = (source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId): void => {
+  const store = useDiagramStore.getState()
+  const edge =
+    buildEntityRelationshipEdge(source, target, sourceId, targetId)
+    ?? buildAttributeOfEdge(source, target, sourceId, targetId)
+    ?? buildIsaChildEdge(source, target, sourceId, targetId)
+  if (edge) store.addEdge(edge)
 }
 
 export const connectNodes = (context: EditorContext, event: EditorEvent): void => {

@@ -5,6 +5,7 @@ import {
   getNodeIntersection,
   assignNodePorts,
   ISA_PARENT_SIDE,
+  isaTrianglePort,
 } from './useFloatingEdge'
 
 // Minimal RF-node shape for the pure helpers. Real RF nodes have more
@@ -228,6 +229,35 @@ describe('assignNodePorts (collision-aware distribution across 4 cardinal ports)
     expect(new Set(map.values()).size).toBeGreaterThanOrEqual(4)
     // Every edge has been assigned some side.
     expect(map.size).toBe(5)
+  })
+})
+
+describe('isaTrianglePort (inverted-triangle ports)', () => {
+  // Inverted triangle: vertices at (0,0), (w,0) and (w/2, h). Left slanted
+  // edge runs from (0,0) to (w/2, h); right slanted edge from (w,0) to
+  // (w/2, h). Midpoints of those slants land at (w/4, h/2) and (3w/4, h/2).
+  const tri = { id: 'isa-1', position: { x: 0, y: 0 }, measured: { width: 100, height: 60 }, width: 100, height: 60 }
+
+  it("top port sits on the centre of the base (the parent attachment)", () => {
+    expect(isaTrianglePort(tri, 'top')).toEqual({ x: 50, y: 0 })
+  })
+
+  it("bottom port sits on the apex (the natural child anchor when directly below)", () => {
+    expect(isaTrianglePort(tri, 'bottom')).toEqual({ x: 50, y: 60 })
+  })
+
+  it("left port sits on the MIDPOINT of the left slanted edge (not the bbox left, which is empty space)", () => {
+    expect(isaTrianglePort(tri, 'left')).toEqual({ x: 25, y: 30 })
+  })
+
+  it("right port sits on the MIDPOINT of the right slanted edge", () => {
+    expect(isaTrianglePort(tri, 'right')).toEqual({ x: 75, y: 30 })
+  })
+
+  it("honours the node's world position by shifting every port by (x, y)", () => {
+    const offset = { id: 'isa-2', position: { x: 200, y: 50 }, measured: { width: 100, height: 60 }, width: 100, height: 60 }
+    expect(isaTrianglePort(offset, 'left')).toEqual({ x: 225, y: 80 })
+    expect(isaTrianglePort(offset, 'right')).toEqual({ x: 275, y: 80 })
   })
 })
 

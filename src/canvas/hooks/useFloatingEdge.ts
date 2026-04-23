@@ -68,6 +68,28 @@ export const sidePort = (n: FloatableNode, side: EdgePosition): Point => {
   }
 }
 
+/**
+ * ISA-triangle-aware port. The ISA glyph is an inverted triangle with
+ * vertices at `(0, 0)`, `(w, 0)` and `(w/2, h)`. The bbox cardinals leave
+ * visible gaps on the slanted left/right edges — at `y = h/2` the triangle
+ * boundary is at `x = w/4` (left) / `x = 3w/4` (right), NOT at the bbox
+ * edge. Project those ports onto the midpoints of the slanted edges so
+ * incoming lines visually touch the shape. `top` and `bottom` already
+ * coincide with real triangle points (base centre + apex) so pass through.
+ */
+export const isaTrianglePort = (n: FloatableNode, side: EdgePosition): Point => {
+  const w = n.measured?.width ?? n.width ?? 0
+  const h = n.measured?.height ?? n.height ?? 0
+  const x = n.position.x
+  const y = n.position.y
+  switch (side) {
+    case 'top': return { x: x + w / 2, y }
+    case 'bottom': return { x: x + w / 2, y: y + h }
+    case 'left': return { x: x + w / 4, y: y + h / 2 }
+    case 'right': return { x: x + 3 * w / 4, y: y + h / 2 }
+  }
+}
+
 // Re-exported for any external code that still wants the raw intersection
 // helper (used, for instance, by the connection-preview overlay).
 export const getNodeIntersection = (a: FloatableNode, b: FloatableNode): Point =>
@@ -350,8 +372,13 @@ export const useFloatingEdge = (
 
     const sSide = resolveSide(s, sourceId, edgeId, diagram) ?? chooseSide(s, t)
     const tSide = resolveSide(t, targetId, edgeId, diagram) ?? chooseSide(t, s)
-    const sp = sidePort(s, sSide)
-    const tp = sidePort(t, tSide)
+    // ISA endpoints use triangle-aware ports so lines visually touch the
+    // slanted edges instead of stopping at the bbox cardinals. Other kinds
+    // keep their rectangular / diamond bbox-midpoint geometry.
+    const sIsIsa = diagram.nodesById[sourceId as NodeId]?.kind === 'isa'
+    const tIsIsa = diagram.nodesById[targetId as NodeId]?.kind === 'isa'
+    const sp = sIsIsa ? isaTrianglePort(s, sSide) : sidePort(s, sSide)
+    const tp = tIsIsa ? isaTrianglePort(t, tSide) : sidePort(t, tSide)
     return {
       sx: sp.x,
       sy: sp.y,
