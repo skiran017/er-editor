@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v2 / Phase 6] — 2026-04-23
+
+### Added
+
+- UI shell under [src/ui/](src/ui/) — menu, toolbar, property panel, overlays (toasts, modals, context menu), inline rename:
+  - [app/AppShell.tsx](src/ui/app/AppShell.tsx) — three-pane responsive layout (toolbar ‖ canvas ‖ properties + overlay slot).
+  - [toolbar/Toolbar.tsx](src/ui/toolbar/Toolbar.tsx) — reads `chenPlugin.tools`, dispatches `PICK_TOOL`, drag-from-toolbar via `application/x-er-tool` MIME.
+  - [menu/](src/ui/menu/) — `MenuBar` + `FileMenu`/`EditMenu`/`ViewMenu`/`HelpMenu`. File menu stubs to Phase-5 toasts until codecs land.
+  - [properties/](src/ui/properties/) — `PropertyPanel` + per-kind editors (`EntityProperties`, `RelationshipProperties`, `AttributeProperties`, `ISAProperties`, `EdgeProperties`) + `MultiSelectSummary` + `EmptyPanel`.
+  - [overlays/](src/ui/overlays/) — `ToastStack` (auto-dismiss, errors manual), `ModalStack` + `CheatsheetModal` / `ConfirmModal` / `ErrorModal`, `ContextMenu`.
+  - [canvas/hooks/useInlineRename.ts](src/canvas/hooks/useInlineRename.ts) + [canvas/InlineRenameOverlay.tsx](src/canvas/InlineRenameOverlay.tsx) — F2/Enter/dblclick inline rename. Hook lives canvas-side (the overlay consumes it; `canvas → ui` is forbidden by the layer rule).
+  - [primitives/](src/ui/primitives/) — `Button`, `IconButton`, `TextInput`, `Checkbox`, `KeyboardShortcut`. Buttons default to `type="button"` to avoid accidental form submission.
+- i18n bootstrap: [platform/i18n/init.ts](src/platform/i18n/init.ts) + `common`/`toolbar`/`menu`/`properties`/`modals` locale bundles for EN and IT (IT stubs copy EN — Phase 7 translates). Race-safe init via in-flight promise memoization.
+- `uiStore.contextMenu` + `uiStore.inlineRename` slices (not persisted).
+- FSM re-enters `connectToGeneralization.waitingForChild` state + new `CONNECT_CHILD_TO_ISA` event, reached via right-click on an ISA glyph. Matches spec §4.6; was deferred from Phase 3.
+- FSM `RENAME` root-level handler upgraded from no-op to a `beginRenameSelected` action that calls `uiStore.startInlineRename` for the selected node.
+- Shared `pickSeverity(errors)` selector in [state/selectors.ts](src/state/selectors.ts) — used by all four node containers (extracted during Task 4 refactor of Phase 4, consumed throughout Phase 6).
+- Coverage thresholds for `src/ui/**` and `src/platform/i18n/**`.
+- [src/ui/index.ts](src/ui/index.ts) barrel for ergonomic imports from `@/ui`.
+
+### Changed
+
+- `src/App.tsx` — mounts the full shell instead of just the canvas.
+- `src/main.tsx` — initialises i18next before render (`void initI18n().then(() => createRoot(...).render(<App />))`).
+- `src/canvas/ERCanvas.tsx` — mounts the `InlineRenameOverlay`.
+- `src/canvas/notation-adapters/ISANode.tsx` — opens the context menu on right-click with "Add child entity".
+
+### Notes
+
+- Phase 5 codec actions are stubbed: File menu items push "Available in Phase 5" toasts. Real `save` / `open` / `export` wire up when Phase 5 lands.
+- Phase 7 completes the Italian bundle and wires query-param overrides (`?lang`, `?readonly`, `?examMode`). Phase 6 does NOT populate the `readOnly` flag from the URL.
+- The "create → rename → save → reopen" exit criterion (spec §10.8) is exercised by `src/ui/integration.test.tsx`'s JSON round-trip. A real codec round-trip replaces it in Phase 5.
+- Context menu is a separate `uiStore.contextMenu` slice (not a modal) because it's cursor-anchored with outside-click + Escape dismissal — different lifecycle than centred modals.
+- Per-editor property panels use a store-subscription pattern (`useDiagramStore((s) => s.diagram.nodesById[node.id])`) to stay reactive with controlled inputs — callers pass a `node` prop but the component re-reads live state.
+- 642 unit tests passing; build, typecheck, and lint clean.
+
 ## [v2 / Phase 4] — 2026-04-22
 
 ### Added

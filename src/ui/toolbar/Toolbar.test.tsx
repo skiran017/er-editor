@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Toolbar } from './Toolbar'
 import { useInteractionStore } from '@/interaction/interactionStore'
@@ -46,5 +46,20 @@ describe('Toolbar', () => {
     for (const tool of ['select', 'pan', 'connect']) {
       expect(container.querySelector(`[data-tool-id="${tool}"][draggable="true"]`)).not.toBeInTheDocument()
     }
+  })
+
+  it('dragging a draggable element tool writes the tool id to dataTransfer', () => {
+    const { container } = render(<Toolbar />)
+    const entityDrag = container.querySelector('[data-tool-id="entity"][draggable="true"]') as HTMLElement
+    expect(entityDrag).toBeInTheDocument()
+    // Build a minimal dataTransfer polyfill — jsdom doesn't set one on DragEvent by default.
+    const store = new Map<string, string>()
+    const dataTransfer = {
+      setData: (key: string, value: string) => { store.set(key, value) },
+      getData: (key: string) => store.get(key) ?? '',
+      effectAllowed: 'uninitialized' as string,
+    }
+    fireEvent.dragStart(entityDrag, { dataTransfer })
+    expect(store.get('application/x-er-tool')).toBe('entity')
   })
 })
