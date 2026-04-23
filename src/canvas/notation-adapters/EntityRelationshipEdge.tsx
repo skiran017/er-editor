@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import { BaseEdge, getStraightPath, type EdgeProps } from '@xyflow/react'
-import { CardinalityLabel } from '@/notation/chen/cardinality'
 import { useFloatingEdge } from '@/canvas/hooks/useFloatingEdge'
 import { useDiagramStore } from '@/state/diagramStore'
 import type { EntityRelationshipEdge as EREdgeModel } from '@/domain/types'
@@ -109,12 +108,10 @@ export const EntityRelationshipEdge = memo(
             pointerEvents="none"
           />
         )}
-        <CardinalityLabel
-          cardinality={edge.cardinality}
-          participation={edge.participation}
-          x={labelX}
-          y={labelY}
-        />
+        {/* Cardinality letter labels intentionally omitted — cardinality is
+            conveyed by the triangle arrowhead at the "1" end, participation
+            by the parallel second line for total. Users can still edit both
+            values from the property panel. */}
         {edge.role && (
           <text
             x={labelX}

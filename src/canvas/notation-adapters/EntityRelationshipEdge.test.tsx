@@ -94,8 +94,10 @@ describe('EntityRelationshipEdge container', () => {
       },
     ]
 
-    const { container, findByText } = renderInFlow(rfNodes, rfEdges)
-    expect(await findByText('N', {}, { timeout: 2000 })).toBeInTheDocument()
+    const { container } = renderInFlow(rfNodes, rfEdges)
+    // Small delay so RF's measurement pass populates handleBounds (required
+    // by getEdgePosition before the edge renders).
+    await new Promise((r) => setTimeout(r, 50))
     // BaseEdge renders the solid primary path.
     const path = container.querySelector(
       '.react-flow__edge-entity-relationship path.react-flow__edge-path',
@@ -108,6 +110,8 @@ describe('EntityRelationshipEdge container', () => {
       '.react-flow__edge-entity-relationship path[data-role="total-participation"]',
     )
     expect(parallel).not.toBeInTheDocument()
+    // Cardinality labels were removed — verify no "N" / "M" text appears.
+    expect(container.querySelector('[data-role="cardinality-label"]')).not.toBeInTheDocument()
   })
 
   it('returns null when the edge id is missing from the store (stale RF frame)', async () => {
