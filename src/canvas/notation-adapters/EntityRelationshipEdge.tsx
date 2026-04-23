@@ -9,9 +9,12 @@ import type { NotationEdgeData } from '@/notation/types'
 // * Orthogonal routing via getSmoothStepPath — axis-aligned segments with a
 //   small corner radius. Lines enter each node perpendicular to the side
 //   computed by useFloatingEdge.
-// * Total participation → a second smoothstep path offset perpendicular to
-//   each endpoint's outward direction (reads as a "double line" near both
-//   ends even though the middle segments can be farther apart).
+// * Total participation → draw a thicker dark stroke along the main path,
+//   then overlay the same path with a thin background-coloured stroke. The
+//   overlay "cuts" a gap through the middle, reading as two parallel lines.
+//   Works for any path geometry (straight, L-bend, Z-bend, vertical, …) —
+//   a geometric offset path was brittle because a single translate can't
+//   offset both horizontal and vertical segments perpendicular to themselves.
 // * Cardinality "1" → solid filled triangle at the ENTITY end, pointing
 //   INTO the entity along the approach direction (perpendicular to the
 //   entity side, NOT the centre-to-centre direction).
@@ -19,12 +22,16 @@ import type { NotationEdgeData } from '@/notation/types'
 // Edge convention: for entity-relationship edges, source = entity and
 // target = relationship (normalised by connectViaConnectTool), so the
 // entity end is the SOURCE end.
-const PARALLEL_OFFSET = 4
 const ARROW_LENGTH = 10
 const ARROW_HALF_WIDTH = 5
 const CORNER_RADIUS = 5
 const STROKE = '#334155'
 const STROKE_WIDTH = 1.5
+// Total-participation rendering: outer stroke width minus inner gap = each
+// of the two visible lines is (TOTAL_OUTER - TOTAL_GAP) / 2 wide.
+const TOTAL_OUTER_WIDTH = 5
+const TOTAL_GAP_WIDTH = 2
+const CANVAS_BG = 'white'
 
 // The direction pointing OUT of the node along the side the edge exits.
 // sourcePosition === 'right' means the edge leaves the node from its right
@@ -82,24 +89,7 @@ export const EntityRelationshipEdge = memo(
       borderRadius: CORNER_RADIUS,
     })
 
-    // Parallel orthogonal path for total participation. Render the SAME
-    // smoothstep path, translated by one consistent offset perpendicular to
-    // the overall source→target displacement — using per-endpoint
-    // perpendiculars (my first attempt) sent the two endpoints into
-    // different axes on L-shaped routes and made the parallel elbows
-    // cross the primary ones.
-    let parallelPath: string | null = null
-    let parallelTransform = ''
-    if (edge.participation === 'total') {
-      const dx = tx - sx
-      const dy = ty - sy
-      const len = Math.hypot(dx, dy) || 1
-      // 90° clockwise rotation of the unit displacement vector.
-      const offX = (dy / len) * PARALLEL_OFFSET
-      const offY = -(dx / len) * PARALLEL_OFFSET
-      parallelPath = path
-      parallelTransform = `translate(${offX}, ${offY})`
-    }
+    const isTotal = edge.participation === 'total'
 
     // Solid triangle arrowhead at the entity (source) end when cardinality = 1.
     // Tip at (sx, sy) on the entity boundary; body extends OUTward along the
@@ -122,18 +112,24 @@ export const EntityRelationshipEdge = memo(
 
     return (
       <>
+        {/* Main path. For total participation we render a thicker dark
+            stroke so the subsequent white-gap overlay can carve out the
+            middle; for partial we render the plain thin stroke. */}
         <BaseEdge
           id={id}
           path={path}
-          style={{ stroke: STROKE, strokeWidth: STROKE_WIDTH, fill: 'none' }}
+          style={{
+            stroke: STROKE,
+            strokeWidth: isTotal ? TOTAL_OUTER_WIDTH : STROKE_WIDTH,
+            fill: 'none',
+          }}
         />
-        {parallelPath && (
+        {isTotal && (
           <path
-            d={parallelPath}
+            d={path}
             data-role="total-participation"
-            transform={parallelTransform}
-            stroke={STROKE}
-            strokeWidth={STROKE_WIDTH}
+            stroke={CANVAS_BG}
+            strokeWidth={TOTAL_GAP_WIDTH}
             fill="none"
             pointerEvents="none"
           />
