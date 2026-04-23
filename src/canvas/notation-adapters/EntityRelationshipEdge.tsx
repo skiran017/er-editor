@@ -1,16 +1,20 @@
 import { memo } from 'react'
-import { BaseEdge, getStraightPath, type EdgeProps } from '@xyflow/react'
-import { useFloatingEdge } from '@/canvas/hooks/useFloatingEdge'
+import { BaseEdge, getSmoothStepPath, Position, type EdgeProps } from '@xyflow/react'
+import { useFloatingEdge, type EdgePosition } from '@/canvas/hooks/useFloatingEdge'
 import { useDiagramStore } from '@/state/diagramStore'
 import type { EntityRelationshipEdge as EREdgeModel } from '@/domain/types'
 import type { NotationEdgeData } from '@/notation/types'
 
-// Chen visual rules ported from legacy ConnectionShape.tsx:
-// * Total participation → a second line drawn parallel at +offset, NOT a
-//   dashed single line. Legacy offsets along the perpendicular; we mirror.
+// Chen visual rules (ported from legacy ConnectionShape.tsx):
+// * Orthogonal routing via getSmoothStepPath — axis-aligned segments with a
+//   small corner radius. Lines enter each node perpendicular to the side
+//   computed by useFloatingEdge.
+// * Total participation → a second smoothstep path offset perpendicular to
+//   each endpoint's outward direction (reads as a "double line" near both
+//   ends even though the middle segments can be farther apart).
 // * Cardinality "1" → solid filled triangle at the ENTITY end, pointing
-//   INTO the entity. No arrow for N or M.
-// * Cardinality "N" / "M" → letter label at midpoint only.
+//   INTO the entity along the approach direction (perpendicular to the
+//   entity side, NOT the centre-to-centre direction).
 //
 // Edge convention: for entity-relationship edges, source = entity and
 // target = relationship (normalised by connectViaConnectTool), so the
@@ -18,8 +22,32 @@ import type { NotationEdgeData } from '@/notation/types'
 const PARALLEL_OFFSET = 4
 const ARROW_LENGTH = 10
 const ARROW_HALF_WIDTH = 5
+const CORNER_RADIUS = 5
 const STROKE = '#334155'
 const STROKE_WIDTH = 1.5
+
+// The direction pointing OUT of the node along the side the edge exits.
+// sourcePosition === 'right' means the edge leaves the node from its right
+// edge → outward direction is +x.
+const AWAY_DIR: Record<EdgePosition, readonly [number, number]> = {
+  top: [0, -1],
+  right: [1, 0],
+  bottom: [0, 1],
+  left: [-1, 0],
+}
+
+const POSITION_MAP: Record<EdgePosition, Position> = {
+  top: Position.Top,
+  right: Position.Right,
+  bottom: Position.Bottom,
+  left: Position.Left,
+}
+
+// Fallback used when `useFloatingEdge` hasn't resolved yet (first render
+// before measurement) — source on the right, target on the left mirrors
+// the handle geometry from diagramToRf.
+const FALLBACK_SOURCE_POS: EdgePosition = 'right'
+const FALLBACK_TARGET_POS: EdgePosition = 'left'
 
 export const EntityRelationshipEdge = memo(
   ({
@@ -43,37 +71,52 @@ export const EntityRelationshipEdge = memo(
     const sy = float ? float.sy : sourceY
     const tx = float ? float.tx : targetX
     const ty = float ? float.ty : targetY
+    const srcSide: EdgePosition = float ? float.sourcePosition : FALLBACK_SOURCE_POS
+    const tgtSide: EdgePosition = float ? float.targetPosition : FALLBACK_TARGET_POS
+    const sourcePosition = POSITION_MAP[srcSide]
+    const targetPosition = POSITION_MAP[tgtSide]
 
-    const [path, labelX, labelY] = getStraightPath({
-      sourceX: sx, sourceY: sy, targetX: tx, targetY: ty,
+    const [path, labelX, labelY] = getSmoothStepPath({
+      sourceX: sx, sourceY: sy, sourcePosition,
+      targetX: tx, targetY: ty, targetPosition,
+      borderRadius: CORNER_RADIUS,
     })
 
-    // Unit vector along the edge + perpendicular (for the parallel line and
-    // arrowhead base points). Guard against zero-length edges.
-    const dx = tx - sx
-    const dy = ty - sy
-    const len = Math.hypot(dx, dy) || 1
-    const ux = dx / len
-    const uy = dy / len
-    const px = -uy
-    const py = ux
+    // Parallel orthogonal path for total participation. Offset each endpoint
+    // by PARALLEL_OFFSET along the PERPENDICULAR of that endpoint's outward
+    // direction — that keeps the double line visually parallel at the ends
+    // even if the middle elbows separate.
+    let parallelPath: string | null = null
+    if (edge.participation === 'total') {
+      const [sax, say] = AWAY_DIR[srcSide]
+      const [tax, tay] = AWAY_DIR[tgtSide]
+      // 90° rotation: (x, y) → (-y, x)
+      const sPerp: [number, number] = [-say, sax]
+      const tPerp: [number, number] = [-tay, tax]
+      const [pPath] = getSmoothStepPath({
+        sourceX: sx + sPerp[0] * PARALLEL_OFFSET,
+        sourceY: sy + sPerp[1] * PARALLEL_OFFSET,
+        sourcePosition,
+        targetX: tx + tPerp[0] * PARALLEL_OFFSET,
+        targetY: ty + tPerp[1] * PARALLEL_OFFSET,
+        targetPosition,
+        borderRadius: CORNER_RADIUS,
+      })
+      parallelPath = pPath
+    }
 
-    // Parallel line for total participation — offset along the perpendicular.
-    const parallelPath =
-      edge.participation === 'total'
-        ? `M ${sx + px * PARALLEL_OFFSET} ${sy + py * PARALLEL_OFFSET} ` +
-          `L ${tx + px * PARALLEL_OFFSET} ${ty + py * PARALLEL_OFFSET}`
-        : null
-
-    // Arrowhead at the entity (source) end when cardinality = 1.
-    // Tip is at (sx, sy). Base is ARROW_LENGTH units along the edge (toward
-    // the relationship, which is the target end), offset ±ARROW_HALF_WIDTH
-    // perpendicular.
+    // Solid triangle arrowhead at the entity (source) end when cardinality = 1.
+    // Tip at (sx, sy) on the entity boundary; body extends OUTward along the
+    // entity side's outward direction (so the arrow points inward).
     const showArrow = edge.cardinality === '1'
     let arrowPath: string | null = null
     if (showArrow) {
-      const baseCx = sx + ux * ARROW_LENGTH
-      const baseCy = sy + uy * ARROW_LENGTH
+      const [ax, ay] = AWAY_DIR[srcSide]
+      // Perpendicular to the approach direction for the base wings.
+      const px = -ay
+      const py = ax
+      const baseCx = sx + ax * ARROW_LENGTH
+      const baseCy = sy + ay * ARROW_LENGTH
       const b1x = baseCx + px * ARROW_HALF_WIDTH
       const b1y = baseCy + py * ARROW_HALF_WIDTH
       const b2x = baseCx - px * ARROW_HALF_WIDTH
