@@ -82,27 +82,23 @@ export const EntityRelationshipEdge = memo(
       borderRadius: CORNER_RADIUS,
     })
 
-    // Parallel orthogonal path for total participation. Offset each endpoint
-    // by PARALLEL_OFFSET along the PERPENDICULAR of that endpoint's outward
-    // direction — that keeps the double line visually parallel at the ends
-    // even if the middle elbows separate.
+    // Parallel orthogonal path for total participation. Render the SAME
+    // smoothstep path, translated by one consistent offset perpendicular to
+    // the overall source→target displacement — using per-endpoint
+    // perpendiculars (my first attempt) sent the two endpoints into
+    // different axes on L-shaped routes and made the parallel elbows
+    // cross the primary ones.
     let parallelPath: string | null = null
+    let parallelTransform = ''
     if (edge.participation === 'total') {
-      const [sax, say] = AWAY_DIR[srcSide]
-      const [tax, tay] = AWAY_DIR[tgtSide]
-      // 90° rotation: (x, y) → (-y, x)
-      const sPerp: [number, number] = [-say, sax]
-      const tPerp: [number, number] = [-tay, tax]
-      const [pPath] = getSmoothStepPath({
-        sourceX: sx + sPerp[0] * PARALLEL_OFFSET,
-        sourceY: sy + sPerp[1] * PARALLEL_OFFSET,
-        sourcePosition,
-        targetX: tx + tPerp[0] * PARALLEL_OFFSET,
-        targetY: ty + tPerp[1] * PARALLEL_OFFSET,
-        targetPosition,
-        borderRadius: CORNER_RADIUS,
-      })
-      parallelPath = pPath
+      const dx = tx - sx
+      const dy = ty - sy
+      const len = Math.hypot(dx, dy) || 1
+      // 90° clockwise rotation of the unit displacement vector.
+      const offX = (dy / len) * PARALLEL_OFFSET
+      const offY = -(dx / len) * PARALLEL_OFFSET
+      parallelPath = path
+      parallelTransform = `translate(${offX}, ${offY})`
     }
 
     // Solid triangle arrowhead at the entity (source) end when cardinality = 1.
@@ -135,6 +131,7 @@ export const EntityRelationshipEdge = memo(
           <path
             d={parallelPath}
             data-role="total-participation"
+            transform={parallelTransform}
             stroke={STROKE}
             strokeWidth={STROKE_WIDTH}
             fill="none"
