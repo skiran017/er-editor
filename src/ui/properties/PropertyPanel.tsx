@@ -6,11 +6,7 @@ import { EntityProperties } from './EntityProperties'
 import { RelationshipProperties } from './RelationshipProperties'
 import { AttributeProperties } from './AttributeProperties'
 import { ISAProperties } from './ISAProperties'
-
-// Edge editors land in Task 12; keep the placeholder until then.
-const Placeholder = ({ label }: { label: string }) => (
-  <div className="p-3 text-xs text-slate-500" data-role="placeholder">{label}</div>
-)
+import { EdgeProperties } from './EdgeProperties'
 
 export const PropertyPanel = () => {
   const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds)
@@ -44,5 +40,5 @@ export const PropertyPanel = () => {
   const id = [...selectedEdgeIds][0]
   const edge = diagram.edgesById[id]
   if (!edge) return <EmptyPanel />
-  return <div data-role="property-panel" data-edge-kind={edge.kind}><Placeholder label={`${edge.kind} editor (Task 12)`} /></div>
+  return <div data-role="property-panel" data-edge-kind={edge.kind}><EdgeProperties edge={edge} /></div>
 }
