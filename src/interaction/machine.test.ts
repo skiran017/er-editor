@@ -347,7 +347,9 @@ describe('machine — placing.attribute (Chen semantics: needs a parent)', () =>
     // attribute-of edge flows FROM attribute TO parent:
     expect(edges[0]!.sourceId).toBe(attrs[0]!.id)
     expect(edges[0]!.targetId).toBe(entity)
-    expect(actor.getSnapshot().matches({ selecting: 'idle' })).toBe(true)
+    // Tool stays active so the user can fan out multiple attributes without
+    // re-picking from the toolbar; Escape / another tool exits.
+    expect(actor.getSnapshot().matches({ placing: 'attribute' })).toBe(true)
     actor.stop()
   })
 
@@ -368,7 +370,28 @@ describe('machine — placing.attribute (Chen semantics: needs a parent)', () =>
     const d = useDiagramStore.getState().diagram
     expect(Object.values(d.nodesById).filter((n) => n.kind === 'attribute')).toHaveLength(1)
     expect(Object.values(d.edgesById).filter((e) => e.kind === 'attribute-of')).toHaveLength(1)
-    expect(actor.getSnapshot().matches({ selecting: 'idle' })).toBe(true)
+    expect(actor.getSnapshot().matches({ placing: 'attribute' })).toBe(true)
+    actor.stop()
+  })
+
+  it('attribute tool stays active after one placement — a second click adds another attribute', () => {
+    const entity = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 100, y: 100 }, size: { width: 120, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'attribute' })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: entity,
+      point: { x: 260, y: 130 }, modifiers: NO_MODIFIERS, button: 'left',
+    })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: entity,
+      point: { x: 160, y: 190 }, modifiers: NO_MODIFIERS, button: 'left',
+    })
+    const attrs = Object.values(useDiagramStore.getState().diagram.nodesById)
+      .filter((n) => n.kind === 'attribute')
+    expect(attrs).toHaveLength(2)
     actor.stop()
   })
 

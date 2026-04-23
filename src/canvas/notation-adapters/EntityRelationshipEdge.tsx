@@ -1,6 +1,7 @@
 import { memo } from 'react'
-import { BaseEdge, getSmoothStepPath, type EdgeProps } from '@xyflow/react'
+import { BaseEdge, getStraightPath, type EdgeProps } from '@xyflow/react'
 import { CardinalityLabel } from '@/notation/chen/cardinality'
+import { useFloatingEdge } from '@/canvas/hooks/useFloatingEdge'
 import { useDiagramStore } from '@/state/diagramStore'
 import type { EntityRelationshipEdge as EREdgeModel } from '@/domain/types'
 import type { NotationEdgeData } from '@/notation/types'
@@ -8,28 +9,26 @@ import type { NotationEdgeData } from '@/notation/types'
 export const EntityRelationshipEdge = memo(
   ({
     id,
+    source,
+    target,
     sourceX,
     sourceY,
     targetX,
     targetY,
-    sourcePosition,
-    targetPosition,
     data,
   }: EdgeProps) => {
     const edgeId = (data as NotationEdgeData).edgeId
     const edge = useDiagramStore((s) => s.diagram.edgesById[edgeId]) as
       | EREdgeModel
       | undefined
+    // Floating attachment on both ends so the edge rotates around entity AND
+    // relationship as either moves. Chen lines are conventionally straight.
+    const float = useFloatingEdge(source, target)
     if (!edge || edge.kind !== 'entity-relationship') return null
 
-    const [path, labelX, labelY] = getSmoothStepPath({
-      sourceX,
-      sourceY,
-      targetX,
-      targetY,
-      sourcePosition,
-      targetPosition,
-    })
+    const [path, labelX, labelY] = float
+      ? getStraightPath({ sourceX: float.sx, sourceY: float.sy, targetX: float.tx, targetY: float.ty })
+      : getStraightPath({ sourceX, sourceY, targetX, targetY })
 
     return (
       <>

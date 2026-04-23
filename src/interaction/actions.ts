@@ -364,12 +364,34 @@ export const placeAttributeOnParent = (event: EditorEvent): void => {
   }
   const name = `attribute ${existingChildren + 1}`
   const size = { width: 90, height: 50 }
-  // Offset 30 px to the right of the parent's right edge, vertically centred
-  // on the parent's top-edge reference so the new attribute sits visually
-  // next to its parent.
+  // Place the attribute outside the parent in the direction of the click —
+  // so the user can "fan out" multiple attributes by clicking different
+  // sides of the parent. A small deterministic jitter based on the child
+  // index prevents duplicates from stacking exactly on top of each other
+  // when the user clicks the same spot repeatedly.
+  const cx = parent.position.x + parent.size.width / 2
+  const cy = parent.position.y + parent.size.height / 2
+  let dx = event.point.x - cx
+  let dy = event.point.y - cy
+  let len = Math.hypot(dx, dy)
+  if (len < 1) {
+    // Click almost exactly at the centre — default direction is to the right.
+    dx = 1
+    dy = 0
+    len = 1
+  }
+  const ux = dx / len
+  const uy = dy / len
+  // Distance from the parent's centre: push past the parent's furthest
+  // corner plus a gap, plus a 14-px step per existing child so repeated
+  // clicks in the same direction walk outward instead of stacking.
+  const diag = Math.hypot(parent.size.width, parent.size.height) / 2
+  const step = 14
+  const gap = 40
+  const dist = diag + gap + existingChildren * step
   const position = {
-    x: parent.position.x + parent.size.width + 30,
-    y: parent.position.y + parent.size.height / 2 - size.height / 2,
+    x: cx + ux * dist - size.width / 2,
+    y: cy + uy * dist - size.height / 2,
   }
 
   // Apply node + edge in a single applyPatch so the invariant subscriber

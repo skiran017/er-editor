@@ -259,10 +259,11 @@ export const editorMachine = setup({
             NODE_POINTER_DOWN: [
               {
                 // Only entity / relationship / attribute can host an attribute child.
-                // Clicking an ISA (or any other non-hosting node) — no-op, stay in placing.
+                // After placing, stay in `placing.attribute` so the user can
+                // place more without re-picking the tool from the toolbar.
+                // Press Escape (or pick another tool) to exit.
                 guard: 'canHostAttribute',
-                target: '#editor.selecting.idle',
-                actions: ['placeAttributeOnParentAction', 'resetContext'],
+                actions: 'placeAttributeOnParentAction',
               },
             ],
             CANVAS_POINTER_UP: {
