@@ -10,5 +10,20 @@
   "loading": "Loading…",
   "readOnly": "Read-only",
   "examMode": "Exam mode",
-  "attributeNeedsParent": "Attributes must be attached to an entity, relationship, or composite attribute. Click a parent node."
+  "attributeNeedsParent": "Attributes must be attached to an entity, relationship, or composite attribute. Click a parent node.",
+  "flow": {
+    "connect": {
+      "pickSource": "Connect: click the first node to start.",
+      "pickTarget": "Connect: click the second node to complete the link."
+    },
+    "quickRel": {
+      "pickFirst": "Quick relationship: click the first entity.",
+      "pickSecond": "Quick relationship: click the second entity."
+    },
+    "quickGen": {
+      "pickParent": "Quick generalization: click the parent entity.",
+      "pickChild": "Quick generalization: click the child entity."
+    },
+    "addChildToIsa": "Click the child entity to add it to this generalization."
+  }
 }

@@ -498,3 +498,68 @@ describe('machine — placing.attribute (Chen semantics: needs a parent)', () =>
   })
 })
 
+describe('machine — edge selection', () => {
+  beforeEach(resetStores)
+  it('EDGE_POINTER_DOWN selects the edge', () => {
+    const actor = startActor()
+    actor.send({
+      type: 'EDGE_POINTER_DOWN',
+      edgeId: 'edge-123' as unknown as never,
+      point: { x: 0, y: 0 }, modifiers: NO_MODIFIERS, button: 'left',
+    })
+    const sel = useSelectionStore.getState()
+    expect(sel.selectedEdgeIds.has('edge-123' as unknown as never)).toBe(true)
+    expect(sel.selectedNodeIds.size).toBe(0)
+    actor.stop()
+  })
+})
+
+describe('machine — flow-hint toasts', () => {
+  beforeEach(resetStores)
+
+  const flowToast = () =>
+    useUiStore.getState().toasts.find((t) => t.id === 'flow-hint')
+
+  it('connect tool: idle → toast "pickSource"; after first node → toast "pickTarget"', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'connect' })
+    expect(flowToast()?.messageKey).toBe('common:flow.connect.pickSource')
+
+    const nid = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: nid,
+      point: { x: 0, y: 0 }, modifiers: NO_MODIFIERS, button: 'left',
+    })
+    expect(flowToast()?.messageKey).toBe('common:flow.connect.pickTarget')
+    actor.stop()
+  })
+
+  it('quickRelationship1N: idle → pickFirst; firstPicked → pickSecond', () => {
+    const a = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship1N' })
+    expect(flowToast()?.messageKey).toBe('common:flow.quickRel.pickFirst')
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: a,
+      point: { x: 0, y: 0 }, modifiers: NO_MODIFIERS, button: 'left',
+    })
+    expect(flowToast()?.messageKey).toBe('common:flow.quickRel.pickSecond')
+    actor.stop()
+  })
+
+  it('switching to a non-flow tool clears the flow-hint toast', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'connect' })
+    expect(flowToast()).toBeDefined()
+    actor.send({ type: 'PICK_TOOL', tool: 'select' })
+    expect(flowToast()).toBeUndefined()
+    actor.stop()
+  })
+})
+

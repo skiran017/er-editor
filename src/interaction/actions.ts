@@ -131,6 +131,15 @@ export const selectNodeFromEvent = (_context: EditorContext, event: EditorEvent)
   }
 }
 
+export const selectEdgeFromEvent = (_context: EditorContext, event: EditorEvent): void => {
+  if (event.type !== 'EDGE_POINTER_DOWN') return
+  if (event.modifiers.shift) {
+    useSelectionStore.getState().toggle({ nodes: [], edges: [event.edgeId] })
+  } else {
+    useSelectionStore.getState().select({ nodes: [], edges: [event.edgeId] })
+  }
+}
+
 // ——— viewport ———
 
 export const panViewportAction = (context: EditorContext, event: EditorEvent): void => {
@@ -483,6 +492,34 @@ export const rejectOrphanAttributeToast = (event: EditorEvent): void => {
     messageKey: 'common:attributeNeedsParent',
   })
 }
+
+// ——— flow toasts ———
+//
+// Multi-step tools (connect, quickRelationship, quickGeneralization,
+// connectToGeneralization) use entry-action toasts to guide the user
+// through each click. Toasts have stable IDs so re-entering a state
+// replaces the previous hint in-place instead of stacking.
+
+const FLOW_TOAST_ID = 'flow-hint'
+
+const showFlowToast = (messageKey: string): void => {
+  const ui = useUiStore.getState()
+  ui.dismissToast(FLOW_TOAST_ID)
+  ui.pushToast({ id: FLOW_TOAST_ID, kind: 'info', messageKey })
+}
+
+const dismissFlowToast = (): void => {
+  useUiStore.getState().dismissToast(FLOW_TOAST_ID)
+}
+
+export const toastConnectPickSource = (): void => showFlowToast('common:flow.connect.pickSource')
+export const toastConnectPickTarget = (): void => showFlowToast('common:flow.connect.pickTarget')
+export const toastQuickRelPickFirst = (): void => showFlowToast('common:flow.quickRel.pickFirst')
+export const toastQuickRelPickSecond = (): void => showFlowToast('common:flow.quickRel.pickSecond')
+export const toastQuickGenPickParent = (): void => showFlowToast('common:flow.quickGen.pickParent')
+export const toastQuickGenPickChild = (): void => showFlowToast('common:flow.quickGen.pickChild')
+export const toastAddChildToIsa = (): void => showFlowToast('common:flow.addChildToIsa')
+export const clearFlowToast = (): void => dismissFlowToast()
 
 // ——— cheatsheet ———
 

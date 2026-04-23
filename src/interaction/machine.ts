@@ -4,9 +4,13 @@ import {
   connectChildToIsaAction, connectNodes, deleteSelectionAction,
   duplicateSelectionAction, fitAction, moveDraggedNode, nudgeSelection,
   panViewportAction, placeAttributeOnParent, placeNode, redoAction,
-  rejectOrphanAttributeToast, selectAllAction, selectNodeFromEvent,
+  rejectOrphanAttributeToast, selectAllAction, selectEdgeFromEvent, selectNodeFromEvent,
   stubCopy, stubCut, stubPaste, toggleCheatsheetAction, undoAction,
   updateRubberbandAction, zoomAtPointAction, zoomInAction, zoomOutAction,
+  toastConnectPickSource, toastConnectPickTarget,
+  toastQuickRelPickFirst, toastQuickRelPickSecond,
+  toastQuickGenPickParent, toastQuickGenPickChild,
+  toastAddChildToIsa, clearFlowToast,
 } from './actions'
 import { useDiagramStore } from '@/state/diagramStore'
 import { initialContext, type EditorContext } from './context'
@@ -95,6 +99,7 @@ export const editorMachine = setup({
     }),
     // Side-effect actions below delegate to action-module functions.
     selectNodeFromEvent: ({ context, event }) => selectNodeFromEvent(context, event),
+    selectEdgeFromEvent: ({ context, event }) => selectEdgeFromEvent(context, event),
     moveDraggedNode: ({ context, event }) => moveDraggedNode(context, event),
     beginRubberband: ({ context, event }) => beginRubberband(context, event),
     updateRubberbandAction: ({ context, event }) => updateRubberbandAction(context, event),
@@ -121,6 +126,15 @@ export const editorMachine = setup({
     zoomOut: ({ context, event }) => zoomOutAction(context, event),
     fit: ({ context, event }) => fitAction(context, event),
     beginRenameSelected: () => beginRenameSelected(),
+    // Flow-hint toasts (entry / exit of multi-step tools).
+    toastConnectPickSource: () => toastConnectPickSource(),
+    toastConnectPickTarget: () => toastConnectPickTarget(),
+    toastQuickRelPickFirst: () => toastQuickRelPickFirst(),
+    toastQuickRelPickSecond: () => toastQuickRelPickSecond(),
+    toastQuickGenPickParent: () => toastQuickGenPickParent(),
+    toastQuickGenPickChild: () => toastQuickGenPickChild(),
+    toastAddChildToIsa: () => toastAddChildToIsa(),
+    clearFlowToast: () => clearFlowToast(),
   },
 }).createMachine({
   id: 'editor',
@@ -182,7 +196,15 @@ export const editorMachine = setup({
     CONFIRM: {},              // Phase 6: modal-level confirm
     CANCEL: {},               // Phase 6: modal-level cancel
     HANDLE_POINTER_DOWN: {},  // Phase 4: React Flow handles
-    EDGE_POINTER_DOWN: {},    // Phase 4: edge interactions
+    // Edge-click selection: fires from any state. Selecting an edge doesn't
+    // interfere with placing/drawing flows (placing cares about
+    // CANVAS_POINTER_UP, drawing cares about NODE_POINTER_DOWN) — worst
+    // case, picking an edge while in Entity mode just selects it and leaves
+    // the tool active.
+    EDGE_POINTER_DOWN: {
+      guard: 'isLeftButton',
+      actions: 'selectEdgeFromEvent',
+    },
   },
   states: {
     selecting: {
@@ -289,8 +311,12 @@ export const editorMachine = setup({
     },
     drawing: {
       initial: 'idle',
+      // Guide the user out of the tool when they pick a different one or
+      // press Escape. Individual idle/fromPicked states show their own toast.
+      exit: 'clearFlowToast',
       states: {
         idle: {
+          entry: 'toastConnectPickSource',
           on: {
             NODE_POINTER_DOWN: [
               { guard: 'isLeftButton', target: 'connection.fromPicked',
@@ -305,6 +331,7 @@ export const editorMachine = setup({
           initial: 'fromPicked',
           states: {
             fromPicked: {
+              entry: 'toastConnectPickTarget',
               on: {
                 // Clicks on nodes arrive as NODE_POINTER_DOWN (useRfEvents
                 // synthesises a CANVAS_POINTER_UP after to avoid the
@@ -333,8 +360,10 @@ export const editorMachine = setup({
     },
     quickRelationship: {
       initial: 'idle',
+      exit: 'clearFlowToast',
       states: {
         idle: {
+          entry: 'toastQuickRelPickFirst',
           on: {
             NODE_POINTER_DOWN: {
               guard: 'isLeftButton',
@@ -347,6 +376,7 @@ export const editorMachine = setup({
           },
         },
         firstPicked: {
+          entry: 'toastQuickRelPickSecond',
           on: {
             NODE_POINTER_DOWN: {
               guard: ({ context, event }) =>
@@ -361,8 +391,10 @@ export const editorMachine = setup({
     },
     quickGeneralization: {
       initial: 'idle',
+      exit: 'clearFlowToast',
       states: {
         idle: {
+          entry: 'toastQuickGenPickParent',
           on: {
             NODE_POINTER_DOWN: {
               guard: 'isLeftButton',
@@ -375,6 +407,7 @@ export const editorMachine = setup({
           },
         },
         firstPicked: {
+          entry: 'toastQuickGenPickChild',
           on: {
             NODE_POINTER_DOWN: {
               guard: ({ context, event }) =>
@@ -392,8 +425,10 @@ export const editorMachine = setup({
     // until the user picks a child entity or cancels.
     connectToGeneralization: {
       initial: 'waitingForChild',
+      exit: 'clearFlowToast',
       states: {
         waitingForChild: {
+          entry: 'toastAddChildToIsa',
           on: {
             NODE_POINTER_DOWN: {
               target: '#editor.selecting.idle',
