@@ -48,17 +48,12 @@ describe('useRfEvents', () => {
     sendSpy.mockRestore()
   })
 
-  it('onPaneClick dispatches CANVAS_POINTER_DOWN followed by CANVAS_POINTER_UP', () => {
+  it('does NOT expose onPaneClick (pane events bubble to the wrapper div where useMouse handles them)', () => {
     const { result } = renderHook(() => useRfEvents())
-    const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
-    result.current.onPaneClick(mkMouseEvent({ clientX: 50, clientY: 60 }))
-    const types = sendSpy.mock.calls.map(([ev]) => ev.type)
-    // Sequence must include DOWN then UP, in that order.
-    const downIdx = types.indexOf('CANVAS_POINTER_DOWN')
-    const upIdx = types.indexOf('CANVAS_POINTER_UP')
-    expect(downIdx).toBeGreaterThanOrEqual(0)
-    expect(upIdx).toBeGreaterThan(downIdx)
-    sendSpy.mockRestore()
+    // Guards against a regression where onPaneClick gets re-added and
+    // double-fires CANVAS_POINTER_* alongside the outer-wrapper useMouse
+    // handler (caused the "two stacked entities" bug).
+    expect((result.current as unknown as { onPaneClick?: unknown }).onPaneClick).toBeUndefined()
   })
 
   it('onNodeClick maps middle/right mouse buttons to PointerButton', () => {

@@ -48,9 +48,9 @@ describe('rendering integration — placement', () => {
     expect(diagram.nodeOrder).toHaveLength(1)
     const entity = diagram.nodesById[diagram.nodeOrder[0]]
     expect(entity.kind).toBe('entity')
-    // placeNode() assigns the default name 'Entity'.
+    // placeNode() assigns a kind-scoped default name ('Entity 1', 'Entity 2', ...).
     const node = entity as { name: string }
-    expect(node.name).toBe('Entity')
+    expect(node.name).toBe('Entity 1')
     expect(await screen.findByText(node.name)).toBeInTheDocument()
   })
 })

@@ -17,14 +17,18 @@ const readButton = (button: number): PointerButton =>
 export interface RfEventHandlers {
   readonly onNodeClick: (e: ReactMouseEvent, node: RfNode) => void
   readonly onEdgeClick: (e: ReactMouseEvent, edge: RfEdge) => void
-  readonly onPaneClick: (e: ReactMouseEvent) => void
 }
 
 /**
  * React Flow v12 catches pointer events on its internal node/edge wrappers
  * before they bubble to the outer wrapper div (where {@link useMouse} lives).
  * This hook produces the per-element handlers we attach to `<ReactFlow>` so
- * the FSM receives NODE/EDGE/CANVAS events.
+ * the FSM receives NODE/EDGE events.
+ *
+ * Note: we deliberately do NOT wire `onPaneClick`. Pane pointer events bubble
+ * up through the wrapper div and are handled by `useMouse`, which is the
+ * single source of truth for CANVAS_POINTER_* events. Dispatching them here
+ * too would double-fire (root cause of the "two stacked entities" bug).
  */
 export const useRfEvents = (): RfEventHandlers => {
   const onNodeClick = useCallback((e: ReactMouseEvent, node: RfNode) => {
@@ -47,14 +51,5 @@ export const useRfEvents = (): RfEventHandlers => {
     })
   }, [])
 
-  const onPaneClick = useCallback((e: ReactMouseEvent) => {
-    const point = { x: e.clientX, y: e.clientY }
-    const modifiers = readModifiers(e)
-    useInteractionStore.getState().send({
-      type: 'CANVAS_POINTER_DOWN', point, modifiers, button: readButton(e.button),
-    })
-    useInteractionStore.getState().send({ type: 'CANVAS_POINTER_UP', point })
-  }, [])
-
-  return { onNodeClick, onEdgeClick, onPaneClick }
+  return { onNodeClick, onEdgeClick }
 }

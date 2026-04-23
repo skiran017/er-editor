@@ -10,7 +10,7 @@ import {
 } from '@/state/commands'
 import { bboxFromNodeLike, bboxIntersects } from '@/domain/geometry'
 import { isEntityNode } from '@/domain/graph'
-import type { BBox, ERNode, EntityRelationshipEdge, ISAEdge, NodeId } from '@/domain/types'
+import type { BBox, Diagram, ERNode, EntityRelationshipEdge, ISAEdge, NodeId } from '@/domain/types'
 import type { EditorContext } from './context'
 import type { EditorEvent } from './events'
 
@@ -30,6 +30,20 @@ const bboxOfRubberband = (origin: { x: number; y: number }, current: { x: number
   height: Math.abs(current.y - origin.y),
 })
 
+// Kind-scoped counter used to give placed nodes distinct default names
+// (e.g. 'Entity 1', 'Entity 2'). Counts live nodes of the given kind in the
+// current diagram; if the user deletes a node the next placement reuses its
+// number, but the diagram invariant (unique ids, not unique names) means
+// duplicate-name collisions are recoverable via inline rename.
+const countOfKind = (diagram: Diagram, kind: 'entity' | 'relationship' | 'attribute'): number => {
+  let n = 0
+  for (const id of diagram.nodeOrder) {
+    const node = diagram.nodesById[id]
+    if (node && node.kind === kind) n += 1
+  }
+  return n
+}
+
 // ——— placement + drag ———
 
 export const placeNode = (context: EditorContext, event: EditorEvent): void => {
@@ -37,19 +51,20 @@ export const placeNode = (context: EditorContext, event: EditorEvent): void => {
   const tool = context.tool
   if (tool !== 'entity' && tool !== 'relationship' && tool !== 'attribute' && tool !== 'isa') return
   const size = DEFAULT_SIZES[tool]
+  const diagram = useDiagramStore.getState().diagram
   if (tool === 'entity') {
     useDiagramStore.getState().addNode({
-      kind: 'entity', name: 'Entity', isWeak: false,
+      kind: 'entity', name: `Entity ${countOfKind(diagram, 'entity') + 1}`, isWeak: false,
       position: event.point, size,
     })
   } else if (tool === 'relationship') {
     useDiagramStore.getState().addNode({
-      kind: 'relationship', name: 'Relationship', isIdentifying: false,
+      kind: 'relationship', name: `Relationship ${countOfKind(diagram, 'relationship') + 1}`, isIdentifying: false,
       position: event.point, size,
     })
   } else if (tool === 'attribute') {
     useDiagramStore.getState().addNode({
-      kind: 'attribute', name: 'attribute',
+      kind: 'attribute', name: `attribute ${countOfKind(diagram, 'attribute') + 1}`,
       isKey: false, isDiscriminant: false, isMultivalued: false, isDerived: false, isComposite: false,
       position: event.point, size,
     })
@@ -199,7 +214,9 @@ const connectViaQuickRelationship = (source: ERNode, target: ERNode, sourceId: N
   if (!isEntityNode(source) || !isEntityNode(target)) return
   const store = useDiagramStore.getState()
   const relId = store.addNode({
-    kind: 'relationship', name: 'Relationship', isIdentifying: false,
+    kind: 'relationship',
+    name: `Relationship ${countOfKind(store.diagram, 'relationship') + 1}`,
+    isIdentifying: false,
     position: midpoint(source, target),
     size: { width: 140, height: 70 },
   })

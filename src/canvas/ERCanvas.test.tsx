@@ -107,15 +107,20 @@ describe('ERCanvas — React Flow event wiring', () => {
     expect(ctx.connectionFromId).toBe(nodeId)
   })
 
-  it('clicking an empty React Flow pane after PICK_TOOL=entity places an entity', () => {
+  it('pointerdown + pointerup on the canvas wrapper after PICK_TOOL=entity places exactly ONE entity', () => {
     const { container } = render(<ERCanvas />)
     act(() => {
       useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'entity' })
     })
-    const pane = container.querySelector('.react-flow__pane') as HTMLElement
-    expect(pane).toBeInTheDocument()
-    fireEvent.click(pane, { clientX: 200, clientY: 180 })
+    const wrapper = container.querySelector('.h-full.w-full.flex-1.relative') as HTMLElement
+    expect(wrapper).toBeInTheDocument()
+    // The outer wrapper's useMouse is the single source of truth for
+    // CANVAS_POINTER_* events. A pane pointer event bubbles here from
+    // React Flow. Simulate the bubble directly.
+    fireEvent.pointerDown(wrapper, { clientX: 200, clientY: 180, button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(wrapper, { clientX: 200, clientY: 180, pointerType: 'mouse' })
     const diagram = useDiagramStore.getState().diagram
+    // Regression guard for "double-create" — must be EXACTLY 1, not 2.
     expect(diagram.nodeOrder).toHaveLength(1)
     expect(diagram.nodesById[diagram.nodeOrder[0]].kind).toBe('entity')
   })

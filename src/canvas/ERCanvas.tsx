@@ -20,6 +20,7 @@ import type { SnapGuide } from '@/domain/snap'
 import type { NodeId } from '@/domain/types'
 import { chenNodeTypes, chenEdgeTypes } from './notation-adapters/chenBindings'
 import { InlineRenameOverlay } from './InlineRenameOverlay'
+import { ConnectionPreviewOverlay } from './ConnectionPreviewOverlay'
 
 // chenBindings exports `Record<NodeKind, ComponentType<NodeProps>>` — structurally
 // compatible with React-Flow's `NodeTypes` at runtime, but TS is stricter about the
@@ -162,7 +163,6 @@ const ERCanvasInner = () => {
         onEdgesChange={handleEdgesChange}
         onNodeClick={rfEvents.onNodeClick}
         onEdgeClick={rfEvents.onEdgeClick}
-        onPaneClick={rfEvents.onPaneClick}
         viewport={{ x: pan.x, y: pan.y, zoom }}
         onViewportChange={handleViewportChange}
         nodesConnectable={false}
@@ -174,6 +174,7 @@ const ERCanvasInner = () => {
       </ReactFlow>
       <SnapOverlay guides={activeGuides} pan={pan} zoom={zoom} />
       <InlineRenameOverlay />
+      <ConnectionPreviewOverlay />
     </div>
   )
 }

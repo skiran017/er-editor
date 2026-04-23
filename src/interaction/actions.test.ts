@@ -74,6 +74,36 @@ describe('actions — placeNode', () => {
     })
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(0)
   })
+  it('gives placed entities unique incrementing names (Entity 1, Entity 2, ...)', () => {
+    placeNode(withContext({ tool: 'entity' }), { type: 'CANVAS_POINTER_UP', point: { x: 10, y: 10 } })
+    placeNode(withContext({ tool: 'entity' }), { type: 'CANVAS_POINTER_UP', point: { x: 20, y: 20 } })
+    placeNode(withContext({ tool: 'entity' }), { type: 'CANVAS_POINTER_UP', point: { x: 30, y: 30 } })
+    const d = useDiagramStore.getState().diagram
+    const names = d.nodeOrder.map((id) => (d.nodesById[id] as { name: string }).name)
+    expect(names).toEqual(['Entity 1', 'Entity 2', 'Entity 3'])
+  })
+  it('gives placed relationships unique incrementing names (Relationship 1, Relationship 2)', () => {
+    placeNode(withContext({ tool: 'relationship' }), { type: 'CANVAS_POINTER_UP', point: { x: 0, y: 0 } })
+    placeNode(withContext({ tool: 'relationship' }), { type: 'CANVAS_POINTER_UP', point: { x: 50, y: 50 } })
+    const d = useDiagramStore.getState().diagram
+    const names = d.nodeOrder.map((id) => (d.nodesById[id] as { name: string }).name)
+    expect(names).toEqual(['Relationship 1', 'Relationship 2'])
+  })
+  it('gives placed attributes unique incrementing names (attribute 1, attribute 2)', () => {
+    placeNode(withContext({ tool: 'attribute' }), { type: 'CANVAS_POINTER_UP', point: { x: 0, y: 0 } })
+    placeNode(withContext({ tool: 'attribute' }), { type: 'CANVAS_POINTER_UP', point: { x: 50, y: 50 } })
+    const d = useDiagramStore.getState().diagram
+    const names = d.nodeOrder.map((id) => (d.nodesById[id] as { name: string }).name)
+    expect(names).toEqual(['attribute 1', 'attribute 2'])
+  })
+  it('counters are kind-scoped — placing entity then relationship does NOT share a counter', () => {
+    placeNode(withContext({ tool: 'entity' }), { type: 'CANVAS_POINTER_UP', point: { x: 0, y: 0 } })
+    placeNode(withContext({ tool: 'relationship' }), { type: 'CANVAS_POINTER_UP', point: { x: 10, y: 10 } })
+    placeNode(withContext({ tool: 'entity' }), { type: 'CANVAS_POINTER_UP', point: { x: 20, y: 20 } })
+    const d = useDiagramStore.getState().diagram
+    const names = d.nodeOrder.map((id) => (d.nodesById[id] as { name: string }).name)
+    expect(names).toEqual(['Entity 1', 'Relationship 1', 'Entity 2'])
+  })
 })
 
 describe('actions — moveDraggedNode', () => {
