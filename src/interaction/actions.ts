@@ -257,15 +257,32 @@ const connectViaConnectTool = (source: ERNode, target: ERNode, sourceId: NodeId,
       kind: 'entity-relationship', sourceId, targetId,
       cardinality: '1', participation: 'partial', waypoints: [],
     })
-  } else if (source.kind === 'relationship' && target.kind === 'entity') {
+    return
+  }
+  if (source.kind === 'relationship' && target.kind === 'entity') {
     store.addEdge({
       kind: 'entity-relationship', sourceId: targetId, targetId: sourceId,
       cardinality: '1', participation: 'partial', waypoints: [],
     })
-  } else if (source.kind === 'attribute' && (target.kind === 'entity' || target.kind === 'relationship' || (target.kind === 'attribute' && target.isComposite))) {
+    return
+  }
+  // Attribute-of: the attribute is always the edge's source (domain
+  // invariants 2/3 — see src/domain/invariants.ts). The user may click the
+  // attribute first or second; normalise by picking whichever participant
+  // is the attribute as the source.
+  if (source.kind === 'attribute' && (target.kind === 'entity' || target.kind === 'relationship' || (target.kind === 'attribute' && target.isComposite))) {
     store.addEdge({
       kind: 'attribute-of', sourceId, targetId, waypoints: [],
     })
+    return
+  }
+  if (target.kind === 'attribute' && (source.kind === 'entity' || source.kind === 'relationship' || (source.kind === 'attribute' && source.isComposite))) {
+    // User clicked the parent first (entity/relationship/composite attribute),
+    // then the attribute. Flip so the attribute is the edge source.
+    store.addEdge({
+      kind: 'attribute-of', sourceId: targetId, targetId: sourceId, waypoints: [],
+    })
+    return
   }
 }
 

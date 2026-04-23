@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useInteractionStore } from '@/interaction/interactionStore'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useViewportStore } from '@/state/viewportStore'
+import { getNodeIntersection } from '@/canvas/hooks/useFloatingEdge'
 import type { NodeId } from '@/domain/types'
 
 /**
@@ -52,10 +53,37 @@ export const ConnectionPreviewOverlay = () => {
   const sourceNode = diagram.nodesById[sourceId]
   if (!sourceNode) return null
 
-  // Matches InlineRenameOverlay's screen-space math: the wrapper div sits at
-  // (0,0) in page coords, so `clientX/clientY` is already the right space.
-  const sx = (sourceNode.position.x + sourceNode.size.width / 2) * zoom + pan.x
-  const sy = (sourceNode.position.y + sourceNode.size.height / 2) * zoom + pan.y
+  // Start the preview line at the source node's BOUNDARY (not its centre) so
+  // it visibly exits the shape. We convert the cursor back to diagram coords,
+  // model the cursor as a zero-size floatable node, and reuse the floating-
+  // edge intersection math. getNodeIntersection returns a finite fallback for
+  // coincident / zero-area inputs (see useFloatingEdge.test.ts).
+  const worldSource = {
+    id: sourceNode.id,
+    position: sourceNode.position,
+    width: sourceNode.size.width,
+    height: sourceNode.size.height,
+    measured: { width: sourceNode.size.width, height: sourceNode.size.height },
+  }
+  const worldCursor = {
+    id: '__cursor__',
+    position: {
+      x: (cursor.x - pan.x) / zoom,
+      y: (cursor.y - pan.y) / zoom,
+    },
+    width: 0,
+    height: 0,
+    measured: { width: 0, height: 0 },
+  }
+  const boundary = getNodeIntersection(worldSource, worldCursor)
+  // Defensive: if the math ever returns NaN, fall back to the centre so the
+  // preview line still renders.
+  const centreX = sourceNode.position.x + sourceNode.size.width / 2
+  const centreY = sourceNode.position.y + sourceNode.size.height / 2
+  const worldSx = Number.isFinite(boundary.x) ? boundary.x : centreX
+  const worldSy = Number.isFinite(boundary.y) ? boundary.y : centreY
+  const sx = worldSx * zoom + pan.x
+  const sy = worldSy * zoom + pan.y
 
   return (
     <svg
@@ -71,7 +99,6 @@ export const ConnectionPreviewOverlay = () => {
         strokeWidth={1.5}
         strokeDasharray="6 4"
       />
-      <circle cx={sx} cy={sy} r={4} fill="#3b82f6" />
     </svg>
   )
 }

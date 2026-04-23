@@ -269,11 +269,25 @@ export const editorMachine = setup({
           states: {
             fromPicked: {
               on: {
+                // Clicks on nodes arrive as NODE_POINTER_DOWN (useRfEvents
+                // synthesises a CANVAS_POINTER_UP after to avoid the
+                // drag-follow bug — see useRfEvents.ts). NODE_POINTER_UP is
+                // kept for compat with direct drag-style connection flows.
+                NODE_POINTER_DOWN: {
+                  target: '#editor.drawing.idle',
+                  actions: ['connectNodesAction', 'resetContext'],
+                },
                 NODE_POINTER_UP: {
                   target: '#editor.drawing.idle',
                   actions: ['connectNodesAction', 'resetContext'],
                 },
-                CANVAS_POINTER_UP: { target: '#editor.drawing.idle', actions: 'resetContext' },
+                // Cancel on a real pane click (starts with CANVAS_POINTER_DOWN
+                // from useMouse — RF swallows pointer events over nodes, so
+                // CANVAS_POINTER_DOWN only reaches us from the blank pane).
+                // We deliberately do NOT listen for CANVAS_POINTER_UP here,
+                // because the synthetic UP from onNodeClick would cancel the
+                // connection immediately after the first-click NODE_POINTER_DOWN.
+                CANVAS_POINTER_DOWN: { target: '#editor.drawing.idle', actions: 'resetContext' },
               },
             },
           },

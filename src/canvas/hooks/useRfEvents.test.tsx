@@ -37,6 +37,24 @@ describe('useRfEvents', () => {
     sendSpy.mockRestore()
   })
 
+  it('onNodeClick dispatches EXACTLY two events in order: NODE_POINTER_DOWN then CANVAS_POINTER_UP (at the same point)', () => {
+    // Regression: React Flow fires onNodeClick AFTER mouseup, but our FSM
+    // expects a matching UP after every DOWN to leave `maybeDragging`.
+    // Without the synthetic UP the next mouse move crossed the drag
+    // threshold and the node tracked the cursor (drag-follow bug).
+    const { result } = renderHook(() => useRfEvents())
+    const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
+    const fakeNode = { id: 'node-1' } as RfNode
+    result.current.onNodeClick(mkMouseEvent({ clientX: 42, clientY: 84 }), fakeNode)
+    expect(sendSpy).toHaveBeenCalledTimes(2)
+    const first = sendSpy.mock.calls[0]![0] as { type: string; point: { x: number; y: number } }
+    const second = sendSpy.mock.calls[1]![0] as { type: string; point: { x: number; y: number } }
+    expect(first.type).toBe('NODE_POINTER_DOWN')
+    expect(second.type).toBe('CANVAS_POINTER_UP')
+    expect(second.point).toEqual({ x: 42, y: 84 })
+    sendSpy.mockRestore()
+  })
+
   it('onEdgeClick dispatches EDGE_POINTER_DOWN with the edge id', () => {
     const { result } = renderHook(() => useRfEvents())
     const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
@@ -45,6 +63,16 @@ describe('useRfEvents', () => {
     const call = sendSpy.mock.calls.find(([ev]) => ev.type === 'EDGE_POINTER_DOWN')
     expect(call).toBeDefined()
     expect((call![0] as { edgeId: string }).edgeId).toBe('edge-1')
+    sendSpy.mockRestore()
+  })
+
+  it('onEdgeClick also dispatches EXACTLY two events in order: EDGE_POINTER_DOWN then CANVAS_POINTER_UP', () => {
+    const { result } = renderHook(() => useRfEvents())
+    const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
+    result.current.onEdgeClick(mkMouseEvent({ clientX: 7, clientY: 11 }), { id: 'edge-1' } as RfEdge)
+    expect(sendSpy).toHaveBeenCalledTimes(2)
+    expect((sendSpy.mock.calls[0]![0] as { type: string }).type).toBe('EDGE_POINTER_DOWN')
+    expect((sendSpy.mock.calls[1]![0] as { type: string }).type).toBe('CANVAS_POINTER_UP')
     sendSpy.mockRestore()
   })
 

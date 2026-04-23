@@ -114,3 +114,112 @@ describe('rendering integration — quick-relationship', () => {
     expect(erEdges).toHaveLength(2)
   })
 })
+
+describe('rendering integration — connect tool (entity → attribute)', () => {
+  it('pick connect, click entity, click attribute → creates exactly one attribute-of edge', () => {
+    // Reproduces the user-reported Bug 3 flow. Each "click" is modeled the
+    // same way useRfEvents models it: NODE_POINTER_DOWN then a synthetic
+    // CANVAS_POINTER_UP at the same point. After fix 1 + the machine change
+    // (drawing.connection.fromPicked now reacts to NODE_POINTER_DOWN + its
+    // CANVAS_POINTER_UP handler is gone), the flow must produce an edge.
+    const ent = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const attr = useDiagramStore.getState().addNode({
+      kind: 'attribute', name: 'name', isKey: false, isDiscriminant: false,
+      isMultivalued: false, isDerived: false, isComposite: false,
+      position: { x: 300, y: 0 }, size: { width: 90, height: 50 },
+    })
+    render(<ERCanvas />)
+    act(() => {
+      const send = useInteractionStore.getState().send
+      send({ type: 'PICK_TOOL', tool: 'connect' })
+      // click entity
+      send({
+        type: 'NODE_POINTER_DOWN', nodeId: ent,
+        point: { x: 60, y: 30 }, modifiers: NO_MODIFIERS, button: 'left',
+      })
+      send({ type: 'CANVAS_POINTER_UP', point: { x: 60, y: 30 } })
+      // click attribute
+      send({
+        type: 'NODE_POINTER_DOWN', nodeId: attr,
+        point: { x: 345, y: 25 }, modifiers: NO_MODIFIERS, button: 'left',
+      })
+      send({ type: 'CANVAS_POINTER_UP', point: { x: 345, y: 25 } })
+    })
+    const d = useDiagramStore.getState().diagram
+    // Exactly one edge, of kind attribute-of, with the attribute as source.
+    expect(d.edgeOrder).toHaveLength(1)
+    const edge = d.edgesById[d.edgeOrder[0]!]!
+    expect(edge.kind).toBe('attribute-of')
+    expect(edge.sourceId).toBe(attr)
+    expect(edge.targetId).toBe(ent)
+  })
+
+  it('click entity on blank pane → connect cancels (no dangling preview)', () => {
+    // After clicking the entity, a REAL pane click fires CANVAS_POINTER_DOWN
+    // first (from useMouse; RF does not swallow pane events). The machine
+    // uses CANVAS_POINTER_DOWN (not UP) to cancel the connection so the
+    // synthetic UP from onNodeClick doesn't immediately cancel the connect.
+    const ent = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    render(<ERCanvas />)
+    act(() => {
+      const send = useInteractionStore.getState().send
+      send({ type: 'PICK_TOOL', tool: 'connect' })
+      send({
+        type: 'NODE_POINTER_DOWN', nodeId: ent,
+        point: { x: 60, y: 30 }, modifiers: NO_MODIFIERS, button: 'left',
+      })
+      // synthetic UP from onNodeClick — must NOT cancel
+      send({ type: 'CANVAS_POINTER_UP', point: { x: 60, y: 30 } })
+    })
+    // Still in drawing.connection.fromPicked, source preserved.
+    expect(useInteractionStore.getState().snapshot.matches({ drawing: { connection: 'fromPicked' } })).toBe(true)
+    expect(useInteractionStore.getState().snapshot.context.connectionFromId).toBe(ent)
+    // Now the user clicks on blank pane → useMouse sends DOWN.
+    act(() => {
+      useInteractionStore.getState().send({
+        type: 'CANVAS_POINTER_DOWN',
+        point: { x: 500, y: 500 }, modifiers: NO_MODIFIERS, button: 'left',
+      })
+    })
+    expect(useInteractionStore.getState().snapshot.matches({ drawing: 'idle' })).toBe(true)
+    expect(useInteractionStore.getState().snapshot.context.connectionFromId).toBeNull()
+    // No edge was created.
+    expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(0)
+  })
+})
+
+describe('rendering integration — drag-follow regression (Bug 1)', () => {
+  it('clicking a node then moving the mouse does NOT drag the node (synthetic UP exits maybeDragging)', () => {
+    // Models what useRfEvents.onNodeClick now does: NODE_POINTER_DOWN +
+    // synthetic CANVAS_POINTER_UP at the same point. Then a subsequent
+    // CANVAS_POINTER_MOVE that would have crossed the drag threshold must
+    // NOT move the node.
+    const id = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 100, y: 100 }, size: { width: 120, height: 60 },
+    })
+    render(<ERCanvas />)
+    act(() => {
+      const send = useInteractionStore.getState().send
+      // Click the node.
+      send({
+        type: 'NODE_POINTER_DOWN', nodeId: id,
+        point: { x: 160, y: 130 }, modifiers: NO_MODIFIERS, button: 'left',
+      })
+      send({ type: 'CANVAS_POINTER_UP', point: { x: 160, y: 130 } })
+      // Move the mouse well past the drag threshold (3px).
+      send({ type: 'CANVAS_POINTER_MOVE', point: { x: 400, y: 400 } })
+    })
+    // Node position unchanged.
+    const node = useDiagramStore.getState().diagram.nodesById[id]!
+    expect(node.position).toEqual({ x: 100, y: 100 })
+    // FSM back in selecting.idle (not dragging / maybeDragging).
+    expect(useInteractionStore.getState().snapshot.matches({ selecting: 'idle' })).toBe(true)
+  })
+})

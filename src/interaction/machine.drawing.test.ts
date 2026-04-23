@@ -71,7 +71,13 @@ describe('machine — drawing', () => {
     actor.stop()
   })
 
-  it('CANVAS_POINTER_UP on empty canvas cancels back to drawing.idle', () => {
+  it('CANVAS_POINTER_DOWN on empty canvas cancels back to drawing.idle', () => {
+    // Cancellation moved from CANVAS_POINTER_UP to CANVAS_POINTER_DOWN so
+    // that the synthetic CANVAS_POINTER_UP fired by useRfEvents.onNodeClick
+    // (see useRfEvents.ts) does not accidentally cancel the connection
+    // right after the first NODE_POINTER_DOWN sets the source. A real pane
+    // click fires CANVAS_POINTER_DOWN first (from useMouse) so cancellation
+    // still happens as soon as the user mousedowns on the blank pane.
     const store = useDiagramStore.getState()
     const e = store.addNode({
       kind: 'entity', name: 'E', isWeak: false,
@@ -83,9 +89,18 @@ describe('machine — drawing', () => {
       type: 'NODE_POINTER_DOWN', nodeId: e, point: { x: 0, y: 0 },
       modifiers: NO_MODIFIERS, button: 'left',
     })
-    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 200, y: 200 } })
+    // Synthetic UP from onNodeClick — must NOT cancel any more.
+    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 0, y: 0 } })
+    expect(actor.getSnapshot().matches({ drawing: { connection: 'fromPicked' } })).toBe(true)
+    expect(actor.getSnapshot().context.connectionFromId).toBe(e)
+    // Real pane click DOWN cancels.
+    actor.send({
+      type: 'CANVAS_POINTER_DOWN', point: { x: 200, y: 200 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
     expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(0)
     expect(actor.getSnapshot().matches({ drawing: 'idle' })).toBe(true)
+    expect(actor.getSnapshot().context.connectionFromId).toBeNull()
     actor.stop()
   })
 })
