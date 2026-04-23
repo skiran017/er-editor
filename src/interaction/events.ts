@@ -68,5 +68,7 @@ export type EditorEvent =
   | { readonly type: 'CANCEL' }
   // Cheatsheet
   | { readonly type: 'TOGGLE_CHEATSHEET' }
+  // Generalization: start connecting an ISA node to a child entity (right-click on ISA → "Add child entity")
+  | { readonly type: 'CONNECT_CHILD_TO_ISA'; readonly isaId: NodeId }
 
 export type EditorEventType = EditorEvent['type']

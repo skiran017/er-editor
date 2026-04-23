@@ -272,6 +272,26 @@ export const connectNodes = (context: EditorContext, event: EditorEvent): void =
   }
 }
 
+// ——— connect-child-to-ISA (right-click on ISA flow) ———
+
+export const connectChildToIsaAction = (context: EditorContext, event: EditorEvent): void => {
+  if (!context.connectionFromId) return
+  if (event.type !== 'NODE_POINTER_DOWN') return
+  const diagram = useDiagramStore.getState().diagram
+  const child = diagram.nodesById[event.nodeId]
+  if (!child || child.kind !== 'entity') return
+  const parentIsa = diagram.nodesById[context.connectionFromId]
+  if (!parentIsa || parentIsa.kind !== 'isa') return
+  const edge: Omit<ISAEdge, 'id'> = {
+    kind: 'isa-link',
+    sourceId: context.connectionFromId,
+    targetId: event.nodeId,
+    role: 'child',
+    waypoints: [],
+  }
+  useDiagramStore.getState().addEdge(edge)
+}
+
 // ——— cheatsheet ———
 
 const CHEATSHEET_MODAL_ID = 'cheatsheet'

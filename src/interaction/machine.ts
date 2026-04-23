@@ -1,11 +1,11 @@
 import { assign, setup } from 'xstate'
 import {
   beginRubberband, clearSelectionAction, commitRubberbandAction,
-  connectNodes, deleteSelectionAction, duplicateSelectionAction, fitAction,
-  moveDraggedNode, nudgeSelection, panViewportAction, placeNode, redoAction,
-  selectAllAction, selectNodeFromEvent, stubCopy, stubCut, stubPaste,
-  toggleCheatsheetAction, undoAction, updateRubberbandAction, zoomAtPointAction,
-  zoomInAction, zoomOutAction,
+  connectChildToIsaAction, connectNodes, deleteSelectionAction,
+  duplicateSelectionAction, fitAction, moveDraggedNode, nudgeSelection,
+  panViewportAction, placeNode, redoAction, selectAllAction, selectNodeFromEvent,
+  stubCopy, stubCut, stubPaste, toggleCheatsheetAction, undoAction,
+  updateRubberbandAction, zoomAtPointAction, zoomInAction, zoomOutAction,
 } from './actions'
 import { initialContext, type EditorContext } from './context'
 import type { EditorEvent, Tool } from './events'
@@ -74,6 +74,10 @@ export const editorMachine = setup({
       resizeHandle: ({ event }) =>
         event.type === 'RESIZE_HANDLE_POINTER_DOWN' ? event.handle : null,
     }),
+    beginConnectChildToIsa: assign({
+      connectionFromId: ({ event }) =>
+        event.type === 'CONNECT_CHILD_TO_ISA' ? event.isaId : null,
+    }),
     // Side-effect actions below delegate to action-module functions.
     selectNodeFromEvent: ({ context, event }) => selectNodeFromEvent(context, event),
     moveDraggedNode: ({ context, event }) => moveDraggedNode(context, event),
@@ -95,6 +99,7 @@ export const editorMachine = setup({
     toggleCheatsheetAction: ({ context, event }) => toggleCheatsheetAction(context, event),
     placeNodeAction: ({ context, event }) => placeNode(context, event),
     connectNodesAction: ({ context, event }) => connectNodes(context, event),
+    connectChildToIsaAction: ({ context, event }) => connectChildToIsaAction(context, event),
     zoomIn: ({ context, event }) => zoomInAction(context, event),
     zoomOut: ({ context, event }) => zoomOutAction(context, event),
     fit: ({ context, event }) => fitAction(context, event),
@@ -136,6 +141,10 @@ export const editorMachine = setup({
     CUT: { actions: 'stubCut' },
     PASTE: { actions: 'stubPaste' },
     TOGGLE_CHEATSHEET: { actions: 'toggleCheatsheetAction' },
+    CONNECT_CHILD_TO_ISA: {
+      target: '.connectToGeneralization.waitingForChild',
+      actions: 'beginConnectChildToIsa',
+    },
     // Viewport shortcuts (keyboard dispatches these via keybindings).
     FIT: { actions: 'fit' },
     ZOOM_IN: { actions: 'zoomIn' },
@@ -326,9 +335,21 @@ export const editorMachine = setup({
         },
       },
     },
-    // connectToGeneralization was scaffolded per spec §4.6 but has no PICK_TOOL
-    // route in Phase 3 — it's driven by a right-click-on-ISA UI action that
-    // lands in Phase 6. Reintroduce the state and add an INITIATE_ISA_CHILD
-    // event when that UI is wired.
+    // Entered via root-level CONNECT_CHILD_TO_ISA (right-click on ISA →
+    // "Add child entity"). The ISA's id lives in context.connectionFromId
+    // until the user picks a child entity or cancels.
+    connectToGeneralization: {
+      initial: 'waitingForChild',
+      states: {
+        waitingForChild: {
+          on: {
+            NODE_POINTER_DOWN: {
+              target: '#editor.selecting.idle',
+              actions: ['connectChildToIsaAction', 'resetContext'],
+            },
+          },
+        },
+      },
+    },
   },
 })

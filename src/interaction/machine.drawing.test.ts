@@ -145,6 +145,86 @@ describe('machine — quickRelationship', () => {
   })
 })
 
+describe('machine — connectToGeneralization (right-click on ISA)', () => {
+  beforeEach(resetStores)
+
+  it('CONNECT_CHILD_TO_ISA transitions to connectToGeneralization.waitingForChild', () => {
+    const isa = useDiagramStore.getState().addNode({
+      kind: 'isa', isTotal: false,
+      position: { x: 0, y: 0 }, size: { width: 100, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'CONNECT_CHILD_TO_ISA', isaId: isa })
+    expect(actor.getSnapshot().matches({ connectToGeneralization: 'waitingForChild' })).toBe(true)
+    expect(actor.getSnapshot().context.connectionFromId).toBe(isa)
+    actor.stop()
+  })
+
+  it('NODE_POINTER_DOWN on entity while waiting adds an isa-link edge and returns to idle', () => {
+    const isa = useDiagramStore.getState().addNode({
+      kind: 'isa', isTotal: false,
+      position: { x: 0, y: 0 }, size: { width: 100, height: 60 },
+    })
+    const child = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'Sub', isWeak: false,
+      position: { x: 200, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'CONNECT_CHILD_TO_ISA', isaId: isa })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: child, point: { x: 260, y: 30 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    const edges = Object.values(useDiagramStore.getState().diagram.edgesById)
+      .filter((e) => e.kind === 'isa-link')
+    expect(edges).toHaveLength(1)
+    expect(edges[0]!.sourceId).toBe(isa)
+    expect(edges[0]!.targetId).toBe(child)
+    expect(edges[0]!.kind === 'isa-link' && edges[0]!.role).toBe('child')
+    expect(actor.getSnapshot().matches({ selecting: 'idle' })).toBe(true)
+    expect(actor.getSnapshot().context.connectionFromId).toBeNull()
+    actor.stop()
+  })
+
+  it('ESCAPE from waitingForChild returns to idle without creating an edge', () => {
+    const isa = useDiagramStore.getState().addNode({
+      kind: 'isa', isTotal: false,
+      position: { x: 0, y: 0 }, size: { width: 100, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'CONNECT_CHILD_TO_ISA', isaId: isa })
+    actor.send({ type: 'ESCAPE' })
+    expect(Object.keys(useDiagramStore.getState().diagram.edgesById)).toHaveLength(0)
+    expect(actor.getSnapshot().matches({ selecting: 'idle' })).toBe(true)
+    expect(actor.getSnapshot().context.connectionFromId).toBeNull()
+    actor.stop()
+  })
+
+  it('picking a non-entity (e.g. attribute) from waitingForChild is a no-op for edge creation', () => {
+    const isa = useDiagramStore.getState().addNode({
+      kind: 'isa', isTotal: false,
+      position: { x: 0, y: 0 }, size: { width: 100, height: 60 },
+    })
+    const attr = useDiagramStore.getState().addNode({
+      kind: 'attribute', name: 'x',
+      isKey: false, isDiscriminant: false, isMultivalued: false, isDerived: false, isComposite: false,
+      position: { x: 0, y: 100 }, size: { width: 90, height: 50 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'CONNECT_CHILD_TO_ISA', isaId: isa })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: attr, point: { x: 0, y: 100 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    const edges = Object.values(useDiagramStore.getState().diagram.edgesById)
+      .filter((e) => e.kind === 'isa-link')
+    expect(edges).toHaveLength(0)
+    // Still transitions back to selecting.idle — the edge-creation guard sits inside the action.
+    expect(actor.getSnapshot().matches({ selecting: 'idle' })).toBe(true)
+    actor.stop()
+  })
+})
+
 describe('machine — quickGeneralization', () => {
   beforeEach(resetStores)
 

@@ -6,6 +6,7 @@ import { ISANode } from './ISANode'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
 import { useValidationStore } from '@/state/validationStore'
+import { useUiStore } from '@/state/uiStore'
 import { emptyDiagram, type NodeId } from '@/domain/types'
 import type { NotationNodeData } from '@/notation/types'
 
@@ -20,6 +21,7 @@ const resetStores = () => {
     rubberband: null,
   })
   useValidationStore.setState({ errorsById: {}, enabled: true })
+  useUiStore.getState().closeContextMenu()
 }
 
 const mkNodeProps = (id: NodeId) =>
@@ -67,5 +69,28 @@ describe('ISANode container', () => {
     })
     const { container } = renderWithProvider(<ISANode {...mkNodeProps(id)} />)
     expect(container.querySelector('[data-kind="isa"]')).not.toBeInTheDocument()
+  })
+
+  it('right-click on ISA opens context menu with "Add child entity"', () => {
+    const id = useDiagramStore.getState().addNode({
+      kind: 'isa',
+      isTotal: false,
+      position: { x: 0, y: 0 },
+      size: { width: 100, height: 60 },
+    })
+    const { container } = renderWithProvider(<ISANode {...mkNodeProps(id)} />)
+    // The outer <svg> wrapping <ISANode /> is the render provider's <svg>; the
+    // component's own <svg> is a descendant (nested svg). Grab the inner one.
+    const svgs = container.querySelectorAll('svg')
+    const inner = svgs[svgs.length - 1] as SVGSVGElement
+    inner.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true, clientX: 50, clientY: 50,
+    }))
+    const cm = useUiStore.getState().contextMenu
+    expect(cm).not.toBeNull()
+    expect(cm?.items).toHaveLength(1)
+    expect(cm?.items[0]?.id).toBe('add-child')
+    expect(cm?.items[0]?.labelKey).toBe('menu:isa.addChild')
+    expect(cm?.at).toEqual({ x: 50, y: 50 })
   })
 })
