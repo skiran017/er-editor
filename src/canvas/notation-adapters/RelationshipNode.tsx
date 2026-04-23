@@ -19,7 +19,7 @@ export const RelationshipNode = memo(({ data }: NodeProps<RelationshipRfNode>) =
   const warnings = useValidationStore((s) => s.errorsById[nodeId])
   if (!node || node.kind !== 'relationship') return null
   return (
-    <>
+    <div style={{ width: node.size.width, height: node.size.height, position: 'relative' }}>
       <Handle
         type="source"
         position={Position.Right}
@@ -42,7 +42,7 @@ export const RelationshipNode = memo(({ data }: NodeProps<RelationshipRfNode>) =
           warningSeverity={pickSeverity(warnings)}
         />
       </svg>
-    </>
+    </div>
   )
 })
 RelationshipNode.displayName = 'RelationshipNode'

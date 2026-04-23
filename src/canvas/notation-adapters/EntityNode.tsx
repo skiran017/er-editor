@@ -18,8 +18,12 @@ export const EntityNode = memo(({ data }: NodeProps<EntityRfNode>) => {
   const isSelected = useSelectionStore((s) => s.selectedNodeIds.has(nodeId))
   const warnings = useValidationStore((s) => s.errorsById[nodeId])
   if (!node || node.kind !== 'entity') return null
+  // Wrap in a sized <div> so React Flow's ResizeObserver can measure the
+  // node (RF v12 error #015: node not initialized). A fragment-with-SVG has
+  // no measurable block-level element, so RF never marks the node as
+  // initialized — which breaks drag AND edge attachment.
   return (
-    <>
+    <div style={{ width: node.size.width, height: node.size.height, position: 'relative' }}>
       <Handle
         type="source"
         position={Position.Right}
@@ -42,7 +46,7 @@ export const EntityNode = memo(({ data }: NodeProps<EntityRfNode>) => {
           warningSeverity={pickSeverity(warnings)}
         />
       </svg>
-    </>
+    </div>
   )
 })
 EntityNode.displayName = 'EntityNode'

@@ -35,7 +35,7 @@ export const ISANode = memo(({ data }: NodeProps<ISARfNode>) => {
 
   if (!node || node.kind !== 'isa') return null
   return (
-    <>
+    <div style={{ width: node.size.width, height: node.size.height, position: 'relative' }}>
       <Handle
         type="source"
         position={Position.Right}
@@ -62,7 +62,7 @@ export const ISANode = memo(({ data }: NodeProps<ISARfNode>) => {
           warningSeverity={pickSeverity(warnings)}
         />
       </svg>
-    </>
+    </div>
   )
 })
 ISANode.displayName = 'ISANode'

@@ -19,7 +19,7 @@ export const AttributeNode = memo(({ data }: NodeProps<AttributeRfNode>) => {
   const warnings = useValidationStore((s) => s.errorsById[nodeId])
   if (!node || node.kind !== 'attribute') return null
   return (
-    <>
+    <div style={{ width: node.size.width, height: node.size.height, position: 'relative' }}>
       <Handle
         type="source"
         position={Position.Right}
@@ -46,7 +46,7 @@ export const AttributeNode = memo(({ data }: NodeProps<AttributeRfNode>) => {
           warningSeverity={pickSeverity(warnings)}
         />
       </svg>
-    </>
+    </div>
   )
 })
 AttributeNode.displayName = 'AttributeNode'
