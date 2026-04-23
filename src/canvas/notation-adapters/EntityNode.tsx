@@ -22,17 +22,15 @@ export const EntityNode = memo(({ data }: NodeProps<EntityRfNode>) => {
     <>
       <Handle
         type="source"
-        position={Position.Top}
+        position={Position.Right}
         id="src"
-        style={{ opacity: 0, pointerEvents: 'none' }}
-        isConnectable={false}
+        style={{ opacity: 0, background: 'transparent', border: 'none', width: 1, height: 1 }}
       />
       <Handle
         type="target"
-        position={Position.Top}
+        position={Position.Left}
         id="tgt"
-        style={{ opacity: 0, pointerEvents: 'none' }}
-        isConnectable={false}
+        style={{ opacity: 0, background: 'transparent', border: 'none', width: 1, height: 1 }}
       />
       <svg width={node.size.width} height={node.size.height} overflow="visible">
         <EntityGlyph
