@@ -54,6 +54,11 @@ export interface UiStoreState {
   readonly snap: UiSnapConfig
   readonly contextMenu: ContextMenuState | null
   readonly inlineRename: InlineRenameState | null
+  // Exam mode — driven by the `?examMode=true` (or default-on under
+  // `?embed=true`) query parameter. When on, the Menu disables destructive /
+  // data-exfiltrating actions: Open, Save, Export, and the Validation toggle.
+  // Deliberately NOT persisted — the URL is the source of truth each session.
+  readonly examMode: boolean
   setTheme: (t: Theme) => void
   setLanguage: (l: Language) => void
   togglePanel: (id: string) => void
@@ -66,6 +71,7 @@ export interface UiStoreState {
   closeContextMenu: () => void
   startInlineRename: (state: InlineRenameState) => void
   cancelInlineRename: () => void
+  setExamMode: (on: boolean) => void
 }
 
 export const useUiStore = create<UiStoreState>()(
@@ -85,6 +91,7 @@ export const useUiStore = create<UiStoreState>()(
         },
         contextMenu: null,
         inlineRename: null,
+        examMode: false,
 
         setTheme: (t) => set((state) => { state.theme = t }),
         setLanguage: (l) => set((state) => { state.language = l }),
@@ -123,6 +130,8 @@ export const useUiStore = create<UiStoreState>()(
           state.inlineRename = s as unknown as typeof state.inlineRename
         }),
         cancelInlineRename: () => set((state) => { state.inlineRename = null }),
+
+        setExamMode: (on) => set((state) => { state.examMode = on }),
       })),
       {
         name: 'er-editor:ui',

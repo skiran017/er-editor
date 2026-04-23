@@ -1,6 +1,19 @@
 import type { TFunction } from 'i18next'
 import type { ComponentType } from 'react'
 import type { Theme } from '@/state/uiStore'
+import { FileActionRow } from './FileActionRow'
+
+// Exam-mode banner at the top of the dropdown — signals *why* the file /
+// validation items below are inert. Inlined as a tiny local component keeps
+// the main body under the arrow-function line cap.
+const ExamModeBanner = ({ t }: { readonly t: TFunction }) => (
+  <div
+    data-role="exam-mode-banner"
+    className="mx-2 mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200"
+  >
+    {t('menu:app.examModeBanner')}
+  </div>
+)
 
 export interface FileAction {
   readonly id: string
@@ -8,6 +21,9 @@ export interface FileAction {
   readonly icon: ComponentType<{ size?: number; className?: string }>
   readonly shortcut?: string
   readonly onSelect: () => void
+  // Exam-mode gating. When true the menu row renders as an inert item with
+  // muted text + not-allowed cursor, and clicks are swallowed.
+  readonly disabled?: boolean
 }
 
 export interface ThemeOption {
@@ -24,6 +40,8 @@ export interface MenuDropdownBodyProps {
   readonly onSetTheme: (t: Theme) => void
   readonly validationEnabled: boolean
   readonly onSetValidationEnabled: (b: boolean) => void
+  readonly validationToggleDisabled?: boolean
+  readonly examMode?: boolean
   readonly onShortcuts: () => void
   readonly onReset: () => void
   readonly onClickOutside: () => void
@@ -42,6 +60,8 @@ export const MenuDropdownBody = ({
   onSetTheme,
   validationEnabled,
   onSetValidationEnabled,
+  validationToggleDisabled = false,
+  examMode = false,
   onShortcuts,
   onReset,
   onClickOutside,
@@ -53,37 +73,31 @@ export const MenuDropdownBody = ({
     <div
       role="menu"
       aria-label={t('menu:app.title')}
+      data-exam-mode={examMode || undefined}
       className="absolute left-0 top-12 z-40 w-64 rounded-lg border border-slate-200 bg-white/95 py-2 shadow-xl backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/95"
     >
-      {fileActions.map((item) => {
-        const Icon = item.icon
-        return (
-          <button
-            key={item.id}
-            type="button"
-            role="menuitem"
-            onClick={item.onSelect}
-            className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            <Icon size={18} className="text-slate-500 dark:text-slate-400" aria-hidden />
-            <span className="flex-1">{t(item.labelKey)}</span>
-            {item.shortcut && (
-              <span className="font-mono text-xs text-slate-400 dark:text-slate-500">{item.shortcut}</span>
-            )}
-          </button>
-        )
-      })}
+      {examMode && <ExamModeBanner t={t} />}
+      {fileActions.map((item) => (
+        <FileActionRow key={item.id} item={item} t={t} />
+      ))}
 
       <div className="my-2 h-px bg-slate-200 dark:bg-slate-700" aria-hidden />
 
-      <label className="flex cursor-pointer items-center justify-between px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700">
+      <label
+        className={
+          validationToggleDisabled
+            ? 'flex cursor-not-allowed items-center justify-between px-4 py-2 text-sm font-medium text-slate-400 dark:text-slate-500'
+            : 'flex cursor-pointer items-center justify-between px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'
+        }
+      >
         <span>{t('menu:app.validation')}</span>
         <input
           type="checkbox"
           aria-label={t('menu:app.validation')}
           checked={validationEnabled}
+          disabled={validationToggleDisabled}
           onChange={(e) => onSetValidationEnabled(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
         />
       </label>
 

@@ -48,7 +48,8 @@
     "themeSystem": "System",
     "reset": "Reset the canvas",
     "resetConfirm": "Reset the canvas? This will delete every element.",
-    "resetDone": "Canvas reset"
+    "resetDone": "Canvas reset",
+    "examModeBanner": "Exam mode — file I/O and validation toggle are locked."
   },
   "notYetAvailable": "Available in Phase 5 (I/O codecs)."
 }

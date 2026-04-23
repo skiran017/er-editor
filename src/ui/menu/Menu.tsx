@@ -47,6 +47,9 @@ export const Menu = () => {
   const theme = useUiStore((s) => s.theme)
   const setTheme = useUiStore((s) => s.setTheme)
   const pushToast = useUiStore((s) => s.pushToast)
+  // Exam mode gates file I/O + the Validation toggle. Sourced from the URL
+  // (`?examMode=true` or default-on under `?embed=true`) during startup.
+  const examMode = useUiStore((s) => s.examMode)
 
   const validationEnabled = useValidationStore((s) => s.enabled)
   const setValidationEnabled = useValidationStore((s) => s.setEnabled)
@@ -87,10 +90,13 @@ export const Menu = () => {
     close()
   }
 
+  // File actions are disabled under exam mode so a student running an embedded
+  // editor can't open a different diagram or export the current one. The
+  // Reset, Shortcuts, and Theme controls stay live — they're UX, not data.
   const fileActions: readonly FileAction[] = [
-    { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O', onSelect: toastPhase5 },
-    { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S', onSelect: toastPhase5 },
-    { id: 'exportImage', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: toastPhase5 },
+    { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O', onSelect: toastPhase5, disabled: examMode },
+    { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S', onSelect: toastPhase5, disabled: examMode },
+    { id: 'exportImage', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: toastPhase5, disabled: examMode },
   ]
 
   return (
@@ -116,6 +122,8 @@ export const Menu = () => {
           onSetTheme={setTheme}
           validationEnabled={validationEnabled}
           onSetValidationEnabled={setValidationEnabled}
+          validationToggleDisabled={examMode}
+          examMode={examMode}
           onShortcuts={handleShortcuts}
           onReset={handleReset}
           onClickOutside={close}

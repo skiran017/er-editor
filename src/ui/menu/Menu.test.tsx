@@ -106,3 +106,46 @@ describe('Menu — hamburger dropdown', () => {
     confirmSpy.mockRestore()
   })
 })
+
+describe('Menu — exam mode', () => {
+  beforeEach(reset)
+
+  it('shows the exam-mode banner at the top of the dropdown', async () => {
+    useUiStore.getState().setExamMode(true)
+    render(<Menu />)
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    expect(screen.getByText(/Exam mode/)).toBeInTheDocument()
+    expect(screen.getByRole('menu')).toHaveAttribute('data-exam-mode', 'true')
+  })
+
+  it('disables Open / Save / Export Image so clicking them does NOT toast', async () => {
+    useUiStore.getState().setExamMode(true)
+    render(<Menu />)
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    const open = screen.getByRole('menuitem', { name: /Open/ })
+    expect(open).toBeDisabled()
+    await userEvent.click(open)
+    // Disabled buttons swallow clicks — no toast is pushed.
+    expect(useUiStore.getState().toasts).toHaveLength(0)
+  })
+
+  it('disables the Validation toggle (input is disabled and clicking is a no-op)', async () => {
+    useUiStore.getState().setExamMode(true)
+    useValidationStore.setState({ enabled: true })
+    render(<Menu />)
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    const toggle = screen.getByRole('checkbox', { name: 'Validation' })
+    expect(toggle).toBeDisabled()
+    await userEvent.click(toggle)
+    expect(useValidationStore.getState().enabled).toBe(true)
+  })
+
+  it('leaves Shortcuts, Theme, and Reset untouched (UX is not gated)', async () => {
+    useUiStore.getState().setExamMode(true)
+    render(<Menu />)
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    expect(screen.getByRole('menuitem', { name: /Keyboard shortcuts/ })).not.toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Dark' })).not.toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: /Reset/ })).not.toBeDisabled()
+  })
+})
