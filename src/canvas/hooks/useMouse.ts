@@ -10,6 +10,17 @@ const readModifiers = (e: { shiftKey: boolean; ctrlKey: boolean; altKey: boolean
 const readButton = (button: number): PointerButton =>
   button === 1 ? 'middle' : button === 2 ? 'right' : 'left'
 
+// React Flow panels (Controls, MiniMap, custom `<Panel>` components) render
+// inside the same wrapper div useMouse listens on. Without this filter, a
+// click on the zoom-in / fit-view button in a placement tool would bubble up
+// as CANVAS_POINTER_DOWN/UP and the FSM would create a node at the button's
+// coords. Treat any pointer whose target sits inside a RF panel as chrome,
+// not canvas.
+const isRfChromeTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) return false
+  return target.closest('.react-flow__panel, .react-flow__attribution') !== null
+}
+
 export interface MouseHandlers {
   readonly onPointerDown: (e: ReactPointerEvent<HTMLElement>) => void
   readonly onPointerMove: (e: ReactPointerEvent<HTMLElement>) => void
@@ -34,6 +45,7 @@ export const useMouse = (): MouseHandlers => {
   return {
     onPointerDown: (e) => {
       if (e.pointerType === 'touch') return
+      if (isRfChromeTarget(e.target)) return
       useInteractionStore.getState().send({
         type: 'CANVAS_POINTER_DOWN',
         point: toFlow(e),
@@ -50,6 +62,7 @@ export const useMouse = (): MouseHandlers => {
     },
     onPointerUp: (e) => {
       if (e.pointerType === 'touch') return
+      if (isRfChromeTarget(e.target)) return
       useInteractionStore.getState().send({
         type: 'CANVAS_POINTER_UP',
         point: toFlow(e),

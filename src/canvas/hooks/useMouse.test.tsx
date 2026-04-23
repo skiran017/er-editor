@@ -144,4 +144,47 @@ describe('useMouse — wheel', () => {
     } as unknown as React.WheelEvent<HTMLElement>)
     expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'WHEEL_ZOOM' }))
   })
+
+  it('clicks inside a React Flow panel (Controls / MiniMap) are ignored — clicking + or − in a placement tool must not create a node', () => {
+    // Regression guard for the bug: in any placement tool the zoom/fit/
+    // interactivity buttons were bubbling CANVAS_POINTER_* through the
+    // wrapper and the FSM was happily placing a node at the button's coords.
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
+    // Build a DOM tree that mirrors RF's markup so closest() resolves.
+    const panel = document.createElement('div')
+    panel.className = 'react-flow__panel react-flow__controls'
+    const button = document.createElement('button')
+    button.className = 'react-flow__controls-button'
+    panel.appendChild(button)
+    document.body.appendChild(panel)
+
+    const evt = {
+      clientX: 20, clientY: 30, button: 0,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      pointerType: 'mouse',
+      target: button,
+      preventDefault: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>
+
+    result.current.onPointerDown(evt)
+    result.current.onPointerUp(evt)
+    expect(sendSpy).not.toHaveBeenCalled()
+    document.body.removeChild(panel)
+  })
+
+  it('clicks on the plain pane (no panel ancestor) still fire CANVAS_POINTER_DOWN', () => {
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
+    const pane = document.createElement('div')
+    pane.className = 'react-flow__pane'
+    document.body.appendChild(pane)
+    result.current.onPointerDown({
+      clientX: 50, clientY: 60, button: 0,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      pointerType: 'mouse',
+      target: pane,
+      preventDefault: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>)
+    expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'CANVAS_POINTER_DOWN' }))
+    document.body.removeChild(pane)
+  })
 })
