@@ -71,13 +71,13 @@ describe('machine — drawing', () => {
     actor.stop()
   })
 
-  it('CANVAS_POINTER_DOWN on empty canvas cancels back to drawing.idle', () => {
-    // Cancellation moved from CANVAS_POINTER_UP to CANVAS_POINTER_DOWN so
-    // that the synthetic CANVAS_POINTER_UP fired by useRfEvents.onNodeClick
-    // (see useRfEvents.ts) does not accidentally cancel the connection
-    // right after the first NODE_POINTER_DOWN sets the source. A real pane
-    // click fires CANVAS_POINTER_DOWN first (from useMouse) so cancellation
-    // still happens as soon as the user mousedowns on the blank pane.
+  it('bubbling CANVAS_POINTER_DOWN/UP from a node click does NOT cancel the connection', () => {
+    // RF v12 does not stop propagation on node pointer events, so a real
+    // click on the TARGET node fires CANVAS_POINTER_DOWN + UP (via useMouse)
+    // *before* React Flow's onNodeClick synthesises NODE_POINTER_DOWN. If
+    // the machine cancelled on either of those, the target click would be
+    // lost. The blank-pane cancel moved to the PANE_CLICK event (fired
+    // exclusively from RF's onPaneClick callback).
     const store = useDiagramStore.getState()
     const e = store.addNode({
       kind: 'entity', name: 'E', isWeak: false,
@@ -89,17 +89,47 @@ describe('machine — drawing', () => {
       type: 'NODE_POINTER_DOWN', nodeId: e, point: { x: 0, y: 0 },
       modifiers: NO_MODIFIERS, button: 'left',
     })
-    // Synthetic UP from onNodeClick — must NOT cancel any more.
-    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 0, y: 0 } })
-    expect(actor.getSnapshot().matches({ drawing: { connection: 'fromPicked' } })).toBe(true)
-    expect(actor.getSnapshot().context.connectionFromId).toBe(e)
-    // Real pane click DOWN cancels.
     actor.send({
       type: 'CANVAS_POINTER_DOWN', point: { x: 200, y: 200 },
       modifiers: NO_MODIFIERS, button: 'left',
     })
-    expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(0)
+    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 200, y: 200 } })
+    expect(actor.getSnapshot().matches({ drawing: { connection: 'fromPicked' } })).toBe(true)
+    expect(actor.getSnapshot().context.connectionFromId).toBe(e)
+    actor.stop()
+  })
+
+  it('PANE_CLICK from RF onPaneClick cancels the connection back to drawing.idle', () => {
+    const e = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'connect' })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: e, point: { x: 0, y: 0 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    actor.send({ type: 'PANE_CLICK', point: { x: 500, y: 500 } })
     expect(actor.getSnapshot().matches({ drawing: 'idle' })).toBe(true)
+    expect(actor.getSnapshot().context.connectionFromId).toBeNull()
+    expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(0)
+    actor.stop()
+  })
+
+  it('ESCAPE from drawing.connection.fromPicked cancels back to selecting.idle', () => {
+    const e = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'connect' })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: e, point: { x: 0, y: 0 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    actor.send({ type: 'ESCAPE' })
+    expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(0)
     expect(actor.getSnapshot().context.connectionFromId).toBeNull()
     actor.stop()
   })

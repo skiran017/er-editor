@@ -183,6 +183,7 @@ const ERCanvasInner = () => {
         onNodeClick={rfEvents.onNodeClick}
         onNodeDoubleClick={rfEvents.onNodeDoubleClick}
         onEdgeClick={rfEvents.onEdgeClick}
+        onPaneClick={rfEvents.onPaneClick}
         viewport={{ x: pan.x, y: pan.y, zoom }}
         onViewportChange={handleViewportChange}
         nodesConnectable={false}

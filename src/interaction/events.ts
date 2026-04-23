@@ -41,6 +41,11 @@ export type EditorEvent =
   | { readonly type: 'CANVAS_POINTER_DOWN'; readonly point: Point; readonly modifiers: Modifiers; readonly button: PointerButton }
   | { readonly type: 'CANVAS_POINTER_MOVE'; readonly point: Point }
   | { readonly type: 'CANVAS_POINTER_UP'; readonly point: Point }
+  // Pane click — dispatched ONLY from React Flow's onPaneClick (i.e. when the
+  // user clicks on the blank pane, not on a node or edge). Use this for
+  // cancel-on-empty-click semantics; do not conflate with CANVAS_POINTER_DOWN
+  // which bubbles from node clicks too (RF v12 does not stop propagation).
+  | { readonly type: 'PANE_CLICK'; readonly point: Point }
   // Node/edge pointer events
   | { readonly type: 'NODE_POINTER_DOWN'; readonly nodeId: NodeId; readonly point: Point; readonly modifiers: Modifiers; readonly button: PointerButton }
   | { readonly type: 'NODE_POINTER_UP'; readonly nodeId: NodeId; readonly point: Point }

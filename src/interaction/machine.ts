@@ -333,10 +333,20 @@ export const editorMachine = setup({
             fromPicked: {
               entry: 'toastConnectPickTarget',
               on: {
-                // Clicks on nodes arrive as NODE_POINTER_DOWN (useRfEvents
-                // synthesises a CANVAS_POINTER_UP after to avoid the
-                // drag-follow bug — see useRfEvents.ts). NODE_POINTER_UP is
-                // kept for compat with direct drag-style connection flows.
+                // Clicks on nodes arrive as NODE_POINTER_DOWN (synthesised from
+                // React Flow's `onNodeClick` — see useRfEvents.ts).
+                // NODE_POINTER_UP is kept for compat with direct drag-style
+                // connection flows.
+                //
+                // Intentionally no CANVAS_POINTER_DOWN cancel handler here.
+                // RF v12 does NOT stop propagation on node-wrapper pointer
+                // events, so a real pointerdown on the target node bubbles to
+                // useMouse and fires CANVAS_POINTER_DOWN *before* onNodeClick
+                // synthesises NODE_POINTER_DOWN. Cancelling on pointerdown
+                // would reset the connection before the target event arrives
+                // and silently break every click-to-connect. Cancellation is
+                // handled by ESCAPE / PICK_TOOL / CANCEL instead — matching
+                // the quickRelationship and quickGeneralization flows.
                 NODE_POINTER_DOWN: {
                   target: '#editor.drawing.idle',
                   actions: ['connectNodesAction', 'resetContext'],
@@ -345,13 +355,13 @@ export const editorMachine = setup({
                   target: '#editor.drawing.idle',
                   actions: ['connectNodesAction', 'resetContext'],
                 },
-                // Cancel on a real pane click (starts with CANVAS_POINTER_DOWN
-                // from useMouse — RF swallows pointer events over nodes, so
-                // CANVAS_POINTER_DOWN only reaches us from the blank pane).
-                // We deliberately do NOT listen for CANVAS_POINTER_UP here,
-                // because the synthetic UP from onNodeClick would cancel the
-                // connection immediately after the first-click NODE_POINTER_DOWN.
-                CANVAS_POINTER_DOWN: { target: '#editor.drawing.idle', actions: 'resetContext' },
+                // Cancel on blank-pane click (only signal that distinguishes
+                // a true pane click from a node click — RF fires onPaneClick
+                // exclusively when the click target is the pane).
+                PANE_CLICK: {
+                  target: '#editor.drawing.idle',
+                  actions: 'resetContext',
+                },
               },
             },
           },
@@ -385,6 +395,10 @@ export const editorMachine = setup({
               target: '#editor.quickRelationship.idle',
               actions: ['connectNodesAction', 'resetContext'],
             },
+            PANE_CLICK: {
+              target: '#editor.quickRelationship.idle',
+              actions: 'resetContext',
+            },
           },
         },
       },
@@ -416,6 +430,10 @@ export const editorMachine = setup({
               target: '#editor.quickGeneralization.idle',
               actions: ['connectNodesAction', 'resetContext'],
             },
+            PANE_CLICK: {
+              target: '#editor.quickGeneralization.idle',
+              actions: 'resetContext',
+            },
           },
         },
       },
@@ -433,6 +451,10 @@ export const editorMachine = setup({
             NODE_POINTER_DOWN: {
               target: '#editor.selecting.idle',
               actions: ['connectChildToIsaAction', 'resetContext'],
+            },
+            PANE_CLICK: {
+              target: '#editor.selecting.idle',
+              actions: 'resetContext',
             },
           },
         },

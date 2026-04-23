@@ -20,6 +20,7 @@ export interface RfEventHandlers {
   readonly onNodeClick: (e: ReactMouseEvent, node: RfNode) => void
   readonly onEdgeClick: (e: ReactMouseEvent, edge: RfEdge) => void
   readonly onNodeDoubleClick: (e: ReactMouseEvent, node: RfNode) => void
+  readonly onPaneClick: (e: ReactMouseEvent) => void
 }
 
 /**
@@ -99,5 +100,15 @@ export const useRfEvents = (): RfEventHandlers => {
     })
   }, [])
 
-  return { onNodeClick, onEdgeClick, onNodeDoubleClick }
+  // RF only fires onPaneClick when the click target is the blank pane (not a
+  // node or edge). That makes it the ONLY reliable signal we have to detect
+  // "user clicked empty canvas", because useMouse's CANVAS_POINTER_DOWN
+  // bubbles from node clicks too. Cancel-on-empty-click flows (e.g. the
+  // Connect tool cancelling when the user clicks empty space) hang off this.
+  const onPaneClick = useCallback((e: ReactMouseEvent) => {
+    const point = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    useInteractionStore.getState().send({ type: 'PANE_CLICK', point })
+  }, [screenToFlowPosition])
+
+  return { onNodeClick, onEdgeClick, onNodeDoubleClick, onPaneClick }
 }

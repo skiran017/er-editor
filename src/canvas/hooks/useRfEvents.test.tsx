@@ -104,12 +104,20 @@ describe('useRfEvents', () => {
     sendSpy.mockRestore()
   })
 
-  it('does NOT expose onPaneClick (pane events bubble to the wrapper div where useMouse handles them)', () => {
+  it('onPaneClick dispatches a distinct PANE_CLICK event (not CANVAS_POINTER_*)', () => {
+    // PANE_CLICK is a new event type deliberately distinct from
+    // CANVAS_POINTER_DOWN/UP so it does NOT double-trigger placement (the
+    // original "two stacked entities" bug). Machines can subscribe to
+    // PANE_CLICK for cancel-on-blank-pane semantics without conflating it
+    // with the pointer lifecycle events that bubble from node clicks.
     const { result } = renderHook(() => useRfEvents(), RF_OPTS)
-    // Guards against a regression where onPaneClick gets re-added and
-    // double-fires CANVAS_POINTER_* alongside the outer-wrapper useMouse
-    // handler (caused the "two stacked entities" bug).
-    expect((result.current as unknown as { onPaneClick?: unknown }).onPaneClick).toBeUndefined()
+    const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
+    result.current.onPaneClick(mkMouseEvent({ clientX: 123, clientY: 456 }))
+    expect(sendSpy).toHaveBeenCalledTimes(1)
+    const call = sendSpy.mock.calls[0]![0] as { type: string; point: { x: number; y: number } }
+    expect(call.type).toBe('PANE_CLICK')
+    expect(call.point).toEqual({ x: 123, y: 456 })
+    sendSpy.mockRestore()
   })
 
   it('onNodeClick maps middle/right mouse buttons to PointerButton', () => {

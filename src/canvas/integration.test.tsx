@@ -157,11 +157,12 @@ describe('rendering integration — connect tool (entity → attribute)', () => 
     expect(edge.targetId).toBe(ent)
   })
 
-  it('click entity on blank pane → connect cancels (no dangling preview)', () => {
-    // After clicking the entity, a REAL pane click fires CANVAS_POINTER_DOWN
-    // first (from useMouse; RF does not swallow pane events). The machine
-    // uses CANVAS_POINTER_DOWN (not UP) to cancel the connection so the
-    // synthetic UP from onNodeClick doesn't immediately cancel the connect.
+  it('PANE_CLICK on blank pane → connect cancels (no dangling preview)', () => {
+    // Cancellation flows through the PANE_CLICK event dispatched from RF's
+    // onPaneClick callback — the only signal that reliably distinguishes a
+    // true pane click from a node click. Plain CANVAS_POINTER_DOWN/UP must
+    // NOT cancel because they also bubble from node clicks (RF v12 doesn't
+    // stop propagation on node pointer events).
     const ent = useDiagramStore.getState().addNode({
       kind: 'entity', name: 'E', isWeak: false,
       position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
@@ -174,22 +175,22 @@ describe('rendering integration — connect tool (entity → attribute)', () => 
         type: 'NODE_POINTER_DOWN', nodeId: ent,
         point: { x: 60, y: 30 }, modifiers: NO_MODIFIERS, button: 'left',
       })
-      // synthetic UP from onNodeClick — must NOT cancel
+      // Pointer-lifecycle events from the node click bubble through useMouse.
+      // None of these should cancel — the source must survive until the user
+      // picks a target or explicitly cancels.
+      send({ type: 'CANVAS_POINTER_DOWN', point: { x: 60, y: 30 }, modifiers: NO_MODIFIERS, button: 'left' })
       send({ type: 'CANVAS_POINTER_UP', point: { x: 60, y: 30 } })
     })
-    // Still in drawing.connection.fromPicked, source preserved.
     expect(useInteractionStore.getState().snapshot.matches({ drawing: { connection: 'fromPicked' } })).toBe(true)
     expect(useInteractionStore.getState().snapshot.context.connectionFromId).toBe(ent)
-    // Now the user clicks on blank pane → useMouse sends DOWN.
+    // Now the user clicks on blank pane → RF onPaneClick → PANE_CLICK.
     act(() => {
       useInteractionStore.getState().send({
-        type: 'CANVAS_POINTER_DOWN',
-        point: { x: 500, y: 500 }, modifiers: NO_MODIFIERS, button: 'left',
+        type: 'PANE_CLICK', point: { x: 500, y: 500 },
       })
     })
     expect(useInteractionStore.getState().snapshot.matches({ drawing: 'idle' })).toBe(true)
     expect(useInteractionStore.getState().snapshot.context.connectionFromId).toBeNull()
-    // No edge was created.
     expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(0)
   })
 })
