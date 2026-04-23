@@ -33,13 +33,13 @@ export const ISAGlyph = ({
   <g data-kind="isa" data-selected={isSelected || undefined}>
     <polygon
       points={trianglePoints(width, height)}
-      className={`fill-white ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800'}`}
+      className={`fill-white dark:fill-slate-800 ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800 dark:stroke-slate-200'}`}
       strokeWidth={OUTER_STROKE}
     />
     {isTotal && (
       <polygon
         points={trianglePoints(width, height, INNER_OFFSET)}
-        className={`fill-none ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800'}`}
+        className={`fill-none ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800 dark:stroke-slate-200'}`}
         strokeWidth={OUTER_STROKE}
       />
     )}

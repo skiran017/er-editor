@@ -14,7 +14,7 @@ export const EntityProperties = ({ node }: EntityPropertiesProps) => {
   const current = live && live.kind === 'entity' ? live : node
   return (
     <div className="flex flex-col gap-3 p-3 text-sm" data-role="entity-properties">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('kind.entity')}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t('kind.entity')}</h3>
       <TextInput
         label={t('name')}
         value={current.name}

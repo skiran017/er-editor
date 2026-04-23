@@ -15,7 +15,7 @@ export const AttributeProperties = ({ node }: AttributePropertiesProps) => {
   const patch = (p: Partial<AttributeNode>): void => { update(node.id, p as Partial<AttributeNode>) }
   return (
     <div className="flex flex-col gap-3 p-3 text-sm" data-role="attribute-properties">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('kind.attribute')}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t('kind.attribute')}</h3>
       <TextInput
         label={t('name')}
         value={current.name}

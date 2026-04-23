@@ -24,10 +24,10 @@ export const ValidationList = ({ targetId }: ValidationListProps) => {
 
   return (
     <section
-      className="flex flex-col gap-1 border-t border-slate-200 p-3"
+      className="flex flex-col gap-1 border-t border-slate-200 p-3 dark:border-slate-700"
       data-role="validation-list"
     >
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {tCommon('validation')} ({sorted.length})
       </h4>
       <ul className="flex flex-col gap-1">
@@ -38,8 +38,8 @@ export const ValidationList = ({ targetId }: ValidationListProps) => {
             data-severity={err.severity}
             className={
               err.severity === 'error'
-                ? 'rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800'
-                : 'rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800'
+                ? 'rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-200'
+                : 'rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'
             }
           >
             {t(err.messageKey, err.messageParams)}

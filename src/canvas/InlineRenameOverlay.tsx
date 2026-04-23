@@ -40,7 +40,7 @@ export const InlineRenameOverlay = () => {
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={onKey}
       onBlur={() => commit(value)}
-      className="absolute z-30 rounded border-2 border-blue-500 bg-white px-1 text-sm text-slate-900 outline-none"
+      className="absolute z-30 rounded border-2 border-blue-500 bg-white px-1 text-sm text-slate-900 outline-none dark:bg-slate-800 dark:text-slate-100"
       style={{ left: screenX, top: screenY, width, height }}
       data-role="inline-rename"
       aria-label="Rename element"

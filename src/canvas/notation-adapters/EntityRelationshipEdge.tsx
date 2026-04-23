@@ -31,13 +31,16 @@ const ARROW_HALF_WIDTH = 5
 // the entire triangle sits in clear canvas space.
 const ARROW_TIP_GAP = 3
 const CORNER_RADIUS = 5
-const STROKE = '#334155'
+// CSS tokens defined in src/index.css: `:root` for light, `.dark` overrides
+// for dark mode. Keeping edges as CSS-variable references means the exact
+// same SVG payload re-skins itself when the theme class flips on <html>.
+const STROKE = 'var(--er-edge-stroke)'
 const STROKE_WIDTH = 1.5
 // Total-participation rendering: outer stroke width minus inner gap = each
 // of the two visible lines is (TOTAL_OUTER - TOTAL_GAP) / 2 wide.
 const TOTAL_OUTER_WIDTH = 5
 const TOTAL_GAP_WIDTH = 2
-const CANVAS_BG = 'white'
+const CANVAS_BG = 'var(--er-canvas-bg)'
 
 // The direction pointing OUT of the node along the side the edge exits.
 // sourcePosition === 'right' means the edge leaves the node from its right
@@ -164,7 +167,7 @@ export const EntityRelationshipEdge = memo(
             y={labelY - 14}
             textAnchor="middle"
             dominantBaseline="central"
-            className="fill-slate-600 text-[10px] italic select-none pointer-events-none"
+            className="fill-slate-600 text-[10px] italic select-none pointer-events-none dark:fill-slate-300"
           >
             {edge.role}
           </text>

@@ -33,7 +33,7 @@ export const AttributeGlyph = ({
 }: AttributeGlyphProps) => {
   const rx = width / 2
   const ry = height / 2
-  const strokeClass = isSelected ? 'stroke-blue-500' : 'stroke-slate-800'
+  const strokeClass = isSelected ? 'stroke-blue-500' : 'stroke-slate-800 dark:stroke-slate-200'
   // Bug 6 — SVG <text> does NOT reliably honour `text-decoration-style: dashed`
   // (especially in Safari). Draw an explicit dashed <line> under the text for
   // the discriminant (partial-key) case. Solid underline for key attributes
@@ -47,7 +47,7 @@ export const AttributeGlyph = ({
         cy={ry}
         rx={Math.max(0, rx - 1)}
         ry={Math.max(0, ry - 1)}
-        className={`fill-white ${strokeClass}`}
+        className={`fill-white dark:fill-slate-800 ${strokeClass}`}
         strokeWidth={OUTER_STROKE}
         strokeDasharray={isDerived ? DASHED : undefined}
       />
@@ -68,7 +68,7 @@ export const AttributeGlyph = ({
         y={ry}
         textAnchor="middle"
         dominantBaseline="central"
-        className="fill-slate-900 text-xs select-none pointer-events-none"
+        className="fill-slate-900 text-xs select-none pointer-events-none dark:fill-slate-100"
         data-discriminant={isDiscriminant ? 'true' : undefined}
         {...(isKey ? { textDecoration: 'underline' } : {})}
       >
@@ -84,14 +84,14 @@ export const AttributeGlyph = ({
           stroke="currentColor"
           strokeWidth={1}
           strokeDasharray="3 2"
-          className="text-slate-900"
+          className="text-slate-900 dark:text-slate-100"
         />
       )}
       {isComposite && (
         <polygon
           data-role="composite-marker"
           points={`${width - 10},6 ${width - 4},6 ${width - 7},12`}
-          className="fill-slate-700"
+          className="fill-slate-700 dark:fill-slate-300"
         />
       )}
       <ValidationBadge

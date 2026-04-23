@@ -33,13 +33,13 @@ export const RelationshipGlyph = ({
   <g data-kind="relationship" data-selected={isSelected || undefined}>
     <polygon
       points={diamondPoints(width, height)}
-      className={`fill-white ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800'}`}
+      className={`fill-white dark:fill-slate-800 ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800 dark:stroke-slate-200'}`}
       strokeWidth={OUTER_STROKE}
     />
     {isIdentifying && (
       <polygon
         points={diamondPoints(width, height, INNER_OFFSET)}
-        className={`fill-none ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800'}`}
+        className={`fill-none ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800 dark:stroke-slate-200'}`}
         strokeWidth={OUTER_STROKE}
       />
     )}
@@ -48,7 +48,7 @@ export const RelationshipGlyph = ({
       y={height / 2}
       textAnchor="middle"
       dominantBaseline="central"
-      className="fill-slate-900 text-sm font-medium select-none pointer-events-none"
+      className="fill-slate-900 text-sm font-medium select-none pointer-events-none dark:fill-slate-100"
     >
       {name}
     </text>

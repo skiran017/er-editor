@@ -30,7 +30,7 @@ export const EntityGlyph = ({
       height={height}
       rx={4}
       ry={4}
-      className={`fill-white ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800'}`}
+      className={`fill-white dark:fill-slate-800 ${isSelected ? 'stroke-blue-500' : 'stroke-slate-800 dark:stroke-slate-200'}`}
       strokeWidth={OUTER_STROKE}
     />
     {isWeak && (
@@ -50,7 +50,7 @@ export const EntityGlyph = ({
       y={height / 2}
       textAnchor="middle"
       dominantBaseline="central"
-      className="fill-slate-900 text-sm font-medium select-none pointer-events-none"
+      className="fill-slate-900 text-sm font-medium select-none pointer-events-none dark:fill-slate-100"
     >
       {name}
     </text>

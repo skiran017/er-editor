@@ -32,7 +32,7 @@ export const ContextMenu = () => {
       <ul
         role="menu"
         data-role="context-menu"
-        className="fixed z-50 min-w-[200px] rounded border border-slate-200 bg-white py-1 shadow-lg"
+        className="fixed z-50 min-w-[200px] rounded border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         style={{ left: at.x, top: at.y }}
       >
         {items.map((it) => (
@@ -42,8 +42,10 @@ export const ContextMenu = () => {
               role="menuitem"
               disabled={it.disabled}
               onClick={() => { it.onSelect(); close() }}
-              className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${
-                it.danger ? 'text-red-700' : 'text-slate-800'
+              className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-700 ${
+                it.danger
+                  ? 'text-red-700 dark:text-red-300'
+                  : 'text-slate-800 dark:text-slate-100'
               }`}
             >
               <span>{t(it.labelKey)}</span>

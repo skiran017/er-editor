@@ -3,7 +3,7 @@ export interface KeyboardShortcutProps {
 }
 
 export const KeyboardShortcut = ({ combo }: KeyboardShortcutProps) => (
-  <kbd className="inline-flex rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
+  <kbd className="inline-flex rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-mono text-slate-600 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200">
     {combo}
   </kbd>
 )

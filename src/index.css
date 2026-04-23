@@ -42,6 +42,18 @@
 }
 
 :root {
+	/* ER-edge stroke tokens. Used by BaseEdge inline styles in
+	   EntityRelationshipEdge / AttributeEdge / ISAEdge via var(). The
+	   canvas-bg token drives the white overlay that carves the gap for
+	   total-participation double lines — it must match the canvas
+	   background so the overlay visually erases, not just paints. */
+	--er-edge-stroke: #334155;
+	--er-edge-attribute-stroke: #475569;
+	--er-edge-role-label: #475569;
+	--er-canvas-bg: #ffffff;
+	--er-connection-preview: #3b82f6;
+	--er-snap-guide: #f59e0b;
+
 	--radius: 0.625rem;
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.129 0.042 264.695);
@@ -77,6 +89,16 @@
 }
 
 .dark {
+	/* Dark palette: brighten edges against the slate-900 canvas, and point
+	   the canvas-bg token at that slate-900 so the total-participation gap
+	   overlay erases instead of painting a pale streak. */
+	--er-edge-stroke: #cbd5e1; /* slate-300 */
+	--er-edge-attribute-stroke: #94a3b8; /* slate-400 */
+	--er-edge-role-label: #cbd5e1; /* slate-300 */
+	--er-canvas-bg: #0f172a; /* slate-900 */
+	--er-connection-preview: #60a5fa; /* blue-400 */
+	--er-snap-guide: #fbbf24; /* amber-400 */
+
 	--background: oklch(0.129 0.042 264.695);
 	--foreground: oklch(0.984 0.003 247.858);
 	--card: oklch(0.208 0.042 265.755);
@@ -131,6 +153,40 @@
 		width: 100vw;
 		height: 100vh;
 	}
+}
+
+/* Dark-mode React Flow canvas surface — without this override the pane
+   stays white underneath the darkened chrome. Background pattern dots also
+   fade into a darker tint. */
+.dark .react-flow {
+	background-color: #0f172a; /* slate-900 — mirrors --er-canvas-bg */
+}
+.dark .react-flow__background {
+	background-color: #0f172a;
+}
+.dark .react-flow__background-pattern {
+	color: #334155; /* slate-700 dot tint */
+}
+
+/* React Flow's built-in `<Controls>` (zoom in/out, fit view, toggle
+   interactivity) renders its own DOM we can't reach with Tailwind classes.
+   Override its theme tokens so the pill panel + buttons flip in dark mode. */
+.dark .react-flow__controls {
+	background: rgba(30, 41, 59, 0.92); /* slate-800 / 92 */
+	border: 1px solid rgba(51, 65, 85, 0.6); /* slate-700 */
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.dark .react-flow__controls-button {
+	background: transparent;
+	border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+	color: #e2e8f0; /* slate-200 */
+}
+.dark .react-flow__controls-button:hover {
+	background: rgba(51, 65, 85, 0.8); /* slate-700 */
+}
+.dark .react-flow__controls-button svg,
+.dark .react-flow__controls-button path {
+	fill: currentColor;
 }
 
 @layer utilities {

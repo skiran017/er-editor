@@ -130,7 +130,7 @@ export const ConnectionPreviewOverlay = () => {
         y1={sy}
         x2={tx}
         y2={ty}
-        stroke="#3b82f6"
+        stroke="var(--er-connection-preview)"
         strokeWidth={1.5}
         strokeDasharray="6 4"
         data-snapped={hoveredTarget ? 'true' : 'false'}

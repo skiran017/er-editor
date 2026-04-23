@@ -15,20 +15,20 @@ const EREdge = ({ edge }: { edge: EntityRelationshipEdge }) => {
   const current = live && live.kind === 'entity-relationship' ? live : edge
   return (
     <>
-      <label className="flex flex-col gap-1 text-xs text-slate-700">
+      <label className="flex flex-col gap-1 text-xs text-slate-700 dark:text-slate-200">
         {t('cardinality')}
         <select
-          className="h-9 rounded border border-slate-300 px-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="h-9 rounded border border-slate-300 bg-white px-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           value={current.cardinality}
           onChange={(e) => update(edge.id, { cardinality: e.target.value as Cardinality })}
         >
           {CARDINALITIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </label>
-      <label className="flex flex-col gap-1 text-xs text-slate-700">
+      <label className="flex flex-col gap-1 text-xs text-slate-700 dark:text-slate-200">
         {t('participation')}
         <select
-          className="h-9 rounded border border-slate-300 px-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="h-9 rounded border border-slate-300 bg-white px-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           value={current.participation}
           onChange={(e) => update(edge.id, { participation: e.target.value as Participation })}
         >
@@ -53,10 +53,10 @@ export const EdgeProperties = ({ edge }: EdgePropertiesProps) => {
   const { t } = useTranslation('properties')
   return (
     <div className="flex flex-col gap-3 p-3 text-sm" data-role="edge-properties" data-edge-kind={edge.kind}>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t(`kind.${edge.kind}`)}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t(`kind.${edge.kind}`)}</h3>
       {edge.kind === 'entity-relationship' && <EREdge edge={edge} />}
       {edge.kind !== 'entity-relationship' && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Source: {edge.sourceId}<br />
           Target: {edge.targetId}
         </p>

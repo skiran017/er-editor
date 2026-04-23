@@ -26,7 +26,7 @@ export const AttributeEdge = memo(
       <BaseEdge
         id={id}
         path={path}
-        style={{ stroke: '#475569', strokeWidth: 1.5, fill: 'none' }}
+        style={{ stroke: 'var(--er-edge-attribute-stroke)', strokeWidth: 1.5, fill: 'none' }}
       />
     )
   },

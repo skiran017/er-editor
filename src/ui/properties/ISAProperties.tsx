@@ -14,7 +14,7 @@ export const ISAProperties = ({ node }: ISAPropertiesProps) => {
   const current = live && live.kind === 'isa' ? live : node
   return (
     <div className="flex flex-col gap-3 p-3 text-sm" data-role="isa-properties">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('kind.isa')}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t('kind.isa')}</h3>
       <Checkbox
         label={t('isTotal')}
         checked={current.isTotal}

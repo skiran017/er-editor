@@ -35,16 +35,16 @@ export const ConfirmModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/30"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 dark:bg-black/60"
       role="dialog"
       aria-modal
       aria-labelledby={`${modalId}-title`}
       data-modal-id={modalId}
       data-kind="confirm"
     >
-      <div className="w-[min(420px,90vw)] rounded bg-white p-4 shadow-lg">
+      <div className="w-[min(420px,90vw)] rounded bg-white p-4 shadow-lg dark:bg-slate-800 dark:text-slate-100">
         <h2 id={`${modalId}-title`} className="mb-2 text-base font-semibold">{t(titleKey)}</h2>
-        <p className="mb-4 text-sm text-slate-700">{t(messageKey, messageParams)}</p>
+        <p className="mb-4 text-sm text-slate-700 dark:text-slate-200">{t(messageKey, messageParams)}</p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={handleCancel}>
             {t('cancel', { ns: 'common' })}

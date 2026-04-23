@@ -50,14 +50,14 @@ export const ConnectionsList = ({ nodeId }: ConnectionsListProps) => {
 
   return (
     <section
-      className="flex flex-col gap-1 border-t border-slate-200 p-3"
+      className="flex flex-col gap-1 border-t border-slate-200 p-3 dark:border-slate-700"
       data-role="connections-list"
     >
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {t('connections')} ({rows.length})
       </h4>
       {rows.length === 0 ? (
-        <p className="text-xs italic text-slate-400">{t('noConnections')}</p>
+        <p className="text-xs italic text-slate-400 dark:text-slate-500">{t('noConnections')}</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {rows.map((r) => (
@@ -65,10 +65,10 @@ export const ConnectionsList = ({ nodeId }: ConnectionsListProps) => {
               <button
                 type="button"
                 onClick={() => select({ nodes: [r.otherId], edges: [] })}
-                className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-sm hover:bg-slate-100"
+                className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 <span className="truncate">{r.otherLabel}</span>
-                <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
+                <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
                   {r.kindLabel}
                 </span>
               </button>

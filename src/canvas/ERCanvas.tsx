@@ -53,7 +53,7 @@ const SnapOverlay = ({ guides, pan, zoom }: SnapOverlayProps) => {
           y1={g.from.y}
           x2={g.to.x}
           y2={g.to.y}
-          stroke="#f59e0b"
+          stroke="var(--er-snap-guide)"
           strokeWidth={1}
           strokeDasharray="4 4"
           data-role="snap-guide"

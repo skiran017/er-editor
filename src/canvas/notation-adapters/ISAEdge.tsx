@@ -23,7 +23,7 @@ export const ISAEdge = memo(
         id={id}
         path={path}
         data-role={edge.role}
-        style={{ stroke: '#334155', strokeWidth: 1.5, fill: 'none' }}
+        style={{ stroke: 'var(--er-edge-stroke)', strokeWidth: 1.5, fill: 'none' }}
       />
     )
   },
