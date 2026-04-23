@@ -57,9 +57,15 @@ export const useRfEvents = (): RfEventHandlers => {
       modifiers: readModifiers(e),
       button: readButton(e.button),
     })
-    // React Flow fires onNodeClick after mouseup, so synthesize the matching
-    // UP to keep the FSM out of drag-held state.
-    send({ type: 'CANVAS_POINTER_UP', point })
+    // Only flush `selecting.maybeDragging` with a synthetic UP. In every other
+    // state (placing, drawing.connection, …) the native pointerup has already
+    // bubbled through useMouse as CANVAS_POINTER_UP, so emitting another one
+    // here would double-trigger side effects — e.g. placing two entities
+    // from a single click on an existing node.
+    const after = useInteractionStore.getState().snapshot
+    if (after.matches({ selecting: 'maybeDragging' })) {
+      send({ type: 'CANVAS_POINTER_UP', point })
+    }
   }, [screenToFlowPosition])
 
   const onEdgeClick = useCallback((e: ReactMouseEvent, edge: RfEdge) => {
@@ -72,8 +78,12 @@ export const useRfEvents = (): RfEventHandlers => {
       modifiers: readModifiers(e),
       button: readButton(e.button),
     })
-    // Same rationale as onNodeClick — complete the click atomically.
-    send({ type: 'CANVAS_POINTER_UP', point })
+    // Same selective-flush rationale as onNodeClick: only emit the synthetic
+    // UP when the FSM is parked in a click-held state that needs it.
+    const after = useInteractionStore.getState().snapshot
+    if (after.matches({ selecting: 'maybeDragging' })) {
+      send({ type: 'CANVAS_POINTER_UP', point })
+    }
   }, [screenToFlowPosition])
 
   // Bug 4 — double-click a node opens the inline rename overlay directly.

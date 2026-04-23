@@ -45,11 +45,13 @@ describe('useRfEvents', () => {
     sendSpy.mockRestore()
   })
 
-  it('onNodeClick dispatches EXACTLY two events in order: NODE_POINTER_DOWN then CANVAS_POINTER_UP (at the same point)', () => {
-    // Regression: React Flow fires onNodeClick AFTER mouseup, but our FSM
-    // expects a matching UP after every DOWN to leave `maybeDragging`.
-    // Without the synthetic UP the next mouse move crossed the drag
-    // threshold and the node tracked the cursor (drag-follow bug).
+  it('onNodeClick in select-tool dispatches NODE_POINTER_DOWN + synthetic CANVAS_POINTER_UP (flushes selecting.maybeDragging)', () => {
+    // Select tool: NODE_POINTER_DOWN lands us in selecting.maybeDragging.
+    // React Flow fires onNodeClick AFTER mouseup, and the native pointerup
+    // has already bubbled out from this node (d3-drag only swallows mouse*
+    // events, not pointer*), so we need a synthetic UP to exit maybeDragging
+    // — otherwise the next mouse move crosses the drag threshold and the
+    // node tracks the cursor (the "drag-follow" bug).
     const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
     const fakeNode = { id: 'node-1' } as RfNode
@@ -60,6 +62,21 @@ describe('useRfEvents', () => {
     expect(first.type).toBe('NODE_POINTER_DOWN')
     expect(second.type).toBe('CANVAS_POINTER_UP')
     expect(second.point).toEqual({ x: 42, y: 84 })
+    sendSpy.mockRestore()
+  })
+
+  it('onNodeClick in a placing tool dispatches ONLY NODE_POINTER_DOWN — no synthetic UP', () => {
+    // Regression guard for the "two entities from one click" bug. In any
+    // state other than selecting.maybeDragging, the native pointerup has
+    // already bubbled through useMouse as CANVAS_POINTER_UP — emitting a
+    // synthetic one here would double-trigger placeNodeAction and create
+    // two entities on a single click.
+    useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'entity' })
+    const { result } = renderHook(() => useRfEvents(), RF_OPTS)
+    const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
+    result.current.onNodeClick(mkMouseEvent(), { id: 'node-1' } as RfNode)
+    expect(sendSpy).toHaveBeenCalledTimes(1)
+    expect((sendSpy.mock.calls[0]![0] as { type: string }).type).toBe('NODE_POINTER_DOWN')
     sendSpy.mockRestore()
   })
 
@@ -74,13 +91,16 @@ describe('useRfEvents', () => {
     sendSpy.mockRestore()
   })
 
-  it('onEdgeClick also dispatches EXACTLY two events in order: EDGE_POINTER_DOWN then CANVAS_POINTER_UP', () => {
+  it('onEdgeClick dispatches EXACTLY one event (EDGE_POINTER_DOWN): no synthetic UP needed since edge clicks do not enter selecting.maybeDragging', () => {
+    // Regression guard for the "two entities from one click" bug: we used
+    // to unconditionally emit a synthetic CANVAS_POINTER_UP after every
+    // click-style event, which double-triggered placement when useMouse had
+    // already bubbled the native pointerup through as CANVAS_POINTER_UP.
     const { result } = renderHook(() => useRfEvents(), RF_OPTS)
     const sendSpy = vi.spyOn(useInteractionStore.getState(), 'send')
     result.current.onEdgeClick(mkMouseEvent({ clientX: 7, clientY: 11 }), { id: 'edge-1' } as RfEdge)
-    expect(sendSpy).toHaveBeenCalledTimes(2)
+    expect(sendSpy).toHaveBeenCalledTimes(1)
     expect((sendSpy.mock.calls[0]![0] as { type: string }).type).toBe('EDGE_POINTER_DOWN')
-    expect((sendSpy.mock.calls[1]![0] as { type: string }).type).toBe('CANVAS_POINTER_UP')
     sendSpy.mockRestore()
   })
 
