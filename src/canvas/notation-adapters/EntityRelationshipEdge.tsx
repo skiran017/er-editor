@@ -24,6 +24,12 @@ import type { NotationEdgeData } from '@/notation/types'
 // entity end is the SOURCE end.
 const ARROW_LENGTH = 10
 const ARROW_HALF_WIDTH = 5
+// React Flow draws the edges SVG layer beneath the nodes layer, so anything
+// drawn exactly on a node boundary gets clipped by the node's 2px stroke
+// (and the filled rectangle behind it if the geometry strays inside). Push
+// the arrow tip this many pixels outward along the approach direction so
+// the entire triangle sits in clear canvas space.
+const ARROW_TIP_GAP = 3
 const CORNER_RADIUS = 5
 const STROKE = '#334155'
 const STROKE_WIDTH = 1.5
@@ -92,8 +98,10 @@ export const EntityRelationshipEdge = memo(
     const isTotal = edge.participation === 'total'
 
     // Solid triangle arrowhead at the entity (source) end when cardinality = 1.
-    // Tip at (sx, sy) on the entity boundary; body extends OUTward along the
-    // entity side's outward direction (so the arrow points inward).
+    // Tip is pushed ARROW_TIP_GAP pixels outside the entity boundary so it
+    // clears the entity's 2px stroke (and doesn't risk being hidden by the
+    // node body when the two nodes are close together). Body extends OUTward
+    // from there.
     const showArrow = edge.cardinality === '1'
     let arrowPath: string | null = null
     if (showArrow) {
@@ -101,13 +109,15 @@ export const EntityRelationshipEdge = memo(
       // Perpendicular to the approach direction for the base wings.
       const px = -ay
       const py = ax
-      const baseCx = sx + ax * ARROW_LENGTH
-      const baseCy = sy + ay * ARROW_LENGTH
+      const tipX = sx + ax * ARROW_TIP_GAP
+      const tipY = sy + ay * ARROW_TIP_GAP
+      const baseCx = tipX + ax * ARROW_LENGTH
+      const baseCy = tipY + ay * ARROW_LENGTH
       const b1x = baseCx + px * ARROW_HALF_WIDTH
       const b1y = baseCy + py * ARROW_HALF_WIDTH
       const b2x = baseCx - px * ARROW_HALF_WIDTH
       const b2y = baseCy - py * ARROW_HALF_WIDTH
-      arrowPath = `M ${sx} ${sy} L ${b1x} ${b1y} L ${b2x} ${b2y} Z`
+      arrowPath = `M ${tipX} ${tipY} L ${b1x} ${b1y} L ${b2x} ${b2y} Z`
     }
 
     return (
