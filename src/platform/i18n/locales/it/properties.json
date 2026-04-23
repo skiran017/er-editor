@@ -29,5 +29,30 @@
   "connections": "Connections",
   "noConnections": "No connections yet.",
   "unnamed": "(unnamed)",
-  "validation": "Validation"
+  "validation": "Validation",
+  "delete": "Delete",
+  "attr": {
+    "section": "Attributes",
+    "count": "{{count}} attribute",
+    "count_other": "{{count}} attributes",
+    "none": "No attributes yet.",
+    "add": "Add attribute",
+    "addLabel": "New attribute name",
+    "addPlaceholder": "Add attribute…",
+    "namePlaceholder": "Attribute name",
+    "delete": "Delete attribute",
+    "showMore": "Show {{count}} more",
+    "showLess": "Show less",
+    "key": "Key",
+    "discriminant": "Discriminant",
+    "multivalued": "Multivalued",
+    "derived": "Derived"
+  },
+  "legs": {
+    "section": "Connection details",
+    "none": "No entities connected yet.",
+    "recursive": "Recursive",
+    "defaultRole": "Role {{n}}",
+    "selectEntity": "Select entity"
+  }
 }

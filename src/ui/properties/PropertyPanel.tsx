@@ -8,19 +8,20 @@ import { RelationshipProperties } from './RelationshipProperties'
 import { AttributeProperties } from './AttributeProperties'
 import { ISAProperties } from './ISAProperties'
 import { EdgeProperties } from './EdgeProperties'
-import { PanelHeader } from './PanelHeader'
+import { PanelHeader, type PanelKind } from './PanelHeader'
 import { ConnectionsList } from './ConnectionsList'
 import { ValidationList } from './ValidationList'
 
 interface FrameProps {
   readonly titleKey: string
+  readonly kind: PanelKind
   readonly children: ReactNode
   readonly testAttrs?: Readonly<Record<string, string>>
 }
 
-const Frame = ({ titleKey, children, testAttrs }: FrameProps) => (
+const Frame = ({ titleKey, kind, children, testAttrs }: FrameProps) => (
   <div className="flex h-full flex-col" data-role="property-panel" {...testAttrs}>
-    <PanelHeader titleKey={titleKey} />
+    <PanelHeader titleKey={titleKey} kind={kind} />
     <div className="flex-1 overflow-y-auto">{children}</div>
   </div>
 )
@@ -42,27 +43,29 @@ export const PropertyPanel = () => {
   if (singleNodeId) {
     if (!node) return <EmptyPanel />
     const titleKey = `kind.${node.kind}`
+    // Entity / Relationship: attributes and (for relationships) per-leg cards
+    // replace the old generic ConnectionsList — you edit everything inline.
     if (node.kind === 'entity') {
       return (
-        <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'entity' }}>
+        <Frame titleKey={titleKey} kind="entity" testAttrs={{ 'data-node-kind': 'entity' }}>
           <EntityProperties node={node} />
           <ValidationList targetId={node.id} />
-          <ConnectionsList nodeId={node.id} />
         </Frame>
       )
     }
     if (node.kind === 'relationship') {
       return (
-        <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'relationship' }}>
+        <Frame titleKey={titleKey} kind="relationship" testAttrs={{ 'data-node-kind': 'relationship' }}>
           <RelationshipProperties node={node} />
           <ValidationList targetId={node.id} />
-          <ConnectionsList nodeId={node.id} />
         </Frame>
       )
     }
+    // Attribute / ISA still use ConnectionsList for navigation to parent(s) —
+    // they don't own inline children, so there's nothing to inline.
     if (node.kind === 'attribute') {
       return (
-        <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'attribute' }}>
+        <Frame titleKey={titleKey} kind="attribute" testAttrs={{ 'data-node-kind': 'attribute' }}>
           <AttributeProperties node={node} />
           <ValidationList targetId={node.id} />
           <ConnectionsList nodeId={node.id} />
@@ -71,7 +74,7 @@ export const PropertyPanel = () => {
     }
     if (node.kind === 'isa') {
       return (
-        <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'isa' }}>
+        <Frame titleKey={titleKey} kind="isa" testAttrs={{ 'data-node-kind': 'isa' }}>
           <ISAProperties node={node} />
           <ValidationList targetId={node.id} />
           <ConnectionsList nodeId={node.id} />
@@ -83,7 +86,7 @@ export const PropertyPanel = () => {
 
   if (!edge) return <EmptyPanel />
   return (
-    <Frame titleKey={`kind.${edge.kind}`} testAttrs={{ 'data-edge-kind': edge.kind }}>
+    <Frame titleKey={`kind.${edge.kind}`} kind={edge.kind} testAttrs={{ 'data-edge-kind': edge.kind }}>
       <EdgeProperties edge={edge} />
       <ValidationList targetId={edge.id} />
     </Frame>
