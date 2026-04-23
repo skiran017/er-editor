@@ -10,3 +10,4 @@ export {
   type EdgePosition,
 } from './useFloatingEdge'
 export { useSnapping, type SnappingApi } from './useSnapping'
+export { useInlineRename, type InlineRenameApi } from './useInlineRename'

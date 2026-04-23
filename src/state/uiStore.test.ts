@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useUiStore } from './uiStore'
+import type { NodeId } from '@/domain/types'
 
 const reset = () => useUiStore.setState({
   theme: 'system',
@@ -14,6 +15,7 @@ const reset = () => useUiStore.setState({
     alignmentThreshold: 4,
   },
   contextMenu: null,
+  inlineRename: null,
 })
 
 describe('uiStore — theme + language', () => {
@@ -96,5 +98,20 @@ describe('uiStore — contextMenu', () => {
     useUiStore.getState().openContextMenu({ at: { x: 0, y: 0 }, items: [] })
     useUiStore.getState().closeContextMenu()
     expect(useUiStore.getState().contextMenu).toBeNull()
+  })
+})
+
+describe('uiStore — inlineRename', () => {
+  beforeEach(reset)
+
+  it('startInlineRename sets state', () => {
+    useUiStore.getState().startInlineRename({ nodeId: 'x' as NodeId, initialValue: 'A' })
+    expect(useUiStore.getState().inlineRename).toEqual({ nodeId: 'x', initialValue: 'A' })
+  })
+
+  it('cancelInlineRename clears state', () => {
+    useUiStore.getState().startInlineRename({ nodeId: 'x' as NodeId, initialValue: 'A' })
+    useUiStore.getState().cancelInlineRename()
+    expect(useUiStore.getState().inlineRename).toBeNull()
   })
 })

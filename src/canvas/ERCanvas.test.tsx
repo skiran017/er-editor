@@ -5,6 +5,7 @@ import { useDiagramStore } from '@/state/diagramStore'
 import { useViewportStore } from '@/state/viewportStore'
 import { useSelectionStore } from '@/state/selectionStore'
 import { useValidationStore } from '@/state/validationStore'
+import { useUiStore } from '@/state/uiStore'
 import { emptyDiagram } from '@/domain/types'
 
 const resetAll = () => {
@@ -13,6 +14,7 @@ const resetAll = () => {
   useViewportStore.setState({ zoom: 1, pan: { x: 0, y: 0 } })
   useSelectionStore.setState({ selectedNodeIds: new Set(), selectedEdgeIds: new Set(), rubberband: null })
   useValidationStore.setState({ errorsById: {}, enabled: true })
+  useUiStore.setState({ inlineRename: null })
 }
 
 beforeEach(resetAll)
@@ -46,5 +48,15 @@ describe('ERCanvas', () => {
     render(<ERCanvas />)
     useViewportStore.setState({ zoom: 1.5, pan: { x: 20, y: 10 } })
     expect(useViewportStore.getState().zoom).toBe(1.5)
+  })
+
+  it('renders InlineRenameOverlay when uiStore.inlineRename is active', () => {
+    const id = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'Foo', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    useUiStore.getState().startInlineRename({ nodeId: id, initialValue: 'Foo' })
+    render(<ERCanvas />)
+    expect(screen.getByDisplayValue('Foo')).toBeInTheDocument()
   })
 })

@@ -19,6 +19,7 @@ import { useKeyboard, useMouse, useTouch, useSnapping } from './hooks'
 import type { SnapGuide } from '@/domain/snap'
 import type { NodeId } from '@/domain/types'
 import { chenNodeTypes, chenEdgeTypes } from './notation-adapters/chenBindings'
+import { InlineRenameOverlay } from './InlineRenameOverlay'
 
 // chenBindings exports `Record<NodeKind, ComponentType<NodeProps>>` — structurally
 // compatible with React-Flow's `NodeTypes` at runtime, but TS is stricter about the
@@ -160,6 +161,7 @@ const ERCanvasInner = () => {
         <Controls />
       </ReactFlow>
       <SnapOverlay guides={activeGuides} pan={pan} zoom={zoom} />
+      <InlineRenameOverlay />
     </div>
   )
 }

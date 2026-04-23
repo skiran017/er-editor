@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
+import type { NodeId } from '@/domain/types'
 
 export type Theme = 'light' | 'dark' | 'system'
 export type Language = 'en' | 'it'
@@ -39,6 +40,11 @@ export interface ContextMenuState {
   readonly items: readonly ContextMenuItem[]
 }
 
+export interface InlineRenameState {
+  readonly nodeId: NodeId
+  readonly initialValue: string
+}
+
 export interface UiStoreState {
   readonly theme: Theme
   readonly language: Language
@@ -47,6 +53,7 @@ export interface UiStoreState {
   readonly toasts: readonly Toast[]
   readonly snap: UiSnapConfig
   readonly contextMenu: ContextMenuState | null
+  readonly inlineRename: InlineRenameState | null
   setTheme: (t: Theme) => void
   setLanguage: (l: Language) => void
   togglePanel: (id: string) => void
@@ -57,6 +64,8 @@ export interface UiStoreState {
   setSnap: (patch: Partial<UiSnapConfig>) => void
   openContextMenu: (state: ContextMenuState) => void
   closeContextMenu: () => void
+  startInlineRename: (state: InlineRenameState) => void
+  cancelInlineRename: () => void
 }
 
 export const useUiStore = create<UiStoreState>()(
@@ -75,6 +84,7 @@ export const useUiStore = create<UiStoreState>()(
           alignmentThreshold: 4,
         },
         contextMenu: null,
+        inlineRename: null,
 
         setTheme: (t) => set((state) => { state.theme = t }),
         setLanguage: (l) => set((state) => { state.language = l }),
@@ -108,6 +118,11 @@ export const useUiStore = create<UiStoreState>()(
           state.contextMenu = s as unknown as typeof state.contextMenu
         }),
         closeContextMenu: () => set((state) => { state.contextMenu = null }),
+
+        startInlineRename: (s) => set((state) => {
+          state.inlineRename = s as unknown as typeof state.inlineRename
+        }),
+        cancelInlineRename: () => set((state) => { state.inlineRename = null }),
       })),
       {
         name: 'er-editor:ui',
