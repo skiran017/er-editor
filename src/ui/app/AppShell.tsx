@@ -20,11 +20,11 @@ export const AppShell = ({ canvas, properties, chrome, overlays }: AppShellProps
   )
   const showProperties = panelToggled && hasSelection
   return (
-    <div className="relative flex h-screen w-screen bg-white text-slate-900">
+    <div className="relative flex h-screen w-screen bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
       <main className="flex flex-1 overflow-hidden">{canvas}</main>
       {showProperties && (
         <aside
-          className="flex w-80 shrink-0 flex-col border-l border-slate-200"
+          className="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
           data-role="properties-panel"
         >
           {properties}

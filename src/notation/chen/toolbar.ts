@@ -6,7 +6,12 @@ export const chenToolbar: ToolbarConfig = {
     {
       id: 'elements',
       labelKey: 'toolbar.group.elements',
-      tools: ['entity', 'relationship', 'attribute', 'isa'],
+      // `isa` is intentionally not here — placing a lone ISA node has no
+      // semantic value in Chen (it must connect a parent and ≥1 child), so
+      // the toolbar surfaces the ISA notation through the two quick flows
+      // in the connections group instead: "Generalization (ISA)" (partial)
+      // and "Generalization (Total)".
+      tools: ['entity', 'relationship', 'attribute'],
     },
     {
       id: 'connections',

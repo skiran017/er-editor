@@ -12,10 +12,10 @@
     "attribute": "Attribute",
     "isa": "Generalization",
     "connect": "Connect",
-    "quickRelationship11": "Quick relationship 1:1",
-    "quickRelationship1N": "Quick relationship 1:N",
-    "quickRelationshipNN": "Quick relationship N:N",
-    "quickGeneralization": "Quick generalization",
-    "quickGeneralizationTotal": "Quick generalization (total)"
+    "quickRelationship11": "Relationship 1:1",
+    "quickRelationship1N": "Relationship 1:N",
+    "quickRelationshipNN": "Relationship N:N",
+    "quickGeneralization": "Generalization (ISA)",
+    "quickGeneralizationTotal": "Generalization (Total)"
   }
 }

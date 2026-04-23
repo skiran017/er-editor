@@ -27,8 +27,8 @@ export const IconButton = ({
     aria-pressed={active || undefined}
     className={`inline-flex items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
       active
-        ? 'bg-blue-100 text-blue-700'
-        : 'bg-transparent text-slate-700 hover:bg-slate-100'
+        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+        : 'bg-transparent text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'
     } ${SIZES[size]} ${className}`}
   >
     {icon}

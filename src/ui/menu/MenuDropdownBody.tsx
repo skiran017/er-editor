@@ -53,7 +53,7 @@ export const MenuDropdownBody = ({
     <div
       role="menu"
       aria-label={t('menu:app.title')}
-      className="absolute left-0 top-12 z-40 w-64 rounded-lg border border-slate-200 bg-white/95 py-2 shadow-xl backdrop-blur-md"
+      className="absolute left-0 top-12 z-40 w-64 rounded-lg border border-slate-200 bg-white/95 py-2 shadow-xl backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/95"
     >
       {fileActions.map((item) => {
         const Icon = item.icon
@@ -63,20 +63,20 @@ export const MenuDropdownBody = ({
             type="button"
             role="menuitem"
             onClick={item.onSelect}
-            className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100"
+            className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
           >
-            <Icon size={18} className="text-slate-500" aria-hidden />
+            <Icon size={18} className="text-slate-500 dark:text-slate-400" aria-hidden />
             <span className="flex-1">{t(item.labelKey)}</span>
             {item.shortcut && (
-              <span className="font-mono text-xs text-slate-400">{item.shortcut}</span>
+              <span className="font-mono text-xs text-slate-400 dark:text-slate-500">{item.shortcut}</span>
             )}
           </button>
         )
       })}
 
-      <div className="my-2 h-px bg-slate-200" aria-hidden />
+      <div className="my-2 h-px bg-slate-200 dark:bg-slate-700" aria-hidden />
 
-      <label className="flex cursor-pointer items-center justify-between px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100">
+      <label className="flex cursor-pointer items-center justify-between px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700">
         <span>{t('menu:app.validation')}</span>
         <input
           type="checkbox"
@@ -93,15 +93,15 @@ export const MenuDropdownBody = ({
         onClick={onShortcuts}
         className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100"
       >
-        <KeyboardIcon size={18} className="text-slate-500" aria-hidden />
+        <KeyboardIcon size={18} className="text-slate-500 dark:text-slate-400" aria-hidden />
         <span className="flex-1">{t('menu:help.cheatsheet')}</span>
-        <span className="font-mono text-xs text-slate-400">?</span>
+        <span className="font-mono text-xs text-slate-400 dark:text-slate-500">?</span>
       </button>
 
-      <div className="my-2 h-px bg-slate-200" aria-hidden />
+      <div className="my-2 h-px bg-slate-200 dark:bg-slate-700" aria-hidden />
 
       <div className="px-4 py-2">
-        <div className="mb-2 text-xs font-medium text-slate-500">{t('menu:app.theme')}</div>
+        <div className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{t('menu:app.theme')}</div>
         <div className="flex items-center gap-2" role="radiogroup" aria-label={t('menu:app.theme')}>
           {themes.map((opt) => {
             const Icon = opt.icon
@@ -116,7 +116,9 @@ export const MenuDropdownBody = ({
                 title={t(opt.labelKey)}
                 onClick={() => onSetTheme(opt.value)}
                 className={`flex flex-1 items-center justify-center rounded-md px-3 py-2 text-sm transition-colors ${
-                  active ? 'bg-blue-100 text-blue-700' : 'text-slate-700 hover:bg-slate-100'
+                  active
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 <Icon size={16} aria-hidden />
@@ -130,7 +132,7 @@ export const MenuDropdownBody = ({
         type="button"
         role="menuitem"
         onClick={onReset}
-        className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+        className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
       >
         <ResetIcon size={18} aria-hidden />
         <span className="flex-1">{t('menu:app.reset')}</span>

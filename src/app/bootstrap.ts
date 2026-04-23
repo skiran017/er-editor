@@ -25,7 +25,7 @@ export const installSubscribers = (): (() => void) => {
     }
   }
 
-  const unsubscribe = useDiagramStore.subscribe(
+  const unsubscribeDiagram = useDiagramStore.subscribe(
     (s) => s.diagram,
     (diagram) => {
       runInvariants(diagram)
@@ -33,5 +33,24 @@ export const installSubscribers = (): (() => void) => {
     },
   )
 
-  return unsubscribe
+  // Flipping the validation switch in the menu must take effect immediately,
+  // not on the next diagram edit. Off → clear stale errors so badges vanish.
+  // On → recompute against the current diagram so badges reappear.
+  const unsubscribeValidationToggle = useValidationStore.subscribe(
+    (s) => s.enabled,
+    (enabled) => {
+      if (enabled) {
+        useValidationStore.getState().setErrors(
+          validateChen(useDiagramStore.getState().diagram),
+        )
+      } else {
+        useValidationStore.getState().clear()
+      }
+    },
+  )
+
+  return () => {
+    unsubscribeDiagram()
+    unsubscribeValidationToggle()
+  }
 }

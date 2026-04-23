@@ -45,7 +45,7 @@ export const Toolbar = memo(() => {
     <nav
       aria-label={t('toolbar:group.elements')}
       data-role="toolbar"
-      className="fixed left-1/2 top-4 z-40 flex h-12 -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white/90 px-3 shadow-lg backdrop-blur-md"
+      className="fixed left-1/2 top-4 z-40 flex h-12 -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white/90 px-3 text-slate-700 shadow-lg backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200"
     >
       {/* Element / tool groups from chenPlugin (select, elements, connections).
           Every group is followed by a separator (history group sits after). */}
@@ -54,7 +54,7 @@ export const Toolbar = memo(() => {
           key={group.id}
           data-role="toolbar-group"
           data-group-id={group.id}
-          className="mr-2 flex items-center gap-0.5 border-r border-slate-200 pr-2"
+          className="mr-2 flex items-center gap-0.5 border-r border-slate-200 pr-2 dark:border-slate-700"
         >
           {group.tools.map((toolId) => (
             <ToolButton
@@ -75,7 +75,7 @@ export const Toolbar = memo(() => {
       <div
         data-role="toolbar-group"
         data-group-id="history"
-        className="mr-2 flex items-center gap-0.5 border-r border-slate-200 pr-2"
+        className="mr-2 flex items-center gap-0.5 border-r border-slate-200 pr-2 dark:border-slate-700"
       >
         <IconButton
           aria-label={t('menu:edit.undo')}
@@ -103,7 +103,7 @@ export const Toolbar = memo(() => {
             title={`${t('menu:edit.delete')} (${selectionCount})`}
             icon={<Trash2 size={ICON_SIZE} aria-hidden />}
             onClick={() => send({ type: 'DELETE' })}
-            className="text-red-600 hover:bg-red-100"
+            className="text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
           />
         </div>
       )}

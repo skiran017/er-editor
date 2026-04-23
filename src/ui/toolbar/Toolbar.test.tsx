@@ -23,12 +23,14 @@ const reset = () => {
 describe('Toolbar — tool picker', () => {
   beforeEach(reset)
 
-  it('renders a button for each tool in chenPlugin (12) plus the two history buttons (14 total, no delete without selection)', () => {
+  it('renders a button for each tool in chenPlugin (11) plus the two history buttons (13 total, no delete without selection)', () => {
     render(<Toolbar />)
-    // Select (2) + Elements (4) + Connections (6) + History (2: undo/redo) = 14.
-    // Delete appears only when something is selected — excluded here.
+    // Select (2) + Elements (3: entity/relationship/attribute — isa removed
+    // since placing a lone ISA node is semantically invalid) + Connections
+    // (6) + History (2: undo/redo) = 13. Delete appears only when something
+    // is selected — excluded here.
     const buttons = screen.getAllByRole('button')
-    expect(buttons.length).toBe(14)
+    expect(buttons.length).toBe(13)
   })
 
   it('clicking "Entity" dispatches PICK_TOOL with tool=entity', async () => {
@@ -44,11 +46,16 @@ describe('Toolbar — tool picker', () => {
     expect(screen.getByRole('button', { name: 'Select' })).not.toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('element tools (entity/relationship/attribute/isa) are draggable', () => {
+  it('element tools (entity/relationship/attribute) are draggable', () => {
     const { container } = render(<Toolbar />)
-    for (const tool of ['entity', 'relationship', 'attribute', 'isa']) {
+    for (const tool of ['entity', 'relationship', 'attribute']) {
       expect(container.querySelector(`[data-tool-id="${tool}"][draggable="true"]`)).toBeInTheDocument()
     }
+  })
+
+  it('isa is no longer rendered in the toolbar (placing a lone ISA has no semantic value)', () => {
+    const { container } = render(<Toolbar />)
+    expect(container.querySelector('[data-tool-id="isa"]')).not.toBeInTheDocument()
   })
 
   it('non-element tools (select/pan/connect) are not draggable', () => {

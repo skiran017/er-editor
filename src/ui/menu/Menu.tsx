@@ -102,7 +102,7 @@ export const Menu = () => {
         aria-expanded={isOpen}
         title={t('menu:app.title')}
         onClick={() => setIsOpen((v) => !v)}
-        className="rounded-md border border-slate-200 bg-white/90 p-2 shadow-lg backdrop-blur-md transition-colors hover:bg-slate-100"
+        className="rounded-md border border-slate-200 bg-white/90 p-2 text-slate-700 shadow-lg backdrop-blur-md transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700"
       >
         {isOpen ? <X size={18} aria-hidden /> : <MenuIcon size={18} aria-hidden />}
       </button>
