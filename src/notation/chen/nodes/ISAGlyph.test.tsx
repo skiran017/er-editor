@@ -10,25 +10,36 @@ const base = {
 }
 
 describe('ISAGlyph', () => {
-  it('partial generalization renders a single polygon', () => {
+  it('always renders a single polygon — isTotal drives the edge, not the glyph', () => {
+    const partial = render(
+      <svg>
+        <ISAGlyph {...base} isTotal={false} />
+      </svg>,
+    )
+    expect(partial.container.querySelectorAll('polygon').length).toBe(1)
+    partial.unmount()
+
+    const total = render(
+      <svg>
+        <ISAGlyph {...base} isTotal />
+      </svg>,
+    )
+    // No inner triangle — the total marker moved onto the parent-ISA edge
+    // as a double line. The glyph shape is identical in both states.
+    expect(total.container.querySelectorAll('polygon').length).toBe(1)
+  })
+
+  it('renders an "ISA" text label inside the triangle', () => {
     const { container } = render(
       <svg>
         <ISAGlyph {...base} isTotal={false} />
       </svg>,
     )
-    expect(container.querySelectorAll('polygon').length).toBe(1)
+    const text = container.querySelector('text')
+    expect(text?.textContent).toBe('ISA')
   })
 
-  it('total generalization renders two polygons (double triangle)', () => {
-    const { container } = render(
-      <svg>
-        <ISAGlyph {...base} isTotal />
-      </svg>,
-    )
-    expect(container.querySelectorAll('polygon').length).toBe(2)
-  })
-
-  it('triangle points downward (top-left, top-right, bottom-centre)', () => {
+  it('triangle is inverted — base along the top, apex at the bottom-centre', () => {
     const { container } = render(
       <svg>
         <ISAGlyph {...base} isTotal={false} />
@@ -37,9 +48,13 @@ describe('ISAGlyph', () => {
     const pts =
       container.querySelector('polygon')?.getAttribute('points')?.trim().split(/\s+/) ?? []
     expect(pts).toHaveLength(3)
-    const [top1, top2, bottom] = pts.map((p) => p.split(',').map(Number))
-    expect(top1[1]).toBeLessThan(bottom[1])
-    expect(top2[1]).toBeLessThan(bottom[1])
+    const [top1, top2, apex] = pts.map((p) => p.split(',').map(Number))
+    // Top-left + top-right share y=0 (the base). Apex sits below at y=height.
+    expect(top1[1]).toBe(0)
+    expect(top2[1]).toBe(0)
+    expect(apex[1]).toBeGreaterThan(top1[1])
+    // Apex is horizontally centred.
+    expect(apex[0]).toBe(base.width / 2)
   })
 
   it('sets data-selected when isSelected', () => {

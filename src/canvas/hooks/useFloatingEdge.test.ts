@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { chooseSide, sidePort, getNodeIntersection, assignNodePorts } from './useFloatingEdge'
+import {
+  chooseSide,
+  sidePort,
+  getNodeIntersection,
+  assignNodePorts,
+  ISA_PARENT_SIDE,
+} from './useFloatingEdge'
 
 // Minimal RF-node shape for the pure helpers. Real RF nodes have more
 // fields but the helpers only read these.
@@ -222,5 +228,63 @@ describe('assignNodePorts (collision-aware distribution across 4 cardinal ports)
     expect(new Set(map.values()).size).toBeGreaterThanOrEqual(4)
     // Every edge has been assigned some side.
     expect(map.size).toBe(5)
+  })
+})
+
+describe('ISA port routing', () => {
+  it('parent-edge side is locked to the top (centre of the inverted-triangle base)', () => {
+    expect(ISA_PARENT_SIDE).toBe('top')
+  })
+
+  it('assignNodePorts with forbidden={top} redirects a child that naturally wants top onto an allowed side', () => {
+    const isa = mkNode(0, 100, 100, 60)
+    // Child node positioned ABOVE the ISA — without the forbidden guard it
+    // would naturally prefer 'top'. With top forbidden it slides to the
+    // nearest allowed cardinal (bottom/left/right).
+    const childAbove = mkNode(40, 0)
+    const map = assignNodePorts(
+      isa,
+      [{ edgeId: 'e1', other: childAbove }],
+      { forbidden: new Set(['top']) },
+    )
+    expect(map.get('e1')).not.toBe('top')
+  })
+
+  it('three ISA children with three different natural directions each get a distinct side, none on top', () => {
+    const isa = mkNode(200, 200, 100, 60)
+    const below = mkNode(200, 400)  // → bottom
+    const right = mkNode(500, 200)  // → right
+    const left  = mkNode(0, 200)    // → left
+    const map = assignNodePorts(
+      isa,
+      [
+        { edgeId: 'below', other: below },
+        { edgeId: 'right', other: right },
+        { edgeId: 'left', other: left },
+      ],
+      { forbidden: new Set(['top']) },
+    )
+    const sides = new Set(map.values())
+    expect(sides.size).toBe(3)
+    expect(sides.has('top')).toBe(false)
+  })
+
+  it('multiple children all naturally wanting bottom fan out across bottom/right/left (no top)', () => {
+    const isa = mkNode(200, 0, 100, 60)
+    // All four children are below → all naturally prefer bottom. Collision
+    // rotation should spread them across the three allowed cardinals.
+    const map = assignNodePorts(
+      isa,
+      [
+        { edgeId: 'c1', other: mkNode(180, 300) },
+        { edgeId: 'c2', other: mkNode(220, 310) },
+        { edgeId: 'c3', other: mkNode(200, 320) },
+      ],
+      { forbidden: new Set(['top']) },
+    )
+    const sides = new Set(map.values())
+    expect(sides.has('top')).toBe(false)
+    // At least two distinct sides used — bottom primary, another displaced.
+    expect(sides.size).toBeGreaterThanOrEqual(2)
   })
 })

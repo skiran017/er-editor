@@ -1,7 +1,7 @@
 import { useInternalNode } from '@xyflow/react'
 import { useMemo } from 'react'
 import { useDiagramStore } from '@/state/diagramStore'
-import type { Point } from '@/domain/types'
+import type { EdgeId, NodeId, Point } from '@/domain/types'
 
 // Minimal shape the pure helpers read from. RfNode / InternalNode are supersets.
 export interface FloatableNode {
@@ -73,6 +73,62 @@ export const sidePort = (n: FloatableNode, side: EdgePosition): Point => {
 export const getNodeIntersection = (a: FloatableNode, b: FloatableNode): Point =>
   sidePort(a, chooseSide(a, b))
 
+// ISA nodes are inverted triangles. The single parent-edge always enters at
+// the top-midpoint (centre of the base) — locked there so there's no
+// ambiguity about which leg is the superclass. Children are free to use any
+// other side (right / bottom / left) and pick their natural direction via
+// the collision-aware assignment with `top` forbidden.
+export const ISA_PARENT_SIDE: EdgePosition = 'top'
+const ISA_CHILD_FORBIDDEN: ReadonlySet<EdgePosition> = new Set(['top'])
+
+// Collect every child-role ISA edge leaving `isaId` as a bundle that
+// assignNodePorts can reason about together. Pulled out of resolveSide so
+// that function stays within the lint complexity cap.
+const collectIsaChildIncidents = (
+  isaId: string,
+  diagram: ReturnType<typeof useDiagramStore.getState>['diagram'],
+): IncidentEdge[] => {
+  const out: IncidentEdge[] = []
+  for (const eid of diagram.edgeOrder) {
+    const e = diagram.edgesById[eid]
+    if (!e || e.kind !== 'isa-link' || e.role !== 'child') continue
+    if (e.sourceId !== isaId) continue
+    const other = diagram.nodesById[e.targetId]
+    if (!other) continue
+    out.push({
+      edgeId: eid,
+      other: {
+        id: other.id,
+        position: other.position,
+        width: other.size.width,
+        height: other.size.height,
+      },
+    })
+  }
+  return out
+}
+
+// Decide the port for one end of an ISA edge, or return undefined when the
+// node/edge pair isn't an ISA case. undefined lets resolveSide fall through
+// to the generic assignment logic. Keeping this out-of-line keeps resolveSide
+// flat and readable.
+const resolveIsaSideIfApplicable = (
+  node: FloatableNode,
+  nodeId: string,
+  edgeId: string,
+  diagram: ReturnType<typeof useDiagramStore.getState>['diagram'],
+): EdgePosition | undefined => {
+  const domainNode = diagram.nodesById[nodeId as NodeId]
+  if (!domainNode || domainNode.kind !== 'isa') return undefined
+  const edge = diagram.edgesById[edgeId as EdgeId]
+  if (!edge || edge.kind !== 'isa-link') return undefined
+  if (edge.role === 'parent') return ISA_PARENT_SIDE
+  const children = collectIsaChildIncidents(nodeId, diagram)
+  if (children.length === 0) return 'bottom'
+  const map = assignNodePorts(node, children, { forbidden: ISA_CHILD_FORBIDDEN })
+  return map.get(edgeId) ?? 'bottom'
+}
+
 // ——— collision-aware port assignment ———
 //
 // When two edges incident to the same node both prefer the same cardinal
@@ -116,6 +172,15 @@ interface IncidentEdge {
 // end up on the SAME cardinal → getSmoothStepPath routes it symmetrically.
 const PARALLEL_OVERRIDES: readonly EdgePosition[] = ['top', 'bottom']
 
+export interface AssignNodePortsOptions {
+  // Sides the algorithm is NOT allowed to pick. Used by ISA nodes to keep
+  // their children off the top cardinal — that port is reserved for the
+  // single parent edge, whose routing is locked by the caller upstream.
+  readonly forbidden?: ReadonlySet<EdgePosition>
+}
+
+const EMPTY_FORBIDDEN: ReadonlySet<EdgePosition> = new Set()
+
 /**
  * For a single node, decide which cardinal side each incident edge should
  * attach to. Collision-aware: if `n` of its edges all prefer the same side,
@@ -124,27 +189,50 @@ const PARALLEL_OVERRIDES: readonly EdgePosition[] = ['top', 'bottom']
  *
  * Parallel edges (multiple edges to the same neighbour) get priority overrides
  * onto top/bottom so a recursive pair doesn't overlap into the same port.
+ *
+ * `options.forbidden` excludes sides from consideration entirely — any edge
+ * whose natural side falls on a forbidden cardinal gets redirected to the
+ * nearest allowed one before grouping.
  */
-export const assignNodePorts = (
+interface PortEntry {
+  readonly edgeId: string
+  readonly otherId: string
+  readonly side: EdgePosition
+  readonly angle: number
+}
+
+// Build a PortEntry per incident edge, redirecting any entry whose natural
+// side falls on a forbidden cardinal to the nearest allowed one.
+const buildEntries = (
   node: FloatableNode,
   incident: readonly IncidentEdge[],
-): Map<string, EdgePosition> => {
+  forbidden: ReadonlySet<EdgePosition>,
+  allowedSides: readonly EdgePosition[],
+): readonly PortEntry[] => {
   const nodeCentre = centreOf(node)
-  const entries = incident.map(({ edgeId, other }) => {
-    const side = chooseSide(node, other)
+  return incident.map(({ edgeId, other }) => {
+    const natural = chooseSide(node, other)
     const oc = centreOf(other)
     const angle = Math.atan2(oc.y - nodeCentre.y, oc.x - nodeCentre.x)
+    const side = forbidden.has(natural)
+      ? [...allowedSides].sort(
+          (a, b) => angularDist(angle, SIDE_ANGLE[a]) - angularDist(angle, SIDE_ANGLE[b]),
+        )[0] ?? natural
+      : natural
     return { edgeId, otherId: other.id, side, angle }
   })
+}
 
-  const assignment = new Map<string, EdgePosition>()
-  const used = new Set<EdgePosition>()
-
-  // Step 1 — parallel-edge overrides. Group by neighbour; for every group of
-  // 2+, sort by edgeId (stable, deterministic across both endpoints) and force
-  // the 2nd, 3rd, ... edges to top/bottom cardinals. This claims those sides
-  // before the regular primary/displaced logic runs.
-  const byOther = new Map<string, typeof entries>()
+// Pass 1 — parallel-edge overrides. Mutates `assignment` + `used`.
+const assignParallelOverrides = (
+  entries: readonly PortEntry[],
+  forbidden: ReadonlySet<EdgePosition>,
+  assignment: Map<string, EdgePosition>,
+  used: Set<EdgePosition>,
+): void => {
+  const parallelOverrides = PARALLEL_OVERRIDES.filter((s) => !forbidden.has(s))
+  if (parallelOverrides.length === 0) return
+  const byOther = new Map<string, PortEntry[]>()
   for (const e of entries) {
     const arr = byOther.get(e.otherId) ?? []
     arr.push(e)
@@ -154,23 +242,28 @@ export const assignNodePorts = (
     if (group.length < 2) continue
     const sorted = [...group].sort((a, b) => a.edgeId.localeCompare(b.edgeId))
     for (let i = 1; i < sorted.length; i++) {
-      const override = PARALLEL_OVERRIDES[(i - 1) % PARALLEL_OVERRIDES.length]!
-      if (used.has(override)) continue // another parallel pair already claimed it
+      const override = parallelOverrides[(i - 1) % parallelOverrides.length]!
+      if (used.has(override)) continue
       assignment.set(sorted[i]!.edgeId, override)
       used.add(override)
     }
   }
+}
 
-  // Group remaining (unassigned) entries by preferred side.
-  const bySide: Record<EdgePosition, typeof entries> = { top: [], right: [], bottom: [], left: [] }
+// Pass 2 — per-side primary: pick the best-aligned unassigned edge for every
+// still-unclaimed allowed side.
+const assignPrimaries = (
+  entries: readonly PortEntry[],
+  allowedSides: readonly EdgePosition[],
+  assignment: Map<string, EdgePosition>,
+  used: Set<EdgePosition>,
+): void => {
+  const bySide: Record<EdgePosition, PortEntry[]> = { top: [], right: [], bottom: [], left: [] }
   for (const e of entries) {
     if (assignment.has(e.edgeId)) continue
     bySide[e.side].push(e)
   }
-
-  // Step 2 — primary pass: every side group (for sides NOT already taken by
-  // a parallel override) assigns its best-aligned edge to that side.
-  for (const side of ALL_SIDES) {
+  for (const side of allowedSides) {
     if (used.has(side)) continue
     const group = bySide[side]
     if (group.length === 0) continue
@@ -180,19 +273,43 @@ export const assignNodePorts = (
     assignment.set(primary.edgeId, side)
     used.add(side)
   }
+}
 
-  // Step 3 — displaced pass: edges still unassigned rotate to the nearest
-  // UNUSED cardinal based on their angle; falls back to the original preference
-  // (stacking) only when every side is taken.
+// Pass 3 — displaced fallback: any edge still unassigned rotates to the
+// nearest unused allowed cardinal, else stacks on the first allowed side.
+const assignDisplaced = (
+  entries: readonly PortEntry[],
+  allowedSides: readonly EdgePosition[],
+  assignment: Map<string, EdgePosition>,
+  used: Set<EdgePosition>,
+): void => {
   for (const e of entries) {
     if (assignment.has(e.edgeId)) continue
-    const candidates = ALL_SIDES
+    const candidates = allowedSides
       .filter((s) => !used.has(s))
       .sort((a, b) => angularDist(e.angle, SIDE_ANGLE[a]) - angularDist(e.angle, SIDE_ANGLE[b]))
-    const picked = candidates[0] ?? e.side
+    const picked = candidates[0] ?? allowedSides[0] ?? e.side
     assignment.set(e.edgeId, picked)
     used.add(picked)
   }
+}
+
+export const assignNodePorts = (
+  node: FloatableNode,
+  incident: readonly IncidentEdge[],
+  options: AssignNodePortsOptions = {},
+): Map<string, EdgePosition> => {
+  const forbidden = options.forbidden ?? EMPTY_FORBIDDEN
+  const allowedSides = ALL_SIDES.filter((s) => !forbidden.has(s))
+  const entries = buildEntries(node, incident, forbidden, allowedSides)
+
+  const assignment = new Map<string, EdgePosition>()
+  // Pre-mark forbidden sides as used so later passes never claim them.
+  const used = new Set<EdgePosition>(forbidden)
+
+  assignParallelOverrides(entries, forbidden, assignment, used)
+  assignPrimaries(entries, allowedSides, assignment, used)
+  assignDisplaced(entries, allowedSides, assignment, used)
 
   return assignment
 }
@@ -250,6 +367,12 @@ export const useFloatingEdge = (
 // the collision-aware assignment over ALL edges incident to that node. Returns
 // null when the node / edge can't be found (caller falls back to naive
 // chooseSide).
+//
+// Special case: ISA nodes are inverted triangles, so their port geometry is
+// NOT symmetric. Parent edges always enter from the top-midpoint (centre of
+// the base), every child edge exits from the bottom-midpoint (the apex).
+// Hard-code those ports here; the collision-aware rotation logic would
+// otherwise scatter children across the sides and break the Chen visual.
 const resolveSide = (
   node: FloatableNode,
   nodeId: string,
@@ -257,6 +380,10 @@ const resolveSide = (
   diagram: ReturnType<typeof useDiagramStore.getState>['diagram'],
 ): EdgePosition | null => {
   if (!edgeId) return null
+
+  const isaSide = resolveIsaSideIfApplicable(node, nodeId, edgeId, diagram)
+  if (isaSide !== undefined) return isaSide
+
   const incident: IncidentEdge[] = []
   for (const eid of diagram.edgeOrder) {
     const e = diagram.edgesById[eid]

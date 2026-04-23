@@ -38,7 +38,7 @@ const renderWithProvider = (ui: ReactElement) =>
 describe('ISANode container', () => {
   beforeEach(resetStores)
 
-  it('renders a total generalization with double triangle', () => {
+  it('renders a total generalization with a single triangle glyph (the total marker lives on the parent edge now, not inside the glyph)', () => {
     const id = useDiagramStore.getState().addNode({
       kind: 'isa',
       isTotal: true,
@@ -46,7 +46,9 @@ describe('ISANode container', () => {
       size: { width: 100, height: 60 },
     })
     const { container } = renderWithProvider(<ISANode {...mkNodeProps(id)} />)
-    expect(container.querySelectorAll('polygon').length).toBe(2)
+    expect(container.querySelectorAll('polygon').length).toBe(1)
+    // "ISA" label is present regardless of totality.
+    expect(container.querySelector('text')?.textContent).toBe('ISA')
   })
 
   it('renders a partial generalization with single triangle', () => {
