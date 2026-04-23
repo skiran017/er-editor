@@ -144,6 +144,49 @@ describe('ConnectionPreviewOverlay — renders while connecting', () => {
     expect(container.querySelector('[data-role="connection-preview"] line')).not.toBeNull()
   })
 
+  it('snaps BOTH endpoints to cardinal midpoints when the cursor is over a valid target node', () => {
+    // Source bbox (0, 0, 100, 40) → centre (50, 20).
+    // Target bbox (300, 0, 100, 40) → centre (350, 20).
+    // Target is directly to the right, so the expected ports are:
+    //   source right-midpoint → (100, 20)
+    //   target left-midpoint  → (300, 20)
+    // The cursor lives INSIDE the target's bbox (say (320, 15)) to trigger snap;
+    // the line ends at the cardinal midpoint, NOT the cursor position.
+    const sourceId = addEntity({ x: 0, y: 0 }, { width: 100, height: 40 })
+    addEntity({ x: 300, y: 0 }, { width: 100, height: 40 })
+    const { container } = render(<ConnectionPreviewOverlay />)
+    act(() => {
+      useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'connect' })
+      useInteractionStore.getState().send({
+        type: 'NODE_POINTER_DOWN', nodeId: sourceId, point: { x: 50, y: 20 },
+        modifiers: NO_MODIFIERS, button: 'left',
+      })
+    })
+    movePointer(320, 15)
+    const line = container.querySelector('[data-role="connection-preview"] line')!
+    expect(line.getAttribute('data-snapped')).toBe('true')
+    expect(parseFloat(line.getAttribute('x1')!)).toBe(100)
+    expect(parseFloat(line.getAttribute('y1')!)).toBe(20)
+    expect(parseFloat(line.getAttribute('x2')!)).toBe(300)
+    expect(parseFloat(line.getAttribute('y2')!)).toBe(20)
+  })
+
+  it('does not snap to the source node itself (cursor over source → follows cursor freely)', () => {
+    const sourceId = addEntity({ x: 0, y: 0 }, { width: 100, height: 40 })
+    const { container } = render(<ConnectionPreviewOverlay />)
+    act(() => {
+      useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'connect' })
+      useInteractionStore.getState().send({
+        type: 'NODE_POINTER_DOWN', nodeId: sourceId, point: { x: 50, y: 20 },
+        modifiers: NO_MODIFIERS, button: 'left',
+      })
+    })
+    // Cursor inside the SOURCE bbox — must NOT snap (source ≠ target).
+    movePointer(30, 15)
+    const line = container.querySelector('[data-role="connection-preview"] line')!
+    expect(line.getAttribute('data-snapped')).toBe('false')
+  })
+
   it('applies viewport zoom + pan when mapping the boundary origin to screen coords', () => {
     // Source world bbox: (10, 20, 100, 40) → world centre (60, 40).
     // With zoom=2, pan=(5, 7) the centre in screen coords is (125, 87) and

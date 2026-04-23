@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useInteractionStore } from '@/interaction/interactionStore'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useViewportStore } from '@/state/viewportStore'
-import { getNodeIntersection } from '@/canvas/hooks/useFloatingEdge'
+import { chooseSide, sidePort } from '@/canvas/hooks/useFloatingEdge'
+import { bboxContains, bboxFromNodeLike } from '@/domain/geometry'
 import type { NodeId } from '@/domain/types'
 
 /**
@@ -53,11 +54,10 @@ export const ConnectionPreviewOverlay = () => {
   const sourceNode = diagram.nodesById[sourceId]
   if (!sourceNode) return null
 
-  // Start the preview line at the source node's BOUNDARY (not its centre) so
-  // it visibly exits the shape. We convert the cursor back to diagram coords,
-  // model the cursor as a zero-size floatable node, and reuse the floating-
-  // edge intersection math. getNodeIntersection returns a finite fallback for
-  // coincident / zero-area inputs (see useFloatingEdge.test.ts).
+  const worldCursor = {
+    x: (cursor.x - pan.x) / zoom,
+    y: (cursor.y - pan.y) / zoom,
+  }
   const worldSource = {
     id: sourceNode.id,
     position: sourceNode.position,
@@ -65,25 +65,60 @@ export const ConnectionPreviewOverlay = () => {
     height: sourceNode.size.height,
     measured: { width: sourceNode.size.width, height: sourceNode.size.height },
   }
-  const worldCursor = {
-    id: '__cursor__',
-    position: {
-      x: (cursor.x - pan.x) / zoom,
-      y: (cursor.y - pan.y) / zoom,
-    },
-    width: 0,
-    height: 0,
-    measured: { width: 0, height: 0 },
+
+  // Detect whether the cursor is hovering over a valid target node. Walk
+  // nodeOrder in REVERSE so the topmost rendered node wins when bboxes overlap.
+  // Source is excluded (you can't connect a node to itself).
+  let hoveredTarget: typeof sourceNode | null = null
+  for (let i = diagram.nodeOrder.length - 1; i >= 0; i--) {
+    const id = diagram.nodeOrder[i]!
+    if (id === sourceId) continue
+    const n = diagram.nodesById[id]
+    if (!n) continue
+    if (bboxContains(bboxFromNodeLike(n), worldCursor)) {
+      hoveredTarget = n
+      break
+    }
   }
-  const boundary = getNodeIntersection(worldSource, worldCursor)
-  // Defensive: if the math ever returns NaN, fall back to the centre so the
-  // preview line still renders.
-  const centreX = sourceNode.position.x + sourceNode.size.width / 2
-  const centreY = sourceNode.position.y + sourceNode.size.height / 2
-  const worldSx = Number.isFinite(boundary.x) ? boundary.x : centreX
-  const worldSy = Number.isFinite(boundary.y) ? boundary.y : centreY
+
+  // Geometry: when hovering a target, both endpoints snap to the target's /
+  // source's cardinal midpoints so the preview lines up with the real edge
+  // that would be created on click. Otherwise, the source port aims toward
+  // the cursor and the line ends at the cursor (free-roaming).
+  let worldSx: number, worldSy: number, worldTx: number, worldTy: number
+  if (hoveredTarget) {
+    const worldTarget = {
+      id: hoveredTarget.id,
+      position: hoveredTarget.position,
+      width: hoveredTarget.size.width,
+      height: hoveredTarget.size.height,
+      measured: { width: hoveredTarget.size.width, height: hoveredTarget.size.height },
+    }
+    const sPort = sidePort(worldSource, chooseSide(worldSource, worldTarget))
+    const tPort = sidePort(worldTarget, chooseSide(worldTarget, worldSource))
+    worldSx = sPort.x
+    worldSy = sPort.y
+    worldTx = tPort.x
+    worldTy = tPort.y
+  } else {
+    const cursorFloat = {
+      id: '__cursor__',
+      position: worldCursor,
+      width: 0,
+      height: 0,
+      measured: { width: 0, height: 0 },
+    }
+    const sPort = sidePort(worldSource, chooseSide(worldSource, cursorFloat))
+    worldSx = sPort.x
+    worldSy = sPort.y
+    worldTx = worldCursor.x
+    worldTy = worldCursor.y
+  }
+
   const sx = worldSx * zoom + pan.x
   const sy = worldSy * zoom + pan.y
+  const tx = worldTx * zoom + pan.x
+  const ty = worldTy * zoom + pan.y
 
   return (
     <svg
@@ -93,11 +128,12 @@ export const ConnectionPreviewOverlay = () => {
       <line
         x1={sx}
         y1={sy}
-        x2={cursor.x}
-        y2={cursor.y}
+        x2={tx}
+        y2={ty}
         stroke="#3b82f6"
         strokeWidth={1.5}
         strokeDasharray="6 4"
+        data-snapped={hoveredTarget ? 'true' : 'false'}
       />
     </svg>
   )
