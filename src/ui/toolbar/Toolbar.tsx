@@ -6,14 +6,7 @@ import { writeToolToDataTransfer } from './dragFromToolbar'
 import { useInteractionStore } from '@/interaction/interactionStore'
 import type { Tool } from '@/interaction/events'
 import { chenPlugin } from '@/notation/chen'
-
-// Tiny inline icon glyphs. Swap for real icons later; the ToolButton contract
-// is agnostic.
-const ICONS: Record<string, string> = {
-  select: '⬚', pan: '✋',
-  entity: '▭', relationship: '◆', attribute: '◯', isa: '△',
-  connect: '↔', quickRelationship: '▭◆▭', quickGeneralization: '△↓',
-}
+import { ICONS } from './icons'
 
 // Only element tools are drag-placeable onto the canvas.
 const DRAG_TOOLS = new Set(['entity', 'relationship', 'attribute', 'isa'])
@@ -39,7 +32,7 @@ export const Toolbar = memo(() => {
               key={toolId}
               toolId={toolId}
               labelKey={`tool.${toolId}`}
-              icon={<span aria-hidden>{ICONS[toolId] ?? '?'}</span>}
+              icon={ICONS[toolId] ?? '?'}
               isActive={currentTool === toolId}
               onPick={handlePick}
               onDragStart={DRAG_TOOLS.has(toolId) ? handleDragStart : undefined}

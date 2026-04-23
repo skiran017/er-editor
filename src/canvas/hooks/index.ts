@@ -12,3 +12,4 @@ export {
 export { useSnapping, type SnappingApi } from './useSnapping'
 export { useInlineRename, type InlineRenameApi } from './useInlineRename'
 export { useToolbarDrop, type ToolbarDropHandlers } from './useToolbarDrop'
+export { useRfEvents, type RfEventHandlers } from './useRfEvents'

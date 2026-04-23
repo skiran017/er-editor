@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { ERCanvas } from './ERCanvas'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useViewportStore } from '@/state/viewportStore'
@@ -83,4 +83,41 @@ describe('ERCanvas', () => {
     expect(diagram.nodeOrder).toHaveLength(1)
     expect(diagram.nodesById[diagram.nodeOrder[0]].kind).toBe('entity')
   })
+})
+
+describe('ERCanvas — React Flow event wiring', () => {
+  it('clicking a React Flow node dispatches NODE_POINTER_DOWN on the FSM', async () => {
+    const nodeId = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'Clickable', isWeak: false,
+      position: { x: 50, y: 50 }, size: { width: 120, height: 60 },
+    })
+    const { container } = render(<ERCanvas />)
+    // Wait for RF to render the node into the DOM.
+    await screen.findByText('Clickable')
+    const rfNode = container.querySelector(`.react-flow__node[data-id="${nodeId}"]`) as HTMLElement
+    expect(rfNode).toBeInTheDocument()
+    // Pick the `connect` tool so the FSM listens for NODE_POINTER_DOWN.
+    act(() => {
+      useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'connect' })
+    })
+    fireEvent.click(rfNode)
+    // The `connect` (drawing) flow records the first-picked node id in
+    // context.connectionFromId after NODE_POINTER_DOWN.
+    const ctx = useInteractionStore.getState().snapshot.context
+    expect(ctx.connectionFromId).toBe(nodeId)
+  })
+
+  it('clicking an empty React Flow pane after PICK_TOOL=entity places an entity', () => {
+    const { container } = render(<ERCanvas />)
+    act(() => {
+      useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'entity' })
+    })
+    const pane = container.querySelector('.react-flow__pane') as HTMLElement
+    expect(pane).toBeInTheDocument()
+    fireEvent.click(pane, { clientX: 200, clientY: 180 })
+    const diagram = useDiagramStore.getState().diagram
+    expect(diagram.nodeOrder).toHaveLength(1)
+    expect(diagram.nodesById[diagram.nodeOrder[0]].kind).toBe('entity')
+  })
+
 })

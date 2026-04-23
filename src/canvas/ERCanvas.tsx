@@ -15,7 +15,7 @@ import { useDiagramStore } from '@/state/diagramStore'
 import { useViewportStore } from '@/state/viewportStore'
 import { diagramToRf } from './adapters/diagramToRf'
 import { rfToDiagramPatch } from './adapters/rfToDiagramPatch'
-import { useKeyboard, useMouse, useTouch, useSnapping, useToolbarDrop } from './hooks'
+import { useKeyboard, useMouse, useTouch, useSnapping, useToolbarDrop, useRfEvents } from './hooks'
 import type { SnapGuide } from '@/domain/snap'
 import type { NodeId } from '@/domain/types'
 import { chenNodeTypes, chenEdgeTypes } from './notation-adapters/chenBindings'
@@ -116,6 +116,12 @@ const ERCanvasInner = () => {
     useViewportStore.setState({ zoom: v.zoom, pan: { x: v.x, y: v.y } })
   }, [])
 
+  // React Flow v12 swallows pointer events on its internal node/edge wrappers
+  // before they bubble to the outer wrapper div's useMouse handler. useRfEvents
+  // wires handlers onto <ReactFlow> directly so the FSM receives
+  // NODE/EDGE/CANVAS events.
+  const rfEvents = useRfEvents()
+
   useEffect(() => {
     const onUp = () => {
       dragging.current = false
@@ -154,6 +160,9 @@ const ERCanvasInner = () => {
         defaultEdgeOptions={{ type: 'smoothstep' }}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
+        onNodeClick={rfEvents.onNodeClick}
+        onEdgeClick={rfEvents.onEdgeClick}
+        onPaneClick={rfEvents.onPaneClick}
         viewport={{ x: pan.x, y: pan.y, zoom }}
         onViewportChange={handleViewportChange}
         nodesConnectable={false}
