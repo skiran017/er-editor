@@ -10,6 +10,7 @@ import { ISAProperties } from './ISAProperties'
 import { EdgeProperties } from './EdgeProperties'
 import { PanelHeader } from './PanelHeader'
 import { ConnectionsList } from './ConnectionsList'
+import { ValidationList } from './ValidationList'
 
 interface FrameProps {
   readonly titleKey: string
@@ -45,6 +46,7 @@ export const PropertyPanel = () => {
       return (
         <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'entity' }}>
           <EntityProperties node={node} />
+          <ValidationList targetId={node.id} />
           <ConnectionsList nodeId={node.id} />
         </Frame>
       )
@@ -53,6 +55,7 @@ export const PropertyPanel = () => {
       return (
         <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'relationship' }}>
           <RelationshipProperties node={node} />
+          <ValidationList targetId={node.id} />
           <ConnectionsList nodeId={node.id} />
         </Frame>
       )
@@ -61,6 +64,7 @@ export const PropertyPanel = () => {
       return (
         <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'attribute' }}>
           <AttributeProperties node={node} />
+          <ValidationList targetId={node.id} />
           <ConnectionsList nodeId={node.id} />
         </Frame>
       )
@@ -69,6 +73,7 @@ export const PropertyPanel = () => {
       return (
         <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'isa' }}>
           <ISAProperties node={node} />
+          <ValidationList targetId={node.id} />
           <ConnectionsList nodeId={node.id} />
         </Frame>
       )
@@ -80,6 +85,7 @@ export const PropertyPanel = () => {
   return (
     <Frame titleKey={`kind.${edge.kind}`} testAttrs={{ 'data-edge-kind': edge.kind }}>
       <EdgeProperties edge={edge} />
+      <ValidationList targetId={edge.id} />
     </Frame>
   )
 }

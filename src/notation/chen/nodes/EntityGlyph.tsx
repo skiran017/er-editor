@@ -1,3 +1,5 @@
+import { ValidationBadge } from './ValidationBadge'
+
 export interface EntityGlyphProps {
   readonly name: string
   readonly isWeak: boolean
@@ -5,6 +7,7 @@ export interface EntityGlyphProps {
   readonly height: number
   readonly isSelected: boolean
   readonly warningSeverity: 'none' | 'warning' | 'error'
+  readonly warningMessages?: readonly string[]
 }
 
 const OUTER_STROKE = 2
@@ -17,6 +20,7 @@ export const EntityGlyph = ({
   height,
   isSelected,
   warningSeverity,
+  warningMessages,
 }: EntityGlyphProps) => (
   <g data-kind="entity" data-selected={isSelected || undefined}>
     <rect
@@ -50,14 +54,11 @@ export const EntityGlyph = ({
     >
       {name}
     </text>
-    {warningSeverity !== 'none' && (
-      <circle
-        cx={width - 6}
-        cy={6}
-        r={5}
-        data-role="warning-badge"
-        className={warningSeverity === 'error' ? 'fill-red-500' : 'fill-amber-400'}
-      />
-    )}
+    <ValidationBadge
+      severity={warningSeverity}
+      cx={width - 6}
+      cy={6}
+      messages={warningMessages}
+    />
   </g>
 )

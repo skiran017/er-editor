@@ -96,13 +96,18 @@ describe('EntityRelationshipEdge container', () => {
 
     const { container, findByText } = renderInFlow(rfNodes, rfEdges)
     expect(await findByText('N', {}, { timeout: 2000 })).toBeInTheDocument()
-    // BaseEdge renders the path under RF's wrapper with class react-flow__edge-entity-relationship.
-    // Partial participation applies stroke-dasharray via inline style on the path.
+    // BaseEdge renders the solid primary path.
     const path = container.querySelector(
       '.react-flow__edge-entity-relationship path.react-flow__edge-path',
     ) as SVGPathElement | null
     expect(path).toBeInTheDocument()
-    expect(path?.style.strokeDasharray || path?.getAttribute('stroke-dasharray')).toBeTruthy()
+    // Partial participation is now the absence of a parallel line — the
+    // double line only renders when participation === 'total'. Verify no
+    // double-line sibling exists.
+    const parallel = container.querySelector(
+      '.react-flow__edge-entity-relationship path[data-role="total-participation"]',
+    )
+    expect(parallel).not.toBeInTheDocument()
   })
 
   it('returns null when the edge id is missing from the store (stale RF frame)', async () => {

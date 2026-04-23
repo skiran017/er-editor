@@ -3,8 +3,7 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { RelationshipGlyph } from '@/notation/chen/nodes/RelationshipGlyph'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
-import { useValidationStore } from '@/state/validationStore'
-import { pickSeverity } from '@/state/selectors'
+import { useValidationForId } from '@/canvas/hooks/useValidationForId'
 import type { RelationshipNode as RelationshipNodeModel } from '@/domain/types'
 import type { NotationNodeData } from '@/notation/types'
 
@@ -16,7 +15,7 @@ export const RelationshipNode = memo(({ data }: NodeProps<RelationshipRfNode>) =
     | RelationshipNodeModel
     | undefined
   const isSelected = useSelectionStore((s) => s.selectedNodeIds.has(nodeId))
-  const warnings = useValidationStore((s) => s.errorsById[nodeId])
+  const validation = useValidationForId(nodeId)
   if (!node || node.kind !== 'relationship') return null
   return (
     <div style={{ width: node.size.width, height: node.size.height, position: 'relative' }}>
@@ -39,7 +38,8 @@ export const RelationshipNode = memo(({ data }: NodeProps<RelationshipRfNode>) =
           width={node.size.width}
           height={node.size.height}
           isSelected={isSelected}
-          warningSeverity={pickSeverity(warnings)}
+          warningSeverity={validation.severity}
+          warningMessages={validation.messages}
         />
       </svg>
     </div>

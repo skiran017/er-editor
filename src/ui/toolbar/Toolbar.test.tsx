@@ -16,9 +16,10 @@ describe('Toolbar', () => {
 
   it('renders a button for each tool in chenPlugin.tools', () => {
     render(<Toolbar />)
-    // Three groups totalling 9 tools: select, pan, entity, relationship, attribute, isa, connect, quickRelationship, quickGeneralization.
+    // Select (2) + Elements (4) + Connections (6: connect + three quick
+    // relationship variants + partial/total ISA) = 12.
     const buttons = screen.getAllByRole('button')
-    expect(buttons.length).toBe(9)
+    expect(buttons.length).toBe(12)
   })
 
   it('clicking "Entity" dispatches PICK_TOOL with tool=entity', async () => {

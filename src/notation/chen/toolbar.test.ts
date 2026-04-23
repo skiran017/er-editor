@@ -16,11 +16,18 @@ describe('chenToolbar', () => {
     )
   })
 
-  it('has a connections group containing connect + quick variants', () => {
+  it('has a connections group containing connect + quick variants (three relationship modes, partial + total ISA)', () => {
     const g = chenToolbar.groups.find((x) => x.id === 'connections')
     expect(g).toBeDefined()
     expect(g!.tools).toEqual(
-      expect.arrayContaining(['connect', 'quickRelationship', 'quickGeneralization']),
+      expect.arrayContaining([
+        'connect',
+        'quickRelationship11',
+        'quickRelationship1N',
+        'quickRelationshipNN',
+        'quickGeneralization',
+        'quickGeneralizationTotal',
+      ]),
     )
   })
 

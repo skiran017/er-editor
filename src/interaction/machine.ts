@@ -27,8 +27,13 @@ export const editorMachine = setup({
     isPlaceAttributeTool: ({ context }) => context.tool === 'attribute',
     isPlaceIsaTool: ({ context }) => context.tool === 'isa',
     isConnectTool: ({ context }) => context.tool === 'connect',
-    isQuickRelationshipTool: ({ context }) => context.tool === 'quickRelationship',
-    isQuickGeneralizationTool: ({ context }) => context.tool === 'quickGeneralization',
+    isQuickRelationshipTool: ({ context }) =>
+      context.tool === 'quickRelationship11'
+      || context.tool === 'quickRelationship1N'
+      || context.tool === 'quickRelationshipNN',
+    isQuickGeneralizationTool: ({ context }) =>
+      context.tool === 'quickGeneralization'
+      || context.tool === 'quickGeneralizationTotal',
     crossedDragThreshold: ({ context, event }) => {
       if (event.type !== 'CANVAS_POINTER_MOVE' && event.type !== 'NODE_POINTER_DOWN') return false
       const origin = context.dragOriginPoint
@@ -109,7 +114,7 @@ export const editorMachine = setup({
     toggleCheatsheetAction: ({ context, event }) => toggleCheatsheetAction(context, event),
     placeNodeAction: ({ context, event }) => placeNode(context, event),
     placeAttributeOnParentAction: ({ event }) => placeAttributeOnParent(event),
-    rejectOrphanAttributeToast: () => rejectOrphanAttributeToast(),
+    rejectOrphanAttributeToast: ({ event }) => rejectOrphanAttributeToast(event),
     connectNodesAction: ({ context, event }) => connectNodes(context, event),
     connectChildToIsaAction: ({ context, event }) => connectChildToIsaAction(context, event),
     zoomIn: ({ context, event }) => zoomInAction(context, event),
@@ -137,9 +142,15 @@ export const editorMachine = setup({
         target: '.placing.isa', actions: ['setTool', 'resetContext'] },
       { guard: ({ event }) => event.type === 'PICK_TOOL' && event.tool === 'connect',
         target: '.drawing', actions: ['setTool', 'resetContext'] },
-      { guard: ({ event }) => event.type === 'PICK_TOOL' && event.tool === 'quickRelationship',
+      { guard: ({ event }) =>
+          event.type === 'PICK_TOOL'
+          && (event.tool === 'quickRelationship11'
+              || event.tool === 'quickRelationship1N'
+              || event.tool === 'quickRelationshipNN'),
         target: '.quickRelationship', actions: ['setTool', 'resetContext'] },
-      { guard: ({ event }) => event.type === 'PICK_TOOL' && event.tool === 'quickGeneralization',
+      { guard: ({ event }) =>
+          event.type === 'PICK_TOOL'
+          && (event.tool === 'quickGeneralization' || event.tool === 'quickGeneralizationTotal'),
         target: '.quickGeneralization', actions: ['setTool', 'resetContext'] },
     ],
     ESCAPE: { target: '.selecting', actions: ['resetContext', 'clearSelectionAction'] },

@@ -9,7 +9,7 @@ import {
   selectAll as selectAllCmd,
   clearSelection as clearSelectionCmd,
 } from '@/state/commands'
-import { bboxFromNodeLike, bboxIntersects, findNonOverlappingOrigin } from '@/domain/geometry'
+import { bboxContains, bboxFromNodeLike, bboxIntersects, findNonOverlappingOrigin } from '@/domain/geometry'
 import { isEntityNode } from '@/domain/graph'
 import { newNodeId, newEdgeId } from '@/domain/id'
 import type { BBox, Diagram, ERNode, EntityRelationshipEdge, ISAEdge, NodeId } from '@/domain/types'
@@ -223,8 +223,20 @@ const midpoint = (a: { position: { x: number; y: number } }, b: { position: { x:
   y: (a.position.y + b.position.y) / 2,
 })
 
-const connectViaQuickRelationship = (source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId): void => {
+type QuickRelMode = 'quickRelationship11' | 'quickRelationship1N' | 'quickRelationshipNN'
+
+const CARDINALITY_PAIR: Record<QuickRelMode, readonly ['1' | 'N' | 'M', '1' | 'N' | 'M']> = {
+  quickRelationship11: ['1', '1'],
+  quickRelationship1N: ['1', 'N'],
+  quickRelationshipNN: ['N', 'N'],
+}
+
+const connectViaQuickRelationship = (
+  source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId,
+  mode: QuickRelMode,
+): void => {
   if (!isEntityNode(source) || !isEntityNode(target)) return
+  const [cardA, cardB] = CARDINALITY_PAIR[mode]
   const store = useDiagramStore.getState()
   const relId = store.addNode({
     kind: 'relationship',
@@ -235,21 +247,24 @@ const connectViaQuickRelationship = (source: ERNode, target: ERNode, sourceId: N
   })
   const e1: Omit<EntityRelationshipEdge, 'id'> = {
     kind: 'entity-relationship', sourceId, targetId: relId,
-    cardinality: '1', participation: 'partial', waypoints: [],
+    cardinality: cardA, participation: 'partial', waypoints: [],
   }
   const e2: Omit<EntityRelationshipEdge, 'id'> = {
     kind: 'entity-relationship', sourceId: targetId, targetId: relId,
-    cardinality: 'N', participation: 'partial', waypoints: [],
+    cardinality: cardB, participation: 'partial', waypoints: [],
   }
   store.addEdge(e1)
   store.addEdge(e2)
 }
 
-const connectViaQuickGeneralization = (source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId): void => {
+const connectViaQuickGeneralization = (
+  source: ERNode, target: ERNode, sourceId: NodeId, targetId: NodeId,
+  isTotal: boolean,
+): void => {
   if (!isEntityNode(source) || !isEntityNode(target)) return
   const store = useDiagramStore.getState()
   const isaId = store.addNode({
-    kind: 'isa', isTotal: false,
+    kind: 'isa', isTotal,
     position: midpoint(source, target),
     size: { width: 100, height: 60 },
   })
@@ -310,10 +325,18 @@ export const connectNodes = (context: EditorContext, event: EditorEvent): void =
   const target = diagram.nodesById[targetId]
   if (!source || !target) return
 
-  if (context.tool === 'quickRelationship') {
-    connectViaQuickRelationship(source, target, sourceId, targetId)
-  } else if (context.tool === 'quickGeneralization') {
-    connectViaQuickGeneralization(source, target, sourceId, targetId)
+  if (
+    context.tool === 'quickRelationship11'
+    || context.tool === 'quickRelationship1N'
+    || context.tool === 'quickRelationshipNN'
+  ) {
+    connectViaQuickRelationship(source, target, sourceId, targetId, context.tool)
+  } else if (
+    context.tool === 'quickGeneralization'
+    || context.tool === 'quickGeneralizationTotal'
+  ) {
+    const isTotal = context.tool === 'quickGeneralizationTotal'
+    connectViaQuickGeneralization(source, target, sourceId, targetId, isTotal)
   } else if (context.tool === 'connect') {
     connectViaConnectTool(source, target, sourceId, targetId)
   }
@@ -439,7 +462,21 @@ export const placeAttributeOnParent = (event: EditorEvent): void => {
   })
 }
 
-export const rejectOrphanAttributeToast = (): void => {
+export const rejectOrphanAttributeToast = (event: EditorEvent): void => {
+  if (event.type !== 'CANVAS_POINTER_UP') return
+  // Native pointerup on a valid-parent node bubbles to useMouse and fires
+  // CANVAS_POINTER_UP *before* RF's onNodeClick dispatches NODE_POINTER_DOWN
+  // (which would take the `canHostAttribute` path). Without this guard we'd
+  // toast "needs a parent" on every successful placement. Skip the toast
+  // whenever the click point falls inside an existing valid-parent node —
+  // the NODE_POINTER_DOWN that follows will handle placement.
+  const { diagram } = useDiagramStore.getState()
+  for (const id of diagram.nodeOrder) {
+    const n = diagram.nodesById[id]
+    if (!n) continue
+    if (n.kind !== 'entity' && n.kind !== 'relationship' && n.kind !== 'attribute') continue
+    if (bboxContains(bboxFromNodeLike(n), event.point)) return
+  }
   useUiStore.getState().pushToast({
     id: `orphan-attr-${nanoid()}`,
     kind: 'info',

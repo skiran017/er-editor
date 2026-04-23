@@ -1,9 +1,12 @@
+import { ValidationBadge } from './ValidationBadge'
+
 export interface ISAGlyphProps {
   readonly isTotal: boolean
   readonly width: number
   readonly height: number
   readonly isSelected: boolean
   readonly warningSeverity: 'none' | 'warning' | 'error'
+  readonly warningMessages?: readonly string[]
 }
 
 const OUTER_STROKE = 2
@@ -25,6 +28,7 @@ export const ISAGlyph = ({
   height,
   isSelected,
   warningSeverity,
+  warningMessages,
 }: ISAGlyphProps) => (
   <g data-kind="isa" data-selected={isSelected || undefined}>
     <polygon
@@ -39,14 +43,11 @@ export const ISAGlyph = ({
         strokeWidth={OUTER_STROKE}
       />
     )}
-    {warningSeverity !== 'none' && (
-      <circle
-        cx={width - 6}
-        cy={6}
-        r={5}
-        data-role="warning-badge"
-        className={warningSeverity === 'error' ? 'fill-red-500' : 'fill-amber-400'}
-      />
-    )}
+    <ValidationBadge
+      severity={warningSeverity}
+      cx={width - 6}
+      cy={6}
+      messages={warningMessages}
+    />
   </g>
 )

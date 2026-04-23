@@ -11,7 +11,14 @@ export const chenToolbar: ToolbarConfig = {
     {
       id: 'connections',
       labelKey: 'toolbar.group.connections',
-      tools: ['connect', 'quickRelationship', 'quickGeneralization'],
+      tools: [
+        'connect',
+        'quickRelationship11',
+        'quickRelationship1N',
+        'quickRelationshipNN',
+        'quickGeneralization',
+        'quickGeneralizationTotal',
+      ],
     },
   ],
 }

@@ -150,7 +150,7 @@ describe('actions — connectNodes', () => {
       position: { x: 200, y: 0 }, size: { width: 120, height: 60 },
     })
     connectNodes(
-      withContext({ tool: 'quickRelationship', quickFirstId: a }),
+      withContext({ tool: 'quickRelationship1N', quickFirstId: a }),
       { type: 'NODE_POINTER_DOWN', nodeId: b, point: { x: 200, y: 0 }, modifiers: NO_MODIFIERS, button: 'left' },
     )
     // Quick-relationship creates a rel node + two ER edges

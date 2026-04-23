@@ -101,7 +101,7 @@ describe('ConnectionPreviewOverlay — renders while connecting', () => {
     const id = addEntity()
     const { container } = render(<ConnectionPreviewOverlay />)
     act(() => {
-      useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'quickRelationship' })
+      useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'quickRelationship1N' })
       useInteractionStore.getState().send({
         type: 'NODE_POINTER_DOWN', nodeId: id, point: { x: 50, y: 20 },
         modifiers: NO_MODIFIERS, button: 'left',

@@ -1,3 +1,5 @@
+import { ValidationBadge } from './ValidationBadge'
+
 export interface RelationshipGlyphProps {
   readonly name: string
   readonly isIdentifying: boolean
@@ -5,6 +7,7 @@ export interface RelationshipGlyphProps {
   readonly height: number
   readonly isSelected: boolean
   readonly warningSeverity: 'none' | 'warning' | 'error'
+  readonly warningMessages?: readonly string[]
 }
 
 const OUTER_STROKE = 2
@@ -25,6 +28,7 @@ export const RelationshipGlyph = ({
   height,
   isSelected,
   warningSeverity,
+  warningMessages,
 }: RelationshipGlyphProps) => (
   <g data-kind="relationship" data-selected={isSelected || undefined}>
     <polygon
@@ -48,14 +52,11 @@ export const RelationshipGlyph = ({
     >
       {name}
     </text>
-    {warningSeverity !== 'none' && (
-      <circle
-        cx={width - 6}
-        cy={6}
-        r={5}
-        data-role="warning-badge"
-        className={warningSeverity === 'error' ? 'fill-red-500' : 'fill-amber-400'}
-      />
-    )}
+    <ValidationBadge
+      severity={warningSeverity}
+      cx={width - 6}
+      cy={6}
+      messages={warningMessages}
+    />
   </g>
 )

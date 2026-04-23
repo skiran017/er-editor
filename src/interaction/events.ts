@@ -8,8 +8,16 @@ export type Tool =
   | 'attribute'
   | 'isa'
   | 'connect'
-  | 'quickRelationship'
+  // Legacy-parity quick-relationship variants: user picks the cardinality
+  // pair up front from the toolbar, then clicks two entities to wire them
+  // through a new relationship node with the chosen cardinality on each edge.
+  | 'quickRelationship11'
+  | 'quickRelationship1N'
+  | 'quickRelationshipNN'
+  // ISA quick-wire — partial is default, total draws the generalization
+  // with isTotal=true (shown as double line from ISA to parent).
   | 'quickGeneralization'
+  | 'quickGeneralizationTotal'
 
 export type PointerButton = 'left' | 'middle' | 'right'
 

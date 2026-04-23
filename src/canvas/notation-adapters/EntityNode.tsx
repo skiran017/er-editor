@@ -3,8 +3,7 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { EntityGlyph } from '@/notation/chen/nodes/EntityGlyph'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
-import { useValidationStore } from '@/state/validationStore'
-import { pickSeverity } from '@/state/selectors'
+import { useValidationForId } from '@/canvas/hooks/useValidationForId'
 import type { EntityNode as EntityNodeModel } from '@/domain/types'
 import type { NotationNodeData } from '@/notation/types'
 
@@ -16,7 +15,7 @@ export const EntityNode = memo(({ data }: NodeProps<EntityRfNode>) => {
     | EntityNodeModel
     | undefined
   const isSelected = useSelectionStore((s) => s.selectedNodeIds.has(nodeId))
-  const warnings = useValidationStore((s) => s.errorsById[nodeId])
+  const validation = useValidationForId(nodeId)
   if (!node || node.kind !== 'entity') return null
   // Wrap in a sized <div> so React Flow's ResizeObserver can measure the
   // node (RF v12 error #015: node not initialized). A fragment-with-SVG has
@@ -43,7 +42,8 @@ export const EntityNode = memo(({ data }: NodeProps<EntityRfNode>) => {
           width={node.size.width}
           height={node.size.height}
           isSelected={isSelected}
-          warningSeverity={pickSeverity(warnings)}
+          warningSeverity={validation.severity}
+          warningMessages={validation.messages}
         />
       </svg>
     </div>

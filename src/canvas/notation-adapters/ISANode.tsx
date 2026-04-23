@@ -3,10 +3,9 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { ISAGlyph } from '@/notation/chen/nodes/ISAGlyph'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
-import { useValidationStore } from '@/state/validationStore'
 import { useUiStore } from '@/state/uiStore'
 import { useInteractionStore } from '@/interaction/interactionStore'
-import { pickSeverity } from '@/state/selectors'
+import { useValidationForId } from '@/canvas/hooks/useValidationForId'
 import type { ISANode as ISANodeModel } from '@/domain/types'
 import type { NotationNodeData } from '@/notation/types'
 
@@ -16,7 +15,7 @@ export const ISANode = memo(({ data }: NodeProps<ISARfNode>) => {
   const nodeId = data.nodeId
   const node = useDiagramStore((s) => s.diagram.nodesById[nodeId]) as ISANodeModel | undefined
   const isSelected = useSelectionStore((s) => s.selectedNodeIds.has(nodeId))
-  const warnings = useValidationStore((s) => s.errorsById[nodeId])
+  const validation = useValidationForId(nodeId)
 
   const handleContextMenu = (e: ReactMouseEvent<SVGSVGElement>): void => {
     e.preventDefault()
@@ -59,7 +58,8 @@ export const ISANode = memo(({ data }: NodeProps<ISARfNode>) => {
           width={node.size.width}
           height={node.size.height}
           isSelected={isSelected}
-          warningSeverity={pickSeverity(warnings)}
+          warningSeverity={validation.severity}
+          warningMessages={validation.messages}
         />
       </svg>
     </div>

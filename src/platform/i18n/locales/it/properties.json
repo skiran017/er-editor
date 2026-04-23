@@ -28,5 +28,6 @@
   "close": "Close properties",
   "connections": "Connections",
   "noConnections": "No connections yet.",
-  "unnamed": "(unnamed)"
+  "unnamed": "(unnamed)",
+  "validation": "Validation"
 }

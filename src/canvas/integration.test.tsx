@@ -89,7 +89,7 @@ describe('rendering integration — quick-relationship', () => {
     render(<ERCanvas />)
     act(() => {
       const send = useInteractionStore.getState().send
-      send({ type: 'PICK_TOOL', tool: 'quickRelationship' })
+      send({ type: 'PICK_TOOL', tool: 'quickRelationship1N' })
       // `isLeftButton` guard on the quickRelationship transitions requires
       // `button: 'left'` on NODE_POINTER_DOWN (see src/interaction/machine.ts).
       send({

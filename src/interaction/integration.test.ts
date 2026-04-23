@@ -27,7 +27,7 @@ describe('interaction — integration flows', () => {
 
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(2)
 
-    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship' })
+    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship1N' })
 
     const [a, b] = useDiagramStore.getState().diagram.nodeOrder
     actor.send({

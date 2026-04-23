@@ -119,7 +119,7 @@ describe('machine — quickRelationship', () => {
       position: { x: 200, y: 0 }, size: { width: 120, height: 60 },
     })
     const actor = startActor()
-    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship' })
+    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship1N' })
     expect(actor.getSnapshot().matches({ quickRelationship: 'idle' })).toBe(true)
 
     actor.send({
@@ -145,7 +145,7 @@ describe('machine — quickRelationship', () => {
       position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
     })
     const actor = startActor()
-    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship' })
+    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship1N' })
     actor.send({
       type: 'NODE_POINTER_DOWN', nodeId: a, point: { x: 0, y: 0 },
       modifiers: NO_MODIFIERS, button: 'left',

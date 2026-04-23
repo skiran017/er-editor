@@ -12,22 +12,23 @@ describe('CardinalityLabel', () => {
     expect(getByText('N')).toBeInTheDocument()
   })
 
-  it('renders a filled disc for total participation', () => {
+  it('exposes participation as data-participation on the label group (total)', () => {
+    // Visual participation is now drawn by the edge component (double line),
+    // not by a marker on the label. The label still carries the attribute
+    // so tests / CSS can target it if needed.
     const { container } = render2(
       <CardinalityLabel cardinality="1" participation="total" x={0} y={0} />,
     )
-    const circle = container.querySelector('circle[data-role="participation-marker"]')
-    expect(circle).toBeInTheDocument()
-    expect(circle?.getAttribute('data-participation')).toBe('total')
+    const group = container.querySelector('g[data-role="cardinality-label"]')
+    expect(group?.getAttribute('data-participation')).toBe('total')
   })
 
-  it('renders a hollow ring for partial participation', () => {
+  it('exposes participation as data-participation on the label group (partial)', () => {
     const { container } = render2(
       <CardinalityLabel cardinality="1" participation="partial" x={0} y={0} />,
     )
-    const circle = container.querySelector('circle[data-role="participation-marker"]')
-    expect(circle?.getAttribute('data-participation')).toBe('partial')
-    expect(circle?.getAttribute('fill')).toMatch(/none|white/i)
+    const group = container.querySelector('g[data-role="cardinality-label"]')
+    expect(group?.getAttribute('data-participation')).toBe('partial')
   })
 
   it('positions the label at (x, y)', () => {

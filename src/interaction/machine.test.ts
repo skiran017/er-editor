@@ -45,8 +45,11 @@ describe('machine — PICK_TOOL routing', () => {
     ['attribute', { placing: 'attribute' }] as const,
     ['isa', { placing: 'isa' }] as const,
     ['connect', 'drawing'] as const,
-    ['quickRelationship', 'quickRelationship'] as const,
+    ['quickRelationship11', 'quickRelationship'] as const,
+    ['quickRelationship1N', 'quickRelationship'] as const,
+    ['quickRelationshipNN', 'quickRelationship'] as const,
     ['quickGeneralization', 'quickGeneralization'] as const,
+    ['quickGeneralizationTotal', 'quickGeneralization'] as const,
   ])('PICK_TOOL %s → correct state', (tool, expected) => {
     const actor = startActor()
     actor.send({ type: 'PICK_TOOL', tool: tool as never })
@@ -418,6 +421,34 @@ describe('machine — placing.attribute (Chen semantics: needs a parent)', () =>
     const d = useDiagramStore.getState().diagram
     expect(Object.values(d.nodesById).filter((n) => n.kind === 'attribute')).toHaveLength(0)
     expect(actor.getSnapshot().matches({ placing: 'attribute' })).toBe(true)
+    actor.stop()
+  })
+
+  it('clicking on a valid parent does NOT fire the orphan toast, even when a CANVAS_POINTER_UP arrives first (useMouse bubble)', () => {
+    // Regression: in the real browser flow, useMouse's native pointerup
+    // bubbles to CANVAS_POINTER_UP *before* RF's onNodeClick dispatches
+    // NODE_POINTER_DOWN. Without a guard, every successful attribute
+    // placement also shows the "needs a parent" toast.
+    const entity = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 100, y: 100 }, size: { width: 120, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'attribute' })
+    // Click inside the entity's bbox (160, 130 is the centre of 100..220, 100..160).
+    actor.send({ type: 'CANVAS_POINTER_UP', point: { x: 160, y: 130 } })
+    actor.send({
+      type: 'NODE_POINTER_DOWN',
+      nodeId: entity,
+      point: { x: 160, y: 130 },
+      modifiers: NO_MODIFIERS,
+      button: 'left',
+    })
+    const toasts = useUiStore.getState().toasts
+    expect(toasts.some((t) => t.messageKey.includes('attributeNeedsParent'))).toBe(false)
+    const attrs = Object.values(useDiagramStore.getState().diagram.nodesById)
+      .filter((n) => n.kind === 'attribute')
+    expect(attrs).toHaveLength(1)
     actor.stop()
   })
 

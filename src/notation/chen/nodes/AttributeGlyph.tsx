@@ -1,3 +1,5 @@
+import { ValidationBadge } from './ValidationBadge'
+
 export interface AttributeGlyphProps {
   readonly name: string
   readonly isKey: boolean
@@ -9,6 +11,7 @@ export interface AttributeGlyphProps {
   readonly height: number
   readonly isSelected: boolean
   readonly warningSeverity: 'none' | 'warning' | 'error'
+  readonly warningMessages?: readonly string[]
 }
 
 const OUTER_STROKE = 2
@@ -26,6 +29,7 @@ export const AttributeGlyph = ({
   height,
   isSelected,
   warningSeverity,
+  warningMessages,
 }: AttributeGlyphProps) => {
   const rx = width / 2
   const ry = height / 2
@@ -90,15 +94,12 @@ export const AttributeGlyph = ({
           className="fill-slate-700"
         />
       )}
-      {warningSeverity !== 'none' && (
-        <circle
-          cx={width - 6}
-          cy={6}
-          r={5}
-          data-role="warning-badge"
-          className={warningSeverity === 'error' ? 'fill-red-500' : 'fill-amber-400'}
-        />
-      )}
+      <ValidationBadge
+        severity={warningSeverity}
+        cx={width - 6}
+        cy={6}
+        messages={warningMessages}
+      />
     </g>
   )
 }
