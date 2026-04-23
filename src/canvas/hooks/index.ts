@@ -4,7 +4,8 @@ export { useTouch, type TouchHandlers } from './useTouch'
 export {
   useFloatingEdge,
   getNodeIntersection,
-  edgePosition,
+  chooseSide,
+  sidePort,
   type FloatableNode,
   type FloatingAttachment,
   type EdgePosition,

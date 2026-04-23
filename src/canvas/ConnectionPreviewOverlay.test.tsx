@@ -84,11 +84,17 @@ describe('ConnectionPreviewOverlay — renders while connecting', () => {
     const y1 = parseFloat(line!.getAttribute('y1')!)
     expect(Number.isFinite(x1)).toBe(true)
     expect(Number.isFinite(y1)).toBe(true)
-    // Centre at (60, 40). Must be offset from the centre toward the cursor.
-    expect(x1).toBeGreaterThan(60)
-    expect(y1).toBeGreaterThan(40)
-    // And must be inside (or on) the bbox: x ∈ [10, 110], y ∈ [20, 60].
+    // Edges now snap to a cardinal midpoint of the source bbox — so the
+    // origin is one of (top, right, bottom, left) midpoints, never the
+    // centre. Cursor at (200, 200) from centre (60, 40) → vertical offset
+    // dominates (scaled by half-sizes), so bottom midpoint (60, 60) is
+    // chosen. X stays at the bbox centre horizontally.
+    expect(x1).toBe(60)
+    expect(y1).toBe(60)
+    // Origin is on the bbox boundary: x ∈ [10, 110], y ∈ [20, 60].
+    expect(x1).toBeGreaterThanOrEqual(10)
     expect(x1).toBeLessThanOrEqual(110)
+    expect(y1).toBeGreaterThanOrEqual(20)
     expect(y1).toBeLessThanOrEqual(60)
     // End point is the cursor.
     expect(line!.getAttribute('x2')).toBe('200')
@@ -160,11 +166,12 @@ describe('ConnectionPreviewOverlay — renders while connecting', () => {
     const y1 = parseFloat(line!.getAttribute('y1')!)
     expect(Number.isFinite(x1)).toBe(true)
     expect(Number.isFinite(y1)).toBe(true)
-    // Must be offset from the screen-space centre (125, 87) toward the
-    // screen-space cursor (400, 400), still within the screen bbox.
-    expect(x1).toBeGreaterThan(125)
+    // Cardinal-midpoint snap: world bottom-midpoint (60, 60) → screen
+    // (125, 127). Origin is on one of the four cardinal midpoints of the
+    // screen-space bbox.
+    expect(x1).toBeGreaterThanOrEqual(25)
     expect(x1).toBeLessThanOrEqual(225)
-    expect(y1).toBeGreaterThan(87)
+    expect(y1).toBeGreaterThanOrEqual(47)
     expect(y1).toBeLessThanOrEqual(127)
   })
 })

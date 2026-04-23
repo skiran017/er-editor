@@ -17,47 +17,60 @@ const hasDimensions = (n: FloatableNode): boolean => {
   return w > 0 && h > 0
 }
 
-const centre = (n: FloatableNode): Point => {
-  const w = n.measured?.width ?? n.width ?? 0
-  const h = n.measured?.height ?? n.height ?? 0
-  return { x: n.position.x + w / 2, y: n.position.y + h / 2 }
-}
-
-// Intersect the line from centre(b) → centre(a) with the bbox of a. Adapted
-// from React Flow's official floating-edges example.
-export const getNodeIntersection = (a: FloatableNode, b: FloatableNode): Point => {
-  const w = (a.measured?.width ?? a.width ?? 0) / 2
-  const h = (a.measured?.height ?? a.height ?? 0) / 2
-  const ca = centre(a)
-  const cb = centre(b)
-  const dx = cb.x - ca.x
-  const dy = cb.y - ca.y
-  const sum = Math.abs(dx) / w + Math.abs(dy) / h
-  if (!Number.isFinite(sum) || sum === 0) return { x: ca.x, y: ca.y }
-  const xx3 = dx / sum / w
-  const yy3 = dy / sum / h
-  return { x: ca.x + xx3 * w, y: ca.y + yy3 * h }
-}
-
 export type EdgePosition = 'top' | 'right' | 'bottom' | 'left'
 
-export const edgePosition = (n: FloatableNode, p: Point): EdgePosition => {
+// Snap attachment strategy: each node exposes FOUR connection ports — the
+// midpoints of its bounding box (top, right, bottom, left). Edges pick the
+// port whose OUTWARD axis best matches the direction toward the other end.
+// For a diamond (relationship) those four points are the four vertices, so
+// the same code covers rectangles, diamonds, ellipses, and triangles.
+//
+// This replaces the earlier "centre-to-centre intersection with the bbox"
+// approach, which could attach edges arbitrarily close to a corner and
+// caused the cardinality-1 arrow to overlap with the adjacent side's stroke
+// (arrow appeared clipped / hidden until the user rearranged the nodes).
+
+/**
+ * Pick which side of `a` a line toward `b`'s centre should exit from.
+ * Chooses the axis (horizontal vs vertical) with the larger offset in
+ * half-size-scaled space — that's the side "closest" to `b` relative to
+ * the bbox's aspect ratio.
+ */
+export const chooseSide = (a: FloatableNode, b: FloatableNode): EdgePosition => {
+  const wA = (a.measured?.width ?? a.width ?? 0) || 1
+  const hA = (a.measured?.height ?? a.height ?? 0) || 1
+  const wB = b.measured?.width ?? b.width ?? 0
+  const hB = b.measured?.height ?? b.height ?? 0
+  const aCx = a.position.x + wA / 2
+  const aCy = a.position.y + hA / 2
+  const bCx = b.position.x + wB / 2
+  const bCy = b.position.y + hB / 2
+  const dx = bCx - aCx
+  const dy = bCy - aCy
+  if (Math.abs(dx) / (wA / 2) > Math.abs(dy) / (hA / 2)) {
+    return dx >= 0 ? 'right' : 'left'
+  }
+  return dy >= 0 ? 'bottom' : 'top'
+}
+
+/** Cardinal midpoint of the given side, in world coordinates. */
+export const sidePort = (n: FloatableNode, side: EdgePosition): Point => {
   const w = n.measured?.width ?? n.width ?? 0
   const h = n.measured?.height ?? n.height ?? 0
-  const left = n.position.x
-  const right = left + w
-  const top = n.position.y
-  const bottom = top + h
-  const rx = Math.abs(p.x - right)
-  const lx = Math.abs(p.x - left)
-  const ty = Math.abs(p.y - top)
-  const by = Math.abs(p.y - bottom)
-  const min = Math.min(rx, lx, ty, by)
-  if (min === rx) return 'right'
-  if (min === lx) return 'left'
-  if (min === ty) return 'top'
-  return 'bottom'
+  const x = n.position.x
+  const y = n.position.y
+  switch (side) {
+    case 'top': return { x: x + w / 2, y }
+    case 'right': return { x: x + w, y: y + h / 2 }
+    case 'bottom': return { x: x + w / 2, y: y + h }
+    case 'left': return { x, y: y + h / 2 }
+  }
 }
+
+// Re-exported for any external code that still wants the raw intersection
+// helper (used, for instance, by the connection-preview overlay).
+export const getNodeIntersection = (a: FloatableNode, b: FloatableNode): Point =>
+  sidePort(a, chooseSide(a, b))
 
 export interface FloatingAttachment {
   readonly sx: number
@@ -70,10 +83,8 @@ export interface FloatingAttachment {
 
 // React-Flow hook: subscribes to the source + target InternalNodes (v12's
 // per-node subscription that correctly re-renders on measurement updates),
-// then computes the float-attachment points. Returns null while either node
-// is unresolved or unmeasured (first frame). Using `useStore` + `nodeLookup`
-// here does NOT re-run when RF measures nodes, so edges stayed invisible in
-// real browsers even after their handles existed — Bug 1 fix.
+// then computes the port-snapped attachment. Returns null while either node
+// is unresolved or unmeasured (first frame).
 export const useFloatingEdge = (
   sourceId: string,
   targetId: string,
@@ -84,21 +95,18 @@ export const useFloatingEdge = (
     if (!sourceNode || !targetNode) return null
     const s = sourceNode as unknown as FloatableNode
     const t = targetNode as unknown as FloatableNode
-    // Need dimensions from either RF's measurement pass (`measured`) or the
-    // adapter-supplied `width`/`height` fallback. The v11 `useStore` pattern
-    // did not re-subscribe when `measured` got populated; `useInternalNode`
-    // does — that's the Bug 1 fix. Guard here so we don't compute geometry
-    // with zero-width bboxes on the first frame.
     if (!hasDimensions(s) || !hasDimensions(t)) return null
-    const sp = getNodeIntersection(s, t)
-    const tp = getNodeIntersection(t, s)
+    const sSide = chooseSide(s, t)
+    const tSide = chooseSide(t, s)
+    const sp = sidePort(s, sSide)
+    const tp = sidePort(t, tSide)
     return {
       sx: sp.x,
       sy: sp.y,
       tx: tp.x,
       ty: tp.y,
-      sourcePosition: edgePosition(s, sp),
-      targetPosition: edgePosition(t, tp),
+      sourcePosition: sSide,
+      targetPosition: tSide,
     }
   }, [sourceNode, targetNode])
 }
