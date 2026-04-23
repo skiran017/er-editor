@@ -1,12 +1,13 @@
 import { memo } from 'react'
-import { getSmoothStepPath, type EdgeProps } from '@xyflow/react'
-import { EntityRelationshipEdgeGlyph } from '@/notation/chen/edges/EntityRelationshipEdgeGlyph'
+import { BaseEdge, getSmoothStepPath, type EdgeProps } from '@xyflow/react'
+import { CardinalityLabel } from '@/notation/chen/cardinality'
 import { useDiagramStore } from '@/state/diagramStore'
 import type { EntityRelationshipEdge as EREdgeModel } from '@/domain/types'
 import type { NotationEdgeData } from '@/notation/types'
 
 export const EntityRelationshipEdge = memo(
   ({
+    id,
     sourceX,
     sourceY,
     targetX,
@@ -31,14 +32,35 @@ export const EntityRelationshipEdge = memo(
     })
 
     return (
-      <EntityRelationshipEdgeGlyph
-        path={path}
-        labelX={labelX}
-        labelY={labelY}
-        cardinality={edge.cardinality}
-        participation={edge.participation}
-        role={edge.role}
-      />
+      <>
+        <BaseEdge
+          id={id}
+          path={path}
+          style={{
+            stroke: '#334155',
+            strokeWidth: 1.5,
+            fill: 'none',
+            strokeDasharray: edge.participation === 'partial' ? '4 4' : undefined,
+          }}
+        />
+        <CardinalityLabel
+          cardinality={edge.cardinality}
+          participation={edge.participation}
+          x={labelX}
+          y={labelY}
+        />
+        {edge.role && (
+          <text
+            x={labelX}
+            y={labelY - 14}
+            textAnchor="middle"
+            dominantBaseline="central"
+            className="fill-slate-600 text-[10px] italic select-none pointer-events-none"
+          >
+            {edge.role}
+          </text>
+        )}
+      </>
     )
   },
 )

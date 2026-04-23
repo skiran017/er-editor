@@ -96,10 +96,13 @@ describe('EntityRelationshipEdge container', () => {
 
     const { container, findByText } = renderInFlow(rfNodes, rfEdges)
     expect(await findByText('N', {}, { timeout: 2000 })).toBeInTheDocument()
+    // BaseEdge renders the path under RF's wrapper with class react-flow__edge-entity-relationship.
+    // Partial participation applies stroke-dasharray via inline style on the path.
     const path = container.querySelector(
-      '[data-kind="entity-relationship"] path',
-    )
-    expect(path?.getAttribute('stroke-dasharray')).toBeTruthy()
+      '.react-flow__edge-entity-relationship path.react-flow__edge-path',
+    ) as SVGPathElement | null
+    expect(path).toBeInTheDocument()
+    expect(path?.style.strokeDasharray || path?.getAttribute('stroke-dasharray')).toBeTruthy()
   })
 
   it('returns null when the edge id is missing from the store (stale RF frame)', async () => {
@@ -132,8 +135,11 @@ describe('EntityRelationshipEdge container', () => {
     ]
     const { container } = renderInFlow(rfNodes, rfEdges)
     await new Promise((r) => setTimeout(r, 0))
-    expect(
-      container.querySelector('[data-kind="entity-relationship"]'),
-    ).not.toBeInTheDocument()
+    // Stale edge (no diagram entry) → component returns null → no path inside
+    // the RF wrapper (wrapper may still exist but has no path).
+    const path = container.querySelector(
+      '.react-flow__edge-entity-relationship path.react-flow__edge-path',
+    )
+    expect(path).not.toBeInTheDocument()
   })
 })

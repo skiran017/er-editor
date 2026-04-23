@@ -108,8 +108,11 @@ describe('ISAEdge container', () => {
 
     const { container } = renderInFlow(rfNodes, rfEdges)
     await new Promise((r) => setTimeout(r, 50))
-    const g = container.querySelector('[data-kind="isa-link"]')
-    expect(g).toBeInTheDocument()
-    expect(g?.getAttribute('data-role')).toBe('child')
+    // BaseEdge renders <path> inside RF's wrapper <g.react-flow__edge-isa-link>
+    const wrapper = container.querySelector('.react-flow__edge-isa-link')
+    expect(wrapper).toBeInTheDocument()
+    const path = wrapper?.querySelector('path.react-flow__edge-path')
+    expect(path).toBeInTheDocument()
+    expect(path?.getAttribute('data-role')).toBe('child')
   })
 })

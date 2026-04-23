@@ -1,12 +1,11 @@
 import { memo } from 'react'
-import { getStraightPath, type EdgeProps } from '@xyflow/react'
-import { AttributeEdgeGlyph } from '@/notation/chen/edges/AttributeEdgeGlyph'
+import { BaseEdge, getStraightPath, type EdgeProps } from '@xyflow/react'
 import { useDiagramStore } from '@/state/diagramStore'
 import type { AttributeEdge as AttrEdgeModel } from '@/domain/types'
 import type { NotationEdgeData } from '@/notation/types'
 
 export const AttributeEdge = memo(
-  ({ sourceX, sourceY, targetX, targetY, data }: EdgeProps) => {
+  ({ id, sourceX, sourceY, targetX, targetY, data }: EdgeProps) => {
     const edgeId = (data as NotationEdgeData).edgeId
     const edge = useDiagramStore((s) => s.diagram.edgesById[edgeId]) as
       | AttrEdgeModel
@@ -15,7 +14,13 @@ export const AttributeEdge = memo(
 
     const [path] = getStraightPath({ sourceX, sourceY, targetX, targetY })
 
-    return <AttributeEdgeGlyph path={path} />
+    return (
+      <BaseEdge
+        id={id}
+        path={path}
+        style={{ stroke: '#475569', strokeWidth: 1.5, fill: 'none' }}
+      />
+    )
   },
 )
 AttributeEdge.displayName = 'AttributeEdge'

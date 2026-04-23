@@ -26,8 +26,11 @@ describe('diagramToRf', () => {
       type: 'entity',
       position: { x: 10, y: 20 },
       data: { nodeId: entity.id },
-      width: 120,
-      height: 60,
+      // RF v12: we pass dimensions as `initialWidth`/`initialHeight` (user-
+      // writable hints) and let RF compute the read-only `width`/`height`
+      // from the measured DOM.
+      initialWidth: 120,
+      initialHeight: 60,
     })
   })
 

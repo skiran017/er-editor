@@ -19,8 +19,13 @@ const domainNodeToRf = (n: ERNode): CanvasNode => ({
   type: n.kind,
   position: { x: n.position.x, y: n.position.y },
   data: { nodeId: n.id },
-  width: n.size.width,
-  height: n.size.height,
+  // RF v12: `width`/`height` on a Node are read-only (computed by RF from the
+  // measured DOM). `initialWidth`/`initialHeight` are the user-writable hints
+  // RF uses before the first measurement. Setting `width`/`height` directly
+  // conflicts with RF's internal measurement pipeline and can prevent edges
+  // from resolving source/target coordinates on the first render.
+  initialWidth: n.size.width,
+  initialHeight: n.size.height,
 })
 
 const domainEdgeToRf = (e: ERLink): CanvasEdge => ({

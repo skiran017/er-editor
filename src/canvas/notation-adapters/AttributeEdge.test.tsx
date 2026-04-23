@@ -112,8 +112,9 @@ describe('AttributeEdge container', () => {
 
     const { container } = renderInFlow(rfNodes, rfEdges)
     await new Promise((r) => setTimeout(r, 50))
-    expect(
-      container.querySelector('[data-kind="attribute-of"]'),
-    ).toBeInTheDocument()
+    // BaseEdge renders a <path> inside RF's wrapper <g.react-flow__edge-attribute-of>
+    const wrapper = container.querySelector('.react-flow__edge-attribute-of')
+    expect(wrapper).toBeInTheDocument()
+    expect(wrapper?.querySelector('path.react-flow__edge-path')).toBeInTheDocument()
   })
 })
