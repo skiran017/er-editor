@@ -11,15 +11,20 @@ import { EdgeProperties } from './EdgeProperties'
 export const PropertyPanel = () => {
   const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds)
   const selectedEdgeIds = useSelectionStore((s) => s.selectedEdgeIds)
-  const diagram = useDiagramStore((s) => s.diagram)
-
   const total = selectedNodeIds.size + selectedEdgeIds.size
+
+  // Pick the lone selected id (or null). We avoid subscribing to the whole
+  // diagram slice so unrelated mutations don't re-render the panel.
+  const singleNodeId = total === 1 && selectedNodeIds.size === 1 ? [...selectedNodeIds][0] : null
+  const singleEdgeId = total === 1 && selectedEdgeIds.size === 1 ? [...selectedEdgeIds][0] : null
+
+  const node = useDiagramStore((s) => (singleNodeId ? s.diagram.nodesById[singleNodeId] : undefined))
+  const edge = useDiagramStore((s) => (singleEdgeId ? s.diagram.edgesById[singleEdgeId] : undefined))
+
   if (total === 0) return <EmptyPanel />
   if (total > 1) return <MultiSelectSummary count={total} />
 
-  if (selectedNodeIds.size === 1) {
-    const id = [...selectedNodeIds][0]
-    const node = diagram.nodesById[id]
+  if (singleNodeId) {
     if (!node) return <EmptyPanel />
     if (node.kind === 'entity') {
       return <div data-role="property-panel" data-node-kind="entity"><EntityProperties node={node} /></div>
@@ -37,8 +42,6 @@ export const PropertyPanel = () => {
     return <EmptyPanel />
   }
 
-  const id = [...selectedEdgeIds][0]
-  const edge = diagram.edgesById[id]
   if (!edge) return <EmptyPanel />
   return <div data-role="property-panel" data-edge-kind={edge.kind}><EdgeProperties edge={edge} /></div>
 }

@@ -17,11 +17,12 @@ export const ErrorModal = ({ modalId, messageKey, messageParams, detail }: Error
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/30"
       role="alertdialog"
       aria-modal
+      aria-labelledby={`${modalId}-title`}
       data-modal-id={modalId}
       data-kind="error"
     >
       <div className="w-[min(480px,90vw)] rounded bg-white p-4 shadow-lg">
-        <h2 className="mb-2 text-base font-semibold text-red-700">
+        <h2 id={`${modalId}-title`} className="mb-2 text-base font-semibold text-red-700">
           {t('error.title', { ns: 'modals' })}
         </h2>
         <p className="mb-2 text-sm text-slate-800">{t(messageKey, messageParams)}</p>

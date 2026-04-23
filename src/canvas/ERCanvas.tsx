@@ -15,7 +15,7 @@ import { useDiagramStore } from '@/state/diagramStore'
 import { useViewportStore } from '@/state/viewportStore'
 import { diagramToRf } from './adapters/diagramToRf'
 import { rfToDiagramPatch } from './adapters/rfToDiagramPatch'
-import { useKeyboard, useMouse, useTouch, useSnapping } from './hooks'
+import { useKeyboard, useMouse, useTouch, useSnapping, useToolbarDrop } from './hooks'
 import type { SnapGuide } from '@/domain/snap'
 import type { NodeId } from '@/domain/types'
 import { chenNodeTypes, chenEdgeTypes } from './notation-adapters/chenBindings'
@@ -77,6 +77,7 @@ const ERCanvasInner = () => {
   useKeyboard()
   const mouse = useMouse()
   const touch = useTouch()
+  const toolbarDrop = useToolbarDrop()
 
   const [activeGuides, setActiveGuides] = useState<readonly SnapGuide[]>([])
   const dragging = useRef(false)
@@ -142,6 +143,8 @@ const ERCanvasInner = () => {
       onWheel={(e) => {
         mouse.onWheel(e)
       }}
+      onDragOver={toolbarDrop.onDragOver}
+      onDrop={toolbarDrop.onDrop}
     >
       <ReactFlow
         nodes={nodes}

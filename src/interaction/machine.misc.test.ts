@@ -99,6 +99,7 @@ describe('machine — event exhaustiveness', () => {
     { type: 'CANCEL' as const },
     { type: 'HANDLE_POINTER_DOWN' as const, nodeId: 'n000000001' as never, handleId: 'h1', point: { x: 0, y: 0 } },
     { type: 'EDGE_POINTER_DOWN' as const, edgeId: 'e000000001' as never, point: { x: 0, y: 0 }, modifiers: NO_MODIFIERS, button: 'left' as const },
+    { type: 'CONNECT_CHILD_TO_ISA' as const, isaId: 'n000000001' as never },
   ]
 
   it.each(DEFERRED_EVENTS)('machine accepts $type without throwing', (event) => {

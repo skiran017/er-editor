@@ -1,13 +1,5 @@
-import type { DragEvent } from 'react'
-
-export const TOOL_MIME = 'application/x-er-tool'
-
-export const writeToolToDataTransfer = (e: DragEvent<HTMLElement>, toolId: string): void => {
-  e.dataTransfer.effectAllowed = 'copy'
-  e.dataTransfer.setData(TOOL_MIME, toolId)
-}
-
-export const readToolFromDataTransfer = (e: DragEvent<HTMLElement>): string | null => {
-  const v = e.dataTransfer.getData(TOOL_MIME)
-  return v || null
-}
+// Re-export of the drag-MIME helpers. The canonical implementation lives in
+// @/domain/dragMime so the canvas drop handler can reach it without crossing
+// the canvas→ui layer boundary (spec §2.2). Toolbar consumers keep their
+// existing import path via this re-export.
+export { TOOL_MIME, writeToolToDataTransfer, readToolFromDataTransfer } from '@/domain/dragMime'
