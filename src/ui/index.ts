@@ -1,5 +1,5 @@
 export { AppShell } from './app/AppShell'
-export { MenuBar } from './menu/MenuBar'
+export { Menu } from './menu/Menu'
 export { Toolbar } from './toolbar/Toolbar'
 export { PropertyPanel } from './properties/PropertyPanel'
 export { ToastStack } from './overlays/ToastStack'

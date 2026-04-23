@@ -1,0 +1,128 @@
+import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  Menu as MenuIcon,
+  X,
+  Upload,
+  Download,
+  Image as ImageIcon,
+  Keyboard,
+  Trash2,
+  Sun,
+  Moon,
+  Monitor,
+} from 'lucide-react'
+import { useUiStore } from '@/state/uiStore'
+import { useValidationStore } from '@/state/validationStore'
+import { useDiagramStore } from '@/state/diagramStore'
+import { useInteractionStore } from '@/interaction/interactionStore'
+import { emptyDiagram } from '@/domain/types'
+import {
+  MenuDropdownBody,
+  type FileAction,
+  type ThemeOption,
+} from './MenuDropdownBody'
+
+const THEMES: readonly ThemeOption[] = [
+  { value: 'light', icon: Sun, labelKey: 'menu:app.themeLight' },
+  { value: 'dark', icon: Moon, labelKey: 'menu:app.themeDark' },
+  { value: 'system', icon: Monitor, labelKey: 'menu:app.themeSystem' },
+]
+
+/**
+ * Hamburger dropdown menu (top-left). Replaces the classic File/Edit/View/Help
+ * menubar with the legacy-app layout: Open / Save / Export (file group),
+ * Validation toggle, Keyboard shortcuts, Theme selector, Reset canvas.
+ *
+ * File-I/O items still toast "Available in Phase 5" — the real codecs land
+ * with Phase 5; this surfaces the menu shape so Phase 6 UI work is complete.
+ *
+ * Undo / Redo intentionally moved to the toolbar (matching legacy). The
+ * keyboard shortcuts still dispatch UNDO / REDO through the FSM regardless.
+ */
+export const Menu = () => {
+  const { t } = useTranslation('menu')
+  const [isOpen, setIsOpen] = useState(false)
+
+  const theme = useUiStore((s) => s.theme)
+  const setTheme = useUiStore((s) => s.setTheme)
+  const pushToast = useUiStore((s) => s.pushToast)
+
+  const validationEnabled = useValidationStore((s) => s.enabled)
+  const setValidationEnabled = useValidationStore((s) => s.setEnabled)
+
+  // Close on Escape so the menu feels like a real dropdown.
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen])
+
+  const close = () => setIsOpen(false)
+
+  const toastPhase5 = () => {
+    pushToast({ id: `phase5-${Date.now()}`, kind: 'info', messageKey: 'menu:notYetAvailable' })
+    close()
+  }
+
+  const handleShortcuts = () => {
+    useInteractionStore.getState().send({ type: 'TOGGLE_CHEATSHEET' })
+    close()
+  }
+
+  const handleReset = () => {
+    // Confirm via window.confirm — modal-less for now. Phase 6 can replace
+    // this with a ModalStack-driven AlertDialog once a modal primitive exists.
+    if (!window.confirm(t('menu:app.resetConfirm'))) return
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+    pushToast({
+      id: `reset-${Date.now()}`,
+      kind: 'success',
+      messageKey: 'menu:app.resetDone',
+    })
+    close()
+  }
+
+  const fileActions: readonly FileAction[] = [
+    { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O', onSelect: toastPhase5 },
+    { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S', onSelect: toastPhase5 },
+    { id: 'exportImage', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: toastPhase5 },
+  ]
+
+  return (
+    <div className="fixed left-4 top-4 z-40">
+      <button
+        type="button"
+        aria-label={t('menu:app.title')}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        title={t('menu:app.title')}
+        onClick={() => setIsOpen((v) => !v)}
+        className="rounded-md border border-slate-200 bg-white/90 p-2 shadow-lg backdrop-blur-md transition-colors hover:bg-slate-100"
+      >
+        {isOpen ? <X size={18} aria-hidden /> : <MenuIcon size={18} aria-hidden />}
+      </button>
+
+      {isOpen && (
+        <MenuDropdownBody
+          t={t}
+          fileActions={fileActions}
+          themes={THEMES}
+          theme={theme}
+          onSetTheme={setTheme}
+          validationEnabled={validationEnabled}
+          onSetValidationEnabled={setValidationEnabled}
+          onShortcuts={handleShortcuts}
+          onReset={handleReset}
+          onClickOutside={close}
+          resetIcon={Trash2}
+          keyboardIcon={Keyboard}
+        />
+      )}
+    </div>
+  )
+}

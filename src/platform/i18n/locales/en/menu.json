@@ -39,5 +39,16 @@
   "isa": {
     "addChild": "Add child entity"
   },
+  "app": {
+    "title": "Menu",
+    "validation": "Validation",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "reset": "Reset the canvas",
+    "resetConfirm": "Reset the canvas? This will delete every element.",
+    "resetDone": "Canvas reset"
+  },
   "notYetAvailable": "Available in Phase 5 (I/O codecs)."
 }

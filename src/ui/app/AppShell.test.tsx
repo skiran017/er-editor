@@ -17,27 +17,25 @@ const reset = () => {
 describe('AppShell', () => {
   beforeEach(reset)
 
-  it('renders all four slots when a node is selected', () => {
+  it('renders canvas, properties, chrome, and overlays when a node is selected', () => {
     render(
       <AppShell
-        menuBar={<div data-testid="menu">Menu</div>}
-        toolbar={<div data-testid="tb">Toolbar</div>}
         canvas={<div data-testid="canvas">Canvas</div>}
         properties={<div data-testid="props">Properties</div>}
+        chrome={<div data-testid="chrome">Chrome</div>}
+        overlays={<div data-testid="overlay">Overlays</div>}
       />,
     )
-    expect(screen.getByTestId('menu')).toBeInTheDocument()
-    expect(screen.getByTestId('tb')).toBeInTheDocument()
     expect(screen.getByTestId('canvas')).toBeInTheDocument()
     expect(screen.getByTestId('props')).toBeInTheDocument()
+    expect(screen.getByTestId('chrome')).toBeInTheDocument()
+    expect(screen.getByTestId('overlay')).toBeInTheDocument()
   })
 
   it('hides properties pane when uiStore.panels.properties is false', () => {
     useUiStore.setState({ panels: { properties: false, minimap: false } })
     render(
       <AppShell
-        menuBar={<div />}
-        toolbar={<div />}
         canvas={<div />}
         properties={<div data-testid="props" />}
       />,
@@ -53,8 +51,6 @@ describe('AppShell', () => {
     })
     render(
       <AppShell
-        menuBar={<div />}
-        toolbar={<div />}
         canvas={<div />}
         properties={<div data-testid="props" />}
       />,
@@ -62,16 +58,20 @@ describe('AppShell', () => {
     expect(screen.queryByTestId('props')).not.toBeInTheDocument()
   })
 
-  it('renders overlays slot above the main layout', () => {
+  it('chrome slot is still rendered when the properties pane is hidden', () => {
+    useSelectionStore.setState({
+      selectedNodeIds: new Set(),
+      selectedEdgeIds: new Set(),
+      rubberband: null,
+    })
     render(
       <AppShell
-        menuBar={<div />}
-        toolbar={<div />}
         canvas={<div />}
-        properties={<div />}
-        overlays={<div data-testid="overlay">Overlays</div>}
+        properties={<div data-testid="props" />}
+        chrome={<div data-testid="chrome" />}
       />,
     )
-    expect(screen.getByTestId('overlay')).toBeInTheDocument()
+    expect(screen.queryByTestId('props')).not.toBeInTheDocument()
+    expect(screen.getByTestId('chrome')).toBeInTheDocument()
   })
 })

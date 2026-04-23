@@ -3,23 +3,32 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Toolbar } from './Toolbar'
 import { useInteractionStore } from '@/interaction/interactionStore'
+import { useDiagramStore } from '@/state/diagramStore'
+import { useSelectionStore } from '@/state/selectionStore'
+import { emptyDiagram } from '@/domain/types'
+import type { NodeId } from '@/domain/types'
 import { initI18n } from '@/platform/i18n'
 
 beforeAll(async () => { await initI18n() })
 
 const reset = () => {
   useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'select' })
+  useDiagramStore.setState({ diagram: emptyDiagram() })
+  useDiagramStore.temporal.getState().clear()
+  useSelectionStore.setState({
+    selectedNodeIds: new Set<NodeId>(), selectedEdgeIds: new Set(), rubberband: null,
+  })
 }
 
-describe('Toolbar', () => {
+describe('Toolbar — tool picker', () => {
   beforeEach(reset)
 
-  it('renders a button for each tool in chenPlugin.tools', () => {
+  it('renders a button for each tool in chenPlugin (12) plus the two history buttons (14 total, no delete without selection)', () => {
     render(<Toolbar />)
-    // Select (2) + Elements (4) + Connections (6: connect + three quick
-    // relationship variants + partial/total ISA) = 12.
+    // Select (2) + Elements (4) + Connections (6) + History (2: undo/redo) = 14.
+    // Delete appears only when something is selected — excluded here.
     const buttons = screen.getAllByRole('button')
-    expect(buttons.length).toBe(12)
+    expect(buttons.length).toBe(14)
   })
 
   it('clicking "Entity" dispatches PICK_TOOL with tool=entity', async () => {
@@ -53,7 +62,6 @@ describe('Toolbar', () => {
     const { container } = render(<Toolbar />)
     const entityDrag = container.querySelector('[data-tool-id="entity"][draggable="true"]') as HTMLElement
     expect(entityDrag).toBeInTheDocument()
-    // Build a minimal dataTransfer polyfill — jsdom doesn't set one on DragEvent by default.
     const store = new Map<string, string>()
     const dataTransfer = {
       setData: (key: string, value: string) => { store.set(key, value) },
@@ -62,5 +70,56 @@ describe('Toolbar', () => {
     }
     fireEvent.dragStart(entityDrag, { dataTransfer })
     expect(store.get('application/x-er-tool')).toBe('entity')
+  })
+})
+
+describe('Toolbar — history group (undo / redo)', () => {
+  beforeEach(reset)
+
+  it('undo and redo buttons are disabled when no history exists', () => {
+    render(<Toolbar />)
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled()
+  })
+
+  it('undo enables after a diagram mutation and dispatches UNDO on click', async () => {
+    render(<Toolbar />)
+    // Mutate the diagram so zundo captures a past state.
+    useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    // Button re-renders via useStore subscription on `temporal`.
+    const undoBtn = await screen.findByRole('button', { name: 'Undo' })
+    expect(undoBtn).not.toBeDisabled()
+    await userEvent.click(undoBtn)
+    // UNDO event is routed through the FSM; verify the node was actually undone.
+    expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(0)
+  })
+})
+
+describe('Toolbar — delete button', () => {
+  beforeEach(reset)
+
+  it('is not rendered when nothing is selected', () => {
+    render(<Toolbar />)
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
+
+  it('is rendered when a node is selected and dispatches DELETE on click', async () => {
+    const id = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    useSelectionStore.setState({
+      selectedNodeIds: new Set<NodeId>([id]),
+      selectedEdgeIds: new Set(),
+      rubberband: null,
+    })
+    render(<Toolbar />)
+    const del = screen.getByRole('button', { name: 'Delete' })
+    expect(del).toBeInTheDocument()
+    await userEvent.click(del)
+    expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(0)
   })
 })
