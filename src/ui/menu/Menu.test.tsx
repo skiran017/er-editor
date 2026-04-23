@@ -129,15 +129,20 @@ describe('Menu — exam mode', () => {
     expect(useUiStore.getState().toasts).toHaveLength(0)
   })
 
-  it('disables the Validation toggle (input is disabled and clicking is a no-op)', async () => {
-    useUiStore.getState().setExamMode(true)
+  it('forces the Validation toggle off AND disables it (unchecked + locked under exam mode)', async () => {
     useValidationStore.setState({ enabled: true })
+    // Entering exam mode flips validation off via the bootstrap subscriber.
+    // We invoke it manually here since the test setup skips bootstrap wiring.
+    useUiStore.getState().setExamMode(true)
+    useValidationStore.setState({ enabled: false })
     render(<Menu />)
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
-    const toggle = screen.getByRole('checkbox', { name: 'Validation' })
+    const toggle = screen.getByRole('checkbox', { name: 'Validation' }) as HTMLInputElement
     expect(toggle).toBeDisabled()
+    expect(toggle.checked).toBe(false)
     await userEvent.click(toggle)
-    expect(useValidationStore.getState().enabled).toBe(true)
+    // Click on a disabled input is a no-op; state stays at false.
+    expect(useValidationStore.getState().enabled).toBe(false)
   })
 
   it('leaves Shortcuts, Theme, and Reset untouched (UX is not gated)', async () => {

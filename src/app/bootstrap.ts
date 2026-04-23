@@ -1,5 +1,6 @@
 import { useDiagramStore } from '@/state/diagramStore'
 import { useValidationStore } from '@/state/validationStore'
+import { useUiStore } from '@/state/uiStore'
 import { validateChen } from '@/notation/chen/rules'
 import { checkInvariants } from '@/domain/invariants'
 import type { Diagram } from '@/domain/types'
@@ -49,8 +50,22 @@ export const installSubscribers = (): (() => void) => {
     },
   )
 
+  // Entering exam mode forces validation OFF (and the Menu further locks the
+  // toggle disabled): students shouldn't see rule-violation hints during an
+  // exam. The validation-toggle subscriber above then clears the error store
+  // so badges disappear immediately. Leaving exam mode does NOT auto-flip
+  // validation back on — the flag stays as-is so the user can re-enable it
+  // intentionally.
+  const unsubscribeExamMode = useUiStore.subscribe(
+    (s) => s.examMode,
+    (on) => {
+      if (on) useValidationStore.getState().setEnabled(false)
+    },
+  )
+
   return () => {
     unsubscribeDiagram()
     unsubscribeValidationToggle()
+    unsubscribeExamMode()
   }
 }
