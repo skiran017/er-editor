@@ -24,5 +24,9 @@
   "participationTotal": "Total",
   "participationPartial": "Partial",
   "role": "Role",
-  "rolePlaceholder": "e.g. parent, child, manages"
+  "rolePlaceholder": "e.g. parent, child, manages",
+  "close": "Close properties",
+  "connections": "Connections",
+  "noConnections": "No connections yet.",
+  "unnamed": "(unnamed)"
 }

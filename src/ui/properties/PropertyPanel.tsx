@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
 import { EmptyPanel } from './EmptyPanel'
@@ -7,14 +8,27 @@ import { RelationshipProperties } from './RelationshipProperties'
 import { AttributeProperties } from './AttributeProperties'
 import { ISAProperties } from './ISAProperties'
 import { EdgeProperties } from './EdgeProperties'
+import { PanelHeader } from './PanelHeader'
+import { ConnectionsList } from './ConnectionsList'
+
+interface FrameProps {
+  readonly titleKey: string
+  readonly children: ReactNode
+  readonly testAttrs?: Readonly<Record<string, string>>
+}
+
+const Frame = ({ titleKey, children, testAttrs }: FrameProps) => (
+  <div className="flex h-full flex-col" data-role="property-panel" {...testAttrs}>
+    <PanelHeader titleKey={titleKey} />
+    <div className="flex-1 overflow-y-auto">{children}</div>
+  </div>
+)
 
 export const PropertyPanel = () => {
   const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds)
   const selectedEdgeIds = useSelectionStore((s) => s.selectedEdgeIds)
   const total = selectedNodeIds.size + selectedEdgeIds.size
 
-  // Pick the lone selected id (or null). We avoid subscribing to the whole
-  // diagram slice so unrelated mutations don't re-render the panel.
   const singleNodeId = total === 1 && selectedNodeIds.size === 1 ? [...selectedNodeIds][0] : null
   const singleEdgeId = total === 1 && selectedEdgeIds.size === 1 ? [...selectedEdgeIds][0] : null
 
@@ -26,22 +40,46 @@ export const PropertyPanel = () => {
 
   if (singleNodeId) {
     if (!node) return <EmptyPanel />
+    const titleKey = `kind.${node.kind}`
     if (node.kind === 'entity') {
-      return <div data-role="property-panel" data-node-kind="entity"><EntityProperties node={node} /></div>
+      return (
+        <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'entity' }}>
+          <EntityProperties node={node} />
+          <ConnectionsList nodeId={node.id} />
+        </Frame>
+      )
     }
     if (node.kind === 'relationship') {
-      return <div data-role="property-panel" data-node-kind="relationship"><RelationshipProperties node={node} /></div>
+      return (
+        <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'relationship' }}>
+          <RelationshipProperties node={node} />
+          <ConnectionsList nodeId={node.id} />
+        </Frame>
+      )
     }
     if (node.kind === 'attribute') {
-      return <div data-role="property-panel" data-node-kind="attribute"><AttributeProperties node={node} /></div>
+      return (
+        <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'attribute' }}>
+          <AttributeProperties node={node} />
+          <ConnectionsList nodeId={node.id} />
+        </Frame>
+      )
     }
     if (node.kind === 'isa') {
-      return <div data-role="property-panel" data-node-kind="isa"><ISAProperties node={node} /></div>
+      return (
+        <Frame titleKey={titleKey} testAttrs={{ 'data-node-kind': 'isa' }}>
+          <ISAProperties node={node} />
+          <ConnectionsList nodeId={node.id} />
+        </Frame>
+      )
     }
-    // unreachable — all 4 node kinds covered above
     return <EmptyPanel />
   }
 
   if (!edge) return <EmptyPanel />
-  return <div data-role="property-panel" data-edge-kind={edge.kind}><EdgeProperties edge={edge} /></div>
+  return (
+    <Frame titleKey={`kind.${edge.kind}`} testAttrs={{ 'data-edge-kind': edge.kind }}>
+      <EdgeProperties edge={edge} />
+    </Frame>
+  )
 }
