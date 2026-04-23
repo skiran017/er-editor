@@ -98,6 +98,7 @@ const ERCanvasInner = () => {
     }
   }, [diagram, selectedNodeIds])
 
+
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const snappedChanges: NodeChange[] = []
@@ -127,6 +128,11 @@ const ERCanvasInner = () => {
   }, [])
 
   const handleViewportChange = useCallback((v: Viewport) => {
+    // Skip no-op writes — RF fires onViewportChange on every frame during
+    // measurement/layout even when values don't change. Creating a new `pan`
+    // object each time would push subscribers into an infinite re-render loop.
+    const { zoom: prevZoom, pan: prevPan } = useViewportStore.getState()
+    if (prevZoom === v.zoom && prevPan.x === v.x && prevPan.y === v.y) return
     useViewportStore.setState({ zoom: v.zoom, pan: { x: v.x, y: v.y } })
   }, [])
 
