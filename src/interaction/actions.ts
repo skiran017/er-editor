@@ -11,6 +11,7 @@ import {
 } from '@/state/commands'
 import { bboxFromNodeLike, bboxIntersects } from '@/domain/geometry'
 import { isEntityNode } from '@/domain/graph'
+import { newNodeId, newEdgeId } from '@/domain/id'
 import type { BBox, Diagram, ERNode, EntityRelationshipEdge, ISAEdge, NodeId } from '@/domain/types'
 import type { EditorContext } from './context'
 import type { EditorEvent } from './events'
@@ -371,24 +372,33 @@ export const placeAttributeOnParent = (event: EditorEvent): void => {
     y: parent.position.y + parent.size.height / 2 - size.height / 2,
   }
 
-  const attrId = useDiagramStore.getState().addNode({
-    kind: 'attribute',
-    name,
-    isKey: false,
-    isDiscriminant: false,
-    isMultivalued: false,
-    isDerived: false,
-    isComposite: false,
-    position,
-    size,
-  })
-  // attribute-of edges flow FROM the attribute TO its parent (domain invariant
-  // — see src/domain/invariants.ts and connectViaConnectTool above).
-  useDiagramStore.getState().addEdge({
-    kind: 'attribute-of',
-    sourceId: attrId,
-    targetId: parent.id,
-    waypoints: [],
+  // Apply node + edge in a single applyPatch so the invariant subscriber
+  // (src/app/bootstrap.ts) doesn't see a transient state where the new
+  // attribute has no outbound attribute-of edge (INV-2).
+  const attrId = newNodeId()
+  const edgeId = newEdgeId()
+  useDiagramStore.getState().applyPatch({
+    addNodes: [{
+      id: attrId,
+      kind: 'attribute',
+      name,
+      isKey: false,
+      isDiscriminant: false,
+      isMultivalued: false,
+      isDerived: false,
+      isComposite: false,
+      position,
+      size,
+    }],
+    addEdges: [{
+      id: edgeId,
+      kind: 'attribute-of',
+      // attribute-of edges flow FROM the attribute TO its parent
+      // (domain invariant — see src/domain/invariants.ts).
+      sourceId: attrId,
+      targetId: parent.id,
+      waypoints: [],
+    }],
   })
 }
 

@@ -17,7 +17,11 @@ export const installSubscribers = (): (() => void) => {
     if (import.meta.env?.DEV !== true) return
     const violations = checkInvariants(diagram)
     if (violations.length > 0) {
-      console.error('[invariant] violations detected:', violations)
+      // Print each violation as its own line with ID + target + detail —
+      // collapsed objects in the console hide the info that matters.
+      for (const v of violations) {
+        console.error(`[invariant ${v.invariantId}] target=${v.targetId} — ${v.detail}`)
+      }
     }
   }
 
