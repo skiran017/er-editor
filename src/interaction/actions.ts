@@ -292,6 +292,18 @@ export const connectChildToIsaAction = (context: EditorContext, event: EditorEve
   useDiagramStore.getState().addEdge(edge)
 }
 
+// ——— inline rename ———
+
+export const beginRenameSelected = (): void => {
+  const selected = useSelectionStore.getState().selectedNodeIds
+  if (selected.size !== 1) return
+  const [id] = [...selected]
+  const node = useDiagramStore.getState().diagram.nodesById[id]
+  if (!node) return
+  if (node.kind === 'isa') return // ISA has no name
+  useUiStore.getState().startInlineRename({ nodeId: id, initialValue: node.name })
+}
+
 // ——— cheatsheet ———
 
 const CHEATSHEET_MODAL_ID = 'cheatsheet'

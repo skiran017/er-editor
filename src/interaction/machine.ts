@@ -1,6 +1,6 @@
 import { assign, setup } from 'xstate'
 import {
-  beginRubberband, clearSelectionAction, commitRubberbandAction,
+  beginRenameSelected, beginRubberband, clearSelectionAction, commitRubberbandAction,
   connectChildToIsaAction, connectNodes, deleteSelectionAction,
   duplicateSelectionAction, fitAction, moveDraggedNode, nudgeSelection,
   panViewportAction, placeNode, redoAction, selectAllAction, selectNodeFromEvent,
@@ -103,6 +103,7 @@ export const editorMachine = setup({
     zoomIn: ({ context, event }) => zoomInAction(context, event),
     zoomOut: ({ context, event }) => zoomOutAction(context, event),
     fit: ({ context, event }) => fitAction(context, event),
+    beginRenameSelected: () => beginRenameSelected(),
   },
 }).createMachine({
   id: 'editor',
@@ -152,7 +153,7 @@ export const editorMachine = setup({
     // Events declared in EditorEvent but whose behaviour lands in later phases.
     // Kept as explicit no-ops so the machine acknowledges the event type and
     // the keybindings registry never silently drops a user shortcut.
-    RENAME: {},               // Phase 6: inline rename UI
+    RENAME: { actions: 'beginRenameSelected' }, // Phase 6: inline rename UI
     CYCLE_SELECTION: {},      // Phase 6: Tab / Shift+Tab selection cycle
     INVERT_SELECTION: {},     // Phase 6: Shift+Alt+A
     CONFIRM: {},              // Phase 6: modal-level confirm
