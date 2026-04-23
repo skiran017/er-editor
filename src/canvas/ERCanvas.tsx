@@ -22,6 +22,7 @@ import type { NodeId } from '@/domain/types'
 import { chenNodeTypes, chenEdgeTypes } from './notation-adapters/chenBindings'
 import { InlineRenameOverlay } from './InlineRenameOverlay'
 import { ConnectionPreviewOverlay } from './ConnectionPreviewOverlay'
+import { RubberbandOverlay } from './RubberbandOverlay'
 
 // chenBindings exports `Record<NodeKind, ComponentType<NodeProps>>` — structurally
 // compatible with React-Flow's `NodeTypes` at runtime, but TS is stricter about the
@@ -196,6 +197,7 @@ const ERCanvasInner = () => {
       <SnapOverlay guides={activeGuides} pan={pan} zoom={zoom} />
       <InlineRenameOverlay />
       <ConnectionPreviewOverlay />
+      <RubberbandOverlay />
     </div>
   )
 }
