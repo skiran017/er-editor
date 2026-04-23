@@ -90,14 +90,17 @@ export const Menu = () => {
     close()
   }
 
-  // File actions are disabled under exam mode so a student running an embedded
-  // editor can't open a different diagram or export the current one. The
-  // Reset, Shortcuts, and Theme controls stay live — they're UX, not data.
-  const fileActions: readonly FileAction[] = [
-    { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O', onSelect: toastPhase5, disabled: examMode },
-    { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S', onSelect: toastPhase5, disabled: examMode },
-    { id: 'exportImage', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: toastPhase5, disabled: examMode },
-  ]
+  // File actions vanish entirely under exam mode. Hiding rather than
+  // disabling is the honest lockdown — a disabled attribute on a button is
+  // one devtools flick away from being re-enabled and clicked. The Reset,
+  // Shortcuts, and Theme controls stay live because they're UX, not data.
+  const fileActions: readonly FileAction[] = examMode
+    ? []
+    : [
+        { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O', onSelect: toastPhase5 },
+        { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S', onSelect: toastPhase5 },
+        { id: 'exportImage', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: toastPhase5 },
+      ]
 
   return (
     <div className="fixed left-4 top-4 z-40">
@@ -122,7 +125,6 @@ export const Menu = () => {
           onSetTheme={setTheme}
           validationEnabled={validationEnabled}
           onSetValidationEnabled={setValidationEnabled}
-          validationToggleDisabled={examMode}
           examMode={examMode}
           onShortcuts={handleShortcuts}
           onReset={handleReset}

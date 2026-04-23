@@ -118,31 +118,20 @@ describe('Menu — exam mode', () => {
     expect(screen.getByRole('menu')).toHaveAttribute('data-exam-mode', 'true')
   })
 
-  it('disables Open / Save / Export Image so clicking them does NOT toast', async () => {
+  it('hides Open / Save / Export Image entirely (no DOM element to bypass via devtools)', async () => {
     useUiStore.getState().setExamMode(true)
     render(<Menu />)
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
-    const open = screen.getByRole('menuitem', { name: /Open/ })
-    expect(open).toBeDisabled()
-    await userEvent.click(open)
-    // Disabled buttons swallow clicks — no toast is pushed.
-    expect(useUiStore.getState().toasts).toHaveLength(0)
+    expect(screen.queryByRole('menuitem', { name: /Open/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Save/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Export PNG/ })).not.toBeInTheDocument()
   })
 
-  it('forces the Validation toggle off AND disables it (unchecked + locked under exam mode)', async () => {
-    useValidationStore.setState({ enabled: true })
-    // Entering exam mode flips validation off via the bootstrap subscriber.
-    // We invoke it manually here since the test setup skips bootstrap wiring.
+  it('hides the Validation toggle entirely under exam mode', async () => {
     useUiStore.getState().setExamMode(true)
-    useValidationStore.setState({ enabled: false })
     render(<Menu />)
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
-    const toggle = screen.getByRole('checkbox', { name: 'Validation' }) as HTMLInputElement
-    expect(toggle).toBeDisabled()
-    expect(toggle.checked).toBe(false)
-    await userEvent.click(toggle)
-    // Click on a disabled input is a no-op; state stays at false.
-    expect(useValidationStore.getState().enabled).toBe(false)
+    expect(screen.queryByRole('checkbox', { name: 'Validation' })).not.toBeInTheDocument()
   })
 
   it('leaves Shortcuts, Theme, and Reset untouched (UX is not gated)', async () => {
