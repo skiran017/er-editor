@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { AttributeGlyph } from '@/notation/chen/nodes/AttributeGlyph'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
@@ -19,20 +19,36 @@ export const AttributeNode = memo(({ data }: NodeProps<AttributeRfNode>) => {
   const warnings = useValidationStore((s) => s.errorsById[nodeId])
   if (!node || node.kind !== 'attribute') return null
   return (
-    <svg width={node.size.width} height={node.size.height} overflow="visible">
-      <AttributeGlyph
-        name={node.name}
-        isKey={node.isKey}
-        isDiscriminant={node.isDiscriminant}
-        isMultivalued={node.isMultivalued}
-        isDerived={node.isDerived}
-        isComposite={node.isComposite}
-        width={node.size.width}
-        height={node.size.height}
-        isSelected={isSelected}
-        warningSeverity={pickSeverity(warnings)}
+    <>
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="src"
+        style={{ opacity: 0, pointerEvents: 'none' }}
+        isConnectable={false}
       />
-    </svg>
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="tgt"
+        style={{ opacity: 0, pointerEvents: 'none' }}
+        isConnectable={false}
+      />
+      <svg width={node.size.width} height={node.size.height} overflow="visible">
+        <AttributeGlyph
+          name={node.name}
+          isKey={node.isKey}
+          isDiscriminant={node.isDiscriminant}
+          isMultivalued={node.isMultivalued}
+          isDerived={node.isDerived}
+          isComposite={node.isComposite}
+          width={node.size.width}
+          height={node.size.height}
+          isSelected={isSelected}
+          warningSeverity={pickSeverity(warnings)}
+        />
+      </svg>
+    </>
   )
 })
 AttributeNode.displayName = 'AttributeNode'

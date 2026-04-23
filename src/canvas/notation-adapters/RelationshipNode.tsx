@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { RelationshipGlyph } from '@/notation/chen/nodes/RelationshipGlyph'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
@@ -19,16 +19,32 @@ export const RelationshipNode = memo(({ data }: NodeProps<RelationshipRfNode>) =
   const warnings = useValidationStore((s) => s.errorsById[nodeId])
   if (!node || node.kind !== 'relationship') return null
   return (
-    <svg width={node.size.width} height={node.size.height} overflow="visible">
-      <RelationshipGlyph
-        name={node.name}
-        isIdentifying={node.isIdentifying}
-        width={node.size.width}
-        height={node.size.height}
-        isSelected={isSelected}
-        warningSeverity={pickSeverity(warnings)}
+    <>
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="src"
+        style={{ opacity: 0, pointerEvents: 'none' }}
+        isConnectable={false}
       />
-    </svg>
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="tgt"
+        style={{ opacity: 0, pointerEvents: 'none' }}
+        isConnectable={false}
+      />
+      <svg width={node.size.width} height={node.size.height} overflow="visible">
+        <RelationshipGlyph
+          name={node.name}
+          isIdentifying={node.isIdentifying}
+          width={node.size.width}
+          height={node.size.height}
+          isSelected={isSelected}
+          warningSeverity={pickSeverity(warnings)}
+        />
+      </svg>
+    </>
   )
 })
 RelationshipNode.displayName = 'RelationshipNode'

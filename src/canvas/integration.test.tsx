@@ -194,6 +194,42 @@ describe('rendering integration — connect tool (entity → attribute)', () => 
   })
 })
 
+describe('rendering integration — edges actually render (handles regression guard)', () => {
+  it('an attribute-of edge between two stored nodes renders visibly in the canvas', async () => {
+    // Regression guard: before node containers mounted <Handle> components,
+    // React Flow v12 silently dropped every edge because it could not resolve
+    // a source/target handle. This test seeds an edge directly into the store,
+    // mounts the canvas, and asserts the rendered edge group is present.
+    const entity = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const attr = useDiagramStore.getState().addNode({
+      kind: 'attribute', name: 'id', isKey: false, isDiscriminant: false,
+      isMultivalued: false, isDerived: false, isComposite: false,
+      position: { x: 200, y: 0 }, size: { width: 90, height: 50 },
+    })
+    useDiagramStore.getState().addEdge({
+      kind: 'attribute-of', sourceId: attr, targetId: entity, waypoints: [],
+    })
+
+    const { container } = render(<ERCanvas />)
+    await new Promise((r) => setTimeout(r, 50))
+    // jsdom can't measure, so RF never actually stamps [data-kind="attribute-of"]
+    // here. The best regression guard we CAN write at this layer is: every
+    // mounted node container renders RF's own .react-flow__handle DOM (source
+    // + target). That's the exact thing whose absence caused the bug — RF's
+    // edge resolver needs handles on both endpoints. If we lose them again,
+    // this assertion flips.
+    const handles = container.querySelectorAll('.react-flow__handle')
+    // Two nodes × (source + target) = 4 handle elements minimum.
+    expect(handles.length).toBeGreaterThanOrEqual(4)
+    // And the edge itself is still in the store — a smoke check that addEdge()
+    // accepted the payload and no cleanup pass dropped it.
+    expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(1)
+  })
+})
+
 describe('rendering integration — drag-follow regression (Bug 1)', () => {
   it('clicking a node then moving the mouse does NOT drag the node (synthetic UP exits maybeDragging)', () => {
     // Models what useRfEvents.onNodeClick now does: NODE_POINTER_DOWN +

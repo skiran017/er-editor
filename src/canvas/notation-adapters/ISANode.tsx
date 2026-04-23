@@ -1,5 +1,5 @@
 import { memo, type MouseEvent as ReactMouseEvent } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { ISAGlyph } from '@/notation/chen/nodes/ISAGlyph'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
@@ -35,20 +35,36 @@ export const ISANode = memo(({ data }: NodeProps<ISARfNode>) => {
 
   if (!node || node.kind !== 'isa') return null
   return (
-    <svg
-      width={node.size.width}
-      height={node.size.height}
-      overflow="visible"
-      onContextMenu={handleContextMenu}
-    >
-      <ISAGlyph
-        isTotal={node.isTotal}
+    <>
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="src"
+        style={{ opacity: 0, pointerEvents: 'none' }}
+        isConnectable={false}
+      />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="tgt"
+        style={{ opacity: 0, pointerEvents: 'none' }}
+        isConnectable={false}
+      />
+      <svg
         width={node.size.width}
         height={node.size.height}
-        isSelected={isSelected}
-        warningSeverity={pickSeverity(warnings)}
-      />
-    </svg>
+        overflow="visible"
+        onContextMenu={handleContextMenu}
+      >
+        <ISAGlyph
+          isTotal={node.isTotal}
+          width={node.size.width}
+          height={node.size.height}
+          isSelected={isSelected}
+          warningSeverity={pickSeverity(warnings)}
+        />
+      </svg>
+    </>
   )
 })
 ISANode.displayName = 'ISANode'
