@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { Position } from '@xyflow/react'
 import { emptyDiagram } from '@/domain/types'
 import { makeEntity, makeAttribute, makeIsa } from '@fixtures/diagrams/makeNode'
 import { makeEREdge, makeAttrEdge, makeIsaEdge } from '@fixtures/diagrams/makeEdge'
@@ -28,9 +29,16 @@ describe('diagramToRf', () => {
       data: { nodeId: entity.id },
       // RF v12: we pass dimensions as `initialWidth`/`initialHeight` (user-
       // writable hints) and let RF compute the read-only `width`/`height`
-      // from the measured DOM.
+      // from the measured DOM. Explicit `handles` lets `getEdgePosition` fall
+      // back to these values before ResizeObserver has populated
+      // `internals.handleBounds`, guaranteeing edges render on first paint.
       initialWidth: 120,
       initialHeight: 60,
+      measured: { width: 120, height: 60 },
+      handles: [
+        { id: 'src', type: 'source', position: Position.Right, x: 120, y: 30 },
+        { id: 'tgt', type: 'target', position: Position.Left, x: 0, y: 30 },
+      ],
     })
   })
 
