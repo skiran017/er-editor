@@ -10,19 +10,23 @@ export interface QueryParams {
 
 const LANGS = new Set<Language>(['en', 'it'])
 
-const parseLang = (raw: string | null): Language | null =>
-  raw && LANGS.has(raw as Language) ? (raw as Language) : null
+const parseLang = (raw: string | null): Language | null => {
+  const norm = raw?.toLowerCase() ?? null
+  return norm && LANGS.has(norm as Language) ? (norm as Language) : null
+}
 
-const parseValidation = (raw: string | null): 'on' | 'off' | null =>
-  raw === 'on' || raw === 'off' ? raw : null
+const parseValidation = (raw: string | null): 'on' | 'off' | null => {
+  const norm = raw?.toLowerCase()
+  return norm === 'on' || norm === 'off' ? norm : null
+}
 
-const parseBool = (raw: string | null): boolean => raw === 'true'
+const parseBool = (raw: string | null): boolean => raw?.toLowerCase() === 'true'
 
 const resolveExamMode = (p: URLSearchParams): boolean => {
-  const raw = p.get('examMode')
+  const raw = p.get('examMode')?.toLowerCase()
   if (raw === 'true') return true
   if (raw === 'false') return false
-  return p.get('embed') === 'true'
+  return p.get('embed')?.toLowerCase() === 'true'
 }
 
 export const parseQueryParams = (search: string): QueryParams => {

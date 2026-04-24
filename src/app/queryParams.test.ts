@@ -24,10 +24,20 @@ describe('parseQueryParams', () => {
     expect(parseQueryParams('?validation=garbage').validation).toBeNull()
   })
 
-  it('parses ?readonly=true and ?embed=true as booleans', () => {
+  it('parses ?readonly / ?embed booleans with symmetric false handling', () => {
     expect(parseQueryParams('?readonly=true').readonly).toBe(true)
     expect(parseQueryParams('?readonly=false').readonly).toBe(false)
     expect(parseQueryParams('?embed=true').embed).toBe(true)
+    expect(parseQueryParams('?embed=false').embed).toBe(false)
+    expect(parseQueryParams('?embed=').embed).toBe(false)
+  })
+
+  it('is case-insensitive on all string params', () => {
+    expect(parseQueryParams('?lang=IT').lang).toBe('it')
+    expect(parseQueryParams('?validation=OFF').validation).toBe('off')
+    expect(parseQueryParams('?readonly=TRUE').readonly).toBe(true)
+    expect(parseQueryParams('?embed=True').embed).toBe(true)
+    expect(parseQueryParams('?examMode=TRUE').examMode).toBe(true)
   })
 
   it('?embed=true defaults examMode on; explicit ?examMode=false wins', () => {
