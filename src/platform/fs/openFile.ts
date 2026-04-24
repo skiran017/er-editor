@@ -7,8 +7,8 @@ export interface OpenFileOptions {
 
 /**
  * Pops the native file-picker by synthesising a click on an invisible
- * `<input type=file>`. Resolves with the chosen File (or null if the user
- * cancelled / closed the picker without choosing anything).
+ * `<input type=file>`. Resolves with the chosen File, or null if the user
+ * confirmed without selecting a file OR dismissed the picker.
  *
  * For `multiple: true` the single-file overload is unchanged; callers that
  * want multi-file selection use `openFiles` (not shipped in Phase 7).
@@ -21,17 +21,25 @@ export const openFile = ({ accept, multiple = false }: OpenFileOptions): Promise
     input.multiple = multiple
     input.style.display = 'none'
 
-    input.addEventListener('change', () => {
-      const file = input.files && input.files.length > 0 ? input.files[0]! : null
+    const settle = (file: File | null): void => {
+      input.removeEventListener('change', onChange)
+      input.removeEventListener('cancel', onCancel)
       resolve(file)
-    }, { once: true })
+    }
+    const onChange = (): void => {
+      settle(input.files && input.files.length > 0 ? input.files[0]! : null)
+    }
+    const onCancel = (): void => { settle(null) }
+
+    input.addEventListener('change', onChange, { once: true })
+    input.addEventListener('cancel', onCancel, { once: true })
 
     // Some browsers require the input to be in the DOM before `click` works.
     document.body.appendChild(input)
     try {
       input.click()
     } finally {
-      // Defer removal so the change event has time to fire.
+      // Defer removal so the change/cancel event has time to fire.
       queueMicrotask(() => input.remove())
     }
   })

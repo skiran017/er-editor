@@ -23,7 +23,7 @@ describe('openFile', () => {
     await expect(openFile({ accept: '.txt' })).resolves.toStrictEqual(file)
   })
 
-  it('resolves with null when the user cancels (no files)', async () => {
+  it('resolves with null when the user confirms with no files selected', async () => {
     const original = document.createElement.bind(document)
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       const el = original(tag) as HTMLElement
@@ -31,6 +31,21 @@ describe('openFile', () => {
         queueMicrotask(() => {
           Object.defineProperty(el, 'files', { value: [], configurable: true })
           el.dispatchEvent(new Event('change'))
+        })
+      }
+      return el as never
+    })
+
+    await expect(openFile({ accept: '.txt' })).resolves.toBeNull()
+  })
+
+  it('resolves with null when the user dismisses the picker (cancel event)', async () => {
+    const original = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const el = original(tag) as HTMLElement
+      if (tag === 'input') {
+        queueMicrotask(() => {
+          el.dispatchEvent(new Event('cancel'))
         })
       }
       return el as never
