@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { toPng } from './toPng'
 
 vi.mock('html-to-image', async () => ({
@@ -6,6 +6,8 @@ vi.mock('html-to-image', async () => ({
 }))
 
 describe('toPng', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
   it('returns the data URL produced by html-to-image.toPng', async () => {
     const el = document.createElement('div')
     await expect(toPng(el)).resolves.toBe('data:image/png;base64,MOCK')
@@ -15,7 +17,6 @@ describe('toPng', () => {
     const { toPng: mockHtmlToImage } = (await import('html-to-image')) as unknown as {
       toPng: ReturnType<typeof vi.fn>
     }
-    mockHtmlToImage.mockClear()
     const el = document.createElement('div')
 
     await toPng(el, { backgroundColor: '#112233', pixelRatio: 2 })
@@ -26,11 +27,10 @@ describe('toPng', () => {
     }))
   })
 
-  it('defaults backgroundColor to white and pixelRatio to window.devicePixelRatio', async () => {
+  it('defaults backgroundColor to white and lets html-to-image own pixelRatio', async () => {
     const { toPng: mockHtmlToImage } = (await import('html-to-image')) as unknown as {
       toPng: ReturnType<typeof vi.fn>
     }
-    mockHtmlToImage.mockClear()
     const el = document.createElement('div')
 
     await toPng(el)
@@ -38,8 +38,7 @@ describe('toPng', () => {
     expect(mockHtmlToImage).toHaveBeenCalledWith(el, expect.objectContaining({
       backgroundColor: 'white',
     }))
-    const callOpts = mockHtmlToImage.mock.calls[0]![1] as { pixelRatio: number }
-    expect(typeof callOpts.pixelRatio).toBe('number')
-    expect(callOpts.pixelRatio).toBeGreaterThan(0)
+    const callOpts = mockHtmlToImage.mock.calls[0]![1] as Record<string, unknown>
+    expect('pixelRatio' in callOpts).toBe(false)
   })
 })
