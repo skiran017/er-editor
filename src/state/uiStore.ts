@@ -59,6 +59,15 @@ export interface UiStoreState {
   // data-exfiltrating actions: Open, Save, Export, and the Validation toggle.
   // Deliberately NOT persisted — the URL is the source of truth each session.
   readonly examMode: boolean
+  // Readonly mode — driven by `?readonly=true`. Blocks mutation actions
+  // (Task 8) and hides mutator UI (Task 9). NOT persisted; URL is the
+  // source of truth each session.
+  //
+  // Embed mode — driven by `?embed=true`. Hides Menu + Toolbar chrome
+  // (Task 10) so the editor can be iframed in Moodle / LMS hosts. NOT
+  // persisted; URL is the source of truth.
+  readonly readonly: boolean
+  readonly embed: boolean
   setTheme: (t: Theme) => void
   setLanguage: (l: Language) => void
   togglePanel: (id: string) => void
@@ -72,6 +81,8 @@ export interface UiStoreState {
   startInlineRename: (state: InlineRenameState) => void
   cancelInlineRename: () => void
   setExamMode: (on: boolean) => void
+  setReadonly: (b: boolean) => void
+  setEmbed: (b: boolean) => void
 }
 
 export const useUiStore = create<UiStoreState>()(
@@ -92,6 +103,8 @@ export const useUiStore = create<UiStoreState>()(
         contextMenu: null,
         inlineRename: null,
         examMode: false,
+        readonly: false,
+        embed: false,
 
         setTheme: (t) => set((state) => { state.theme = t }),
         setLanguage: (l) => set((state) => { state.language = l }),
@@ -132,6 +145,8 @@ export const useUiStore = create<UiStoreState>()(
         cancelInlineRename: () => set((state) => { state.inlineRename = null }),
 
         setExamMode: (on) => set((state) => { state.examMode = on }),
+        setReadonly: (b) => set((state) => { state.readonly = b }),
+        setEmbed: (b) => set((state) => { state.embed = b }),
       })),
       {
         name: 'er-editor:ui',

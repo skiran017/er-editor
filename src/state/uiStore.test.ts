@@ -115,3 +115,27 @@ describe('uiStore — inlineRename', () => {
     expect(useUiStore.getState().inlineRename).toBeNull()
   })
 })
+
+describe('uiStore — readonly + embed flags', () => {
+  beforeEach(() => useUiStore.setState({ readonly: false, embed: false }))
+
+  it('setReadonly + setEmbed mutate only their own fields', () => {
+    useUiStore.setState({ readonly: false, embed: false })
+    useUiStore.getState().setReadonly(true)
+    useUiStore.getState().setEmbed(true)
+    expect(useUiStore.getState().readonly).toBe(true)
+    expect(useUiStore.getState().embed).toBe(true)
+  })
+
+  it('readonly and embed are NOT persisted', () => {
+    // Set both plus language, then trigger persistence via setLanguage
+    useUiStore.setState({ readonly: true, embed: true })
+    useUiStore.getState().setLanguage('it')
+    // Reach into the persist middleware's serializer:
+    const persisted = JSON.parse(localStorage.getItem('er-editor:ui') ?? '{}')
+    expect(persisted.state.readonly).toBeUndefined()
+    expect(persisted.state.embed).toBeUndefined()
+    // Sanity: language IS persisted.
+    expect(persisted.state.language).toBe('it')
+  })
+})
