@@ -16,6 +16,23 @@ const ExamModeBanner = ({ t }: { readonly t: TFunction }) => (
   </div>
 )
 
+const LanguageSection = ({
+  t,
+  language,
+  onSetLanguage,
+}: {
+  readonly t: TFunction
+  readonly language: Language
+  readonly onSetLanguage: (l: Language) => void
+}) => (
+  <div className="px-4 py-2">
+    <div className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+      {t('menu:app.language')}
+    </div>
+    <LanguageToggle value={language} onChange={onSetLanguage} />
+  </div>
+)
+
 export interface FileAction {
   readonly id: string
   readonly labelKey: string
@@ -151,10 +168,7 @@ export const MenuDropdownBody = ({
           </div>
         </div>
 
-        <div className="px-4 py-2">
-          <div className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{t('menu:app.language')}</div>
-          <LanguageToggle value={language} onChange={onSetLanguage} />
-        </div>
+        <LanguageSection t={t} language={language} onSetLanguage={onSetLanguage} />
 
         <button
           type="button"

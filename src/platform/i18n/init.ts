@@ -35,9 +35,14 @@ const resources = {
   },
 } as const
 
+// Mirror of the Language alias in @/state/uiStore. Defined locally to keep
+// the platform layer free of state-store imports per the layer-boundary
+// rule. Update both sites when adding a new locale.
+type Language = 'en' | 'it'
+
 let inFlight: Promise<typeof i18next> | null = null
 
-export const initI18n = async (lng = 'en'): Promise<typeof i18next> => {
+export const initI18n = async (lng: Language = 'en'): Promise<typeof i18next> => {
   if (i18next.isInitialized) return i18next
   if (inFlight) return inFlight
   inFlight = (async () => {
