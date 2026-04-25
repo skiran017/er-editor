@@ -46,6 +46,8 @@ export const Menu = () => {
 
   const theme = useUiStore((s) => s.theme)
   const setTheme = useUiStore((s) => s.setTheme)
+  const language = useUiStore((s) => s.language)
+  const setLanguage = useUiStore((s) => s.setLanguage)
   const pushToast = useUiStore((s) => s.pushToast)
   // Exam mode gates file I/O + the Validation toggle. Sourced from the URL
   // (`?examMode=true` or default-on under `?embed=true`) during startup.
@@ -123,6 +125,8 @@ export const Menu = () => {
           themes={THEMES}
           theme={theme}
           onSetTheme={setTheme}
+          language={language}
+          onSetLanguage={setLanguage}
           validationEnabled={validationEnabled}
           onSetValidationEnabled={setValidationEnabled}
           examMode={examMode}

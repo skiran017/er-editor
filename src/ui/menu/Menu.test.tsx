@@ -42,6 +42,15 @@ describe('Menu — hamburger dropdown', () => {
     expect(screen.getByRole('menuitem', { name: /Reset/ })).toBeInTheDocument()
     // Theme radiogroup.
     expect(screen.getByRole('radiogroup', { name: /Theme/ })).toBeInTheDocument()
+    // Language radiogroup.
+    expect(screen.getByRole('radiogroup', { name: /Language/ })).toBeInTheDocument()
+  })
+
+  it('clicking IT in the language toggle writes "it" to uiStore.language', async () => {
+    render(<Menu />)
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    await userEvent.click(screen.getByRole('radio', { name: /italian/i }))
+    expect(useUiStore.getState().language).toBe('it')
   })
 
   it('Phase-5 file actions push an info toast with the "not yet available" key', async () => {

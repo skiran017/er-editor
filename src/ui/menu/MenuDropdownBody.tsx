@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next'
 import type { ComponentType } from 'react'
-import type { Theme } from '@/state/uiStore'
+import type { Language, Theme } from '@/state/uiStore'
+import { LanguageToggle } from '@/ui/primitives'
 import { FileActionRow } from './FileActionRow'
 
 // Exam-mode banner at the top of the dropdown — signals *why* the file /
@@ -47,6 +48,8 @@ export interface MenuDropdownBodyProps {
   readonly onClickOutside: () => void
   readonly resetIcon: ComponentType<{ size?: number; className?: string }>
   readonly keyboardIcon: ComponentType<{ size?: number; className?: string }>
+  readonly language: Language
+  readonly onSetLanguage: (l: Language) => void
 }
 
 // Split out of Menu.tsx so the outer component stays under the lint cap for
@@ -66,6 +69,8 @@ export const MenuDropdownBody = ({
   onClickOutside,
   resetIcon: ResetIcon,
   keyboardIcon: KeyboardIcon,
+  language,
+  onSetLanguage,
 }: MenuDropdownBodyProps) => {
   const hasFileActions = fileActions.length > 0
   const showValidation = !examMode
@@ -144,6 +149,11 @@ export const MenuDropdownBody = ({
               )
             })}
           </div>
+        </div>
+
+        <div className="px-4 py-2">
+          <div className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{t('menu:app.language')}</div>
+          <LanguageToggle value={language} onChange={onSetLanguage} />
         </div>
 
         <button
