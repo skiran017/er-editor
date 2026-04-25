@@ -221,6 +221,7 @@ const logStub = (label: string): void => {
   console.info(`[actions] ${label} — stub; full impl in Sub-project 4`)
 }
 
+// stubCopy is read-only — no readonly gate needed.
 export const stubCopy = (_c: EditorContext, _e: EditorEvent) => logStub('copy')
 export const stubCut = (_c: EditorContext, _e: EditorEvent): void => {
   if (isReadonly()) return

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { placeNode, nudgeSelection, deleteSelectionAction } from './actions'
+import { placeNode, nudgeSelection, deleteSelectionAction, undoAction } from './actions'
 import { initialContext } from './context'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
@@ -50,6 +50,23 @@ describe('actions — readonly gate', () => {
     nudgeSelection(initialContext, { type: 'NUDGE', dx: 10, dy: 10 })
 
     expect(useDiagramStore.getState().diagram.nodesById[id]!.position).toEqual({ x: 0, y: 0 })
+  })
+
+  it('undoAction does not rewind history when readonly is true', () => {
+    // Seed an entity (this is one history step).
+    const id = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    expect(useDiagramStore.getState().diagram.nodeOrder).toContain(id)
+
+    useUiStore.setState({ readonly: true })
+
+    undoAction(initialContext, { type: 'UNDO' })
+
+    // Without the gate, undo would have removed the entity. With the gate,
+    // the diagram is unchanged.
+    expect(useDiagramStore.getState().diagram.nodeOrder).toContain(id)
   })
 
   it('with readonly false, placeNode still works (sanity — gate is scoped)', () => {
