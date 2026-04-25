@@ -18,6 +18,8 @@ import type { EditorEvent } from './events'
 
 // ——— helpers ———
 
+const isReadonly = (): boolean => useUiStore.getState().readonly
+
 const DEFAULT_SIZES = {
   entity:       { width: 120, height: 60 },
   relationship: { width: 140, height: 70 },
@@ -49,6 +51,7 @@ const countOfKind = (diagram: Diagram, kind: 'entity' | 'relationship' | 'attrib
 // ——— placement + drag ———
 
 export const placeNode = (context: EditorContext, event: EditorEvent): void => {
+  if (isReadonly()) return
   if (event.type !== 'CANVAS_POINTER_UP') return
   const tool = context.tool
   if (tool !== 'entity' && tool !== 'relationship' && tool !== 'attribute' && tool !== 'isa') return
@@ -90,6 +93,7 @@ export const placeNode = (context: EditorContext, event: EditorEvent): void => {
 }
 
 export const moveDraggedNode = (context: EditorContext, event: EditorEvent): void => {
+  if (isReadonly()) return
   if (event.type !== 'CANVAS_POINTER_MOVE') return
   if (!context.draggedNodeId) return
   useDiagramStore.getState().moveNode(context.draggedNodeId, event.point)
@@ -189,6 +193,7 @@ export const fitAction = (_context: EditorContext, _event: EditorEvent): void =>
 // ——— selection ops ———
 
 export const nudgeSelection = (_context: EditorContext, event: EditorEvent): void => {
+  if (isReadonly()) return
   if (event.type !== 'NUDGE') return
   const diagram = useDiagramStore.getState().diagram
   for (const id of useSelectionStore.getState().selectedNodeIds) {
@@ -201,10 +206,12 @@ export const nudgeSelection = (_context: EditorContext, event: EditorEvent): voi
 // ——— history ———
 
 export const undoAction = (_context: EditorContext, _event: EditorEvent): void => {
+  if (isReadonly()) return
   useDiagramStore.temporal.getState().undo()
 }
 
 export const redoAction = (_context: EditorContext, _event: EditorEvent): void => {
+  if (isReadonly()) return
   useDiagramStore.temporal.getState().redo()
 }
 
@@ -215,13 +222,25 @@ const logStub = (label: string): void => {
 }
 
 export const stubCopy = (_c: EditorContext, _e: EditorEvent) => logStub('copy')
-export const stubCut = (_c: EditorContext, _e: EditorEvent) => logStub('cut')
-export const stubPaste = (_c: EditorContext, _e: EditorEvent) => logStub('paste')
+export const stubCut = (_c: EditorContext, _e: EditorEvent): void => {
+  if (isReadonly()) return
+  logStub('cut')
+}
+export const stubPaste = (_c: EditorContext, _e: EditorEvent): void => {
+  if (isReadonly()) return
+  logStub('paste')
+}
 
 // ——— commands passthroughs ———
 
-export const deleteSelectionAction = (_c: EditorContext, _e: EditorEvent) => deleteSelectionCmd()
-export const duplicateSelectionAction = (_c: EditorContext, _e: EditorEvent) => duplicateSelectionCmd()
+export const deleteSelectionAction = (_c: EditorContext, _e: EditorEvent): void => {
+  if (isReadonly()) return
+  deleteSelectionCmd()
+}
+export const duplicateSelectionAction = (_c: EditorContext, _e: EditorEvent): void => {
+  if (isReadonly()) return
+  duplicateSelectionCmd()
+}
 export const selectAllAction = (_c: EditorContext, _e: EditorEvent) => selectAllCmd()
 export const clearSelectionAction = (_c: EditorContext, _e: EditorEvent) => clearSelectionCmd()
 
@@ -348,6 +367,7 @@ const connectViaConnectTool = (source: ERNode, target: ERNode, sourceId: NodeId,
 }
 
 export const connectNodes = (context: EditorContext, event: EditorEvent): void => {
+  if (isReadonly()) return
   if (event.type !== 'NODE_POINTER_DOWN' && event.type !== 'NODE_POINTER_UP') return
   const targetId = event.nodeId
   const sourceId = context.connectionFromId ?? context.quickFirstId
@@ -378,6 +398,7 @@ export const connectNodes = (context: EditorContext, event: EditorEvent): void =
 // ——— connect-child-to-ISA (right-click on ISA flow) ———
 
 export const connectChildToIsaAction = (context: EditorContext, event: EditorEvent): void => {
+  if (isReadonly()) return
   if (!context.connectionFromId) return
   if (event.type !== 'NODE_POINTER_DOWN') return
   const diagram = useDiagramStore.getState().diagram
@@ -398,6 +419,7 @@ export const connectChildToIsaAction = (context: EditorContext, event: EditorEve
 // ——— inline rename ———
 
 export const beginRenameSelected = (): void => {
+  if (isReadonly()) return
   const selected = useSelectionStore.getState().selectedNodeIds
   if (selected.size !== 1) return
   const [id] = [...selected]
@@ -413,6 +435,7 @@ export const beginRenameSelected = (): void => {
 // (composite). When the Attribute tool is active and the user clicks one of
 // those kinds, create the attribute adjacent to the parent and wire it.
 export const placeAttributeOnParent = (event: EditorEvent): void => {
+  if (isReadonly()) return
   if (event.type !== 'NODE_POINTER_DOWN') return
   const { diagram } = useDiagramStore.getState()
   const parent = diagram.nodesById[event.nodeId]
