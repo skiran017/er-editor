@@ -52,6 +52,7 @@ export const Menu = () => {
   // Exam mode gates file I/O + the Validation toggle. Sourced from the URL
   // (`?examMode=true` or default-on under `?embed=true`) during startup.
   const examMode = useUiStore((s) => s.examMode)
+  const readonly = useUiStore((s) => s.readonly)
 
   const validationEnabled = useValidationStore((s) => s.enabled)
   const setValidationEnabled = useValidationStore((s) => s.setEnabled)
@@ -135,6 +136,7 @@ export const Menu = () => {
           onClickOutside={close}
           resetIcon={Trash2}
           keyboardIcon={Keyboard}
+          showReset={!readonly}
         />
       )}
     </div>

@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PanelHeader } from './PanelHeader'
 import { useSelectionStore } from '@/state/selectionStore'
 import { useInteractionStore } from '@/interaction/interactionStore'
+import { useUiStore } from '@/state/uiStore'
 import type { NodeId } from '@/domain/types'
 import { initI18n } from '@/platform/i18n'
 
@@ -17,10 +18,12 @@ const reset = () => {
     selectedEdgeIds: new Set(),
     rubberband: null,
   })
+  useUiStore.setState({ readonly: false })
 }
 
 describe('PanelHeader', () => {
   beforeEach(reset)
+  afterEach(() => useUiStore.setState({ readonly: false }))
 
   it('renders the localized title', () => {
     render(<PanelHeader titleKey="kind.entity" kind="entity" />)
@@ -47,5 +50,13 @@ describe('PanelHeader', () => {
       'data-kind',
       'relationship',
     )
+  })
+
+  it('hides the delete button when uiStore.readonly is true', () => {
+    useUiStore.setState({ readonly: true })
+    render(<PanelHeader titleKey="kind.entity" kind="entity" />)
+    expect(screen.queryByRole('button', { name: /delete/i })).toBeNull()
+    // close button stays
+    expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument()
   })
 })

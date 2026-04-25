@@ -33,6 +33,46 @@ const LanguageSection = ({
   </div>
 )
 
+const ThemeSection = ({
+  t,
+  themes,
+  theme,
+  onSetTheme,
+}: {
+  readonly t: TFunction
+  readonly themes: readonly ThemeOption[]
+  readonly theme: Theme
+  readonly onSetTheme: (v: Theme) => void
+}) => (
+  <div className="px-4 py-2">
+    <div className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{t('menu:app.theme')}</div>
+    <div className="flex items-center gap-2" role="radiogroup" aria-label={t('menu:app.theme')}>
+      {themes.map((opt) => {
+        const Icon = opt.icon
+        const active = theme === opt.value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={t(opt.labelKey)}
+            title={t(opt.labelKey)}
+            onClick={() => onSetTheme(opt.value)}
+            className={`flex flex-1 items-center justify-center rounded-md px-3 py-2 text-sm transition-colors ${
+              active
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Icon size={16} aria-hidden />
+          </button>
+        )
+      })}
+    </div>
+  </div>
+)
+
 export interface FileAction {
   readonly id: string
   readonly labelKey: string
@@ -67,6 +107,9 @@ export interface MenuDropdownBodyProps {
   readonly keyboardIcon: ComponentType<{ size?: number; className?: string }>
   readonly language: Language
   readonly onSetLanguage: (l: Language) => void
+  // When false (readonly mode), the Reset row is hidden entirely so there is
+  // no DOM element a user could re-enable via DevTools.
+  readonly showReset?: boolean
 }
 
 // Split out of Menu.tsx so the outer component stays under the lint cap for
@@ -88,6 +131,7 @@ export const MenuDropdownBody = ({
   keyboardIcon: KeyboardIcon,
   language,
   onSetLanguage,
+  showReset = true,
 }: MenuDropdownBodyProps) => {
   const hasFileActions = fileActions.length > 0
   const showValidation = !examMode
@@ -140,45 +184,21 @@ export const MenuDropdownBody = ({
 
         <div className="my-2 h-px bg-slate-200 dark:bg-slate-700" aria-hidden />
 
-        <div className="px-4 py-2">
-          <div className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{t('menu:app.theme')}</div>
-          <div className="flex items-center gap-2" role="radiogroup" aria-label={t('menu:app.theme')}>
-            {themes.map((opt) => {
-              const Icon = opt.icon
-              const active = theme === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  aria-label={t(opt.labelKey)}
-                  title={t(opt.labelKey)}
-                  onClick={() => onSetTheme(opt.value)}
-                  className={`flex flex-1 items-center justify-center rounded-md px-3 py-2 text-sm transition-colors ${
-                    active
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <Icon size={16} aria-hidden />
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        <ThemeSection t={t} themes={themes} theme={theme} onSetTheme={onSetTheme} />
 
         <LanguageSection t={t} language={language} onSetLanguage={onSetLanguage} />
 
-        <button
-          type="button"
-          role="menuitem"
-          onClick={onReset}
-          className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-        >
-          <ResetIcon size={18} aria-hidden />
-          <span className="flex-1">{t('menu:app.reset')}</span>
-        </button>
+        {showReset && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onReset}
+            className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+          >
+            <ResetIcon size={18} aria-hidden />
+            <span className="flex-1">{t('menu:app.reset')}</span>
+          </button>
+        )}
       </div>
     </>
   )

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Menu } from './Menu'
@@ -16,6 +16,7 @@ const reset = () => {
     theme: 'system', language: 'en',
     panels: { properties: true, minimap: false },
     modals: [], toasts: [], contextMenu: null, inlineRename: null,
+    readonly: false,
   })
   useValidationStore.setState({ errorsById: {}, enabled: true })
   useDiagramStore.setState({ diagram: emptyDiagram() })
@@ -113,6 +114,19 @@ describe('Menu — hamburger dropdown', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: /Reset/ }))
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(1)
     confirmSpy.mockRestore()
+  })
+})
+
+describe('Menu — readonly mode', () => {
+  beforeEach(reset)
+  afterEach(() => useUiStore.setState({ readonly: false }))
+
+  it('hides the Reset row when uiStore.readonly is true', async () => {
+    const user = userEvent.setup()
+    useUiStore.setState({ readonly: true })
+    render(<Menu />)
+    await user.click(screen.getByRole('button', { name: /menu/i }))
+    expect(screen.queryByRole('menuitem', { name: /reset/i })).toBeNull()
   })
 })
 

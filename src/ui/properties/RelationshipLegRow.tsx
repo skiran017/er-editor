@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
+import { useUiStore } from '@/state/uiStore'
 import type {
   Cardinality,
   EntityNode,
@@ -29,6 +30,7 @@ export const RelationshipLegRow = ({
   const { t } = useTranslation('properties')
   const updateEdge = useDiagramStore((s) => s.updateEdge)
   const select = useSelectionStore((s) => s.select)
+  const readonly = useUiStore((s) => s.readonly)
 
   return (
     <div
@@ -58,6 +60,7 @@ export const RelationshipLegRow = ({
             value={edge.role ?? ''}
             placeholder={t('rolePlaceholder')}
             onChange={(e) => updateEdge(edge.id, { role: e.target.value || undefined })}
+            disabled={readonly}
             className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus:border-purple-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
         </label>
@@ -69,6 +72,7 @@ export const RelationshipLegRow = ({
           <select
             value={edge.cardinality}
             onChange={(e) => updateEdge(edge.id, { cardinality: e.target.value as Cardinality })}
+            disabled={readonly}
             className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus:border-purple-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           >
             {CARDINALITIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -79,6 +83,7 @@ export const RelationshipLegRow = ({
           <select
             value={edge.participation}
             onChange={(e) => updateEdge(edge.id, { participation: e.target.value as Participation })}
+            disabled={readonly}
             className="rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus:border-purple-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           >
             {PARTICIPATIONS.map((p) => (
