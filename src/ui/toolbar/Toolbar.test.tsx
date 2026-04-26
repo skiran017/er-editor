@@ -151,12 +151,14 @@ describe('Toolbar — readonly mode', () => {
 describe('Toolbar — responsive positioning', () => {
   beforeEach(reset)
 
-  it('pins to the top at every breakpoint and clamps to viewport on narrow phones', () => {
+  it('top-pinned but stacked below the hamburger on mobile (top-16), shares the top-4 row on sm+', () => {
     const { container } = render(<Toolbar />)
     const nav = container.querySelector('[data-role="toolbar"]')!
-    // Top-pinned everywhere — the bottom-pinned mobile variant was reverted
-    // because it collided with the on-screen keyboard and the property drawer.
-    expect(nav.className).toContain('top-4')
+    // Default (mobile): toolbar sits one row below the menu so it doesn't
+    // cover the top-left hamburger.
+    expect(nav.className).toContain('top-16')
+    // sm+: enough horizontal room for menu + toolbar to share top-4.
+    expect(nav.className).toContain('sm:top-4')
     // Horizontal-overflow scroll keeps the full tool set reachable on phones
     // narrower than ~360px without clipping either end of the centered pill.
     expect(nav.className).toContain('max-w-[calc(100vw-1rem)]')
