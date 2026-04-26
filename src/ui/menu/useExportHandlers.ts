@@ -1,4 +1,4 @@
-import { toPng, canvasToSvg } from '@/platform/imageExport'
+import { toPng, canvasToSvg, inlineComputedStyles } from '@/platform/imageExport'
 import { downloadBlob } from '@/platform/fs'
 import { useUiStore } from '@/state/uiStore'
 
@@ -26,6 +26,7 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
       return
     }
+    const restore = inlineComputedStyles(el)
     try {
       const dataUrl = await toPng(el)
       await downloadDataUrl(dataUrl, `diagram-${timestamp()}.png`)
@@ -33,6 +34,8 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
     } catch (err) {
       console.error('PNG export failed', err)
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
+    } finally {
+      restore()
     }
     close()
   }
@@ -43,6 +46,7 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
       return
     }
+    const restore = inlineComputedStyles(el)
     try {
       const dataUrl = await canvasToSvg(el)
       await downloadDataUrl(dataUrl, `diagram-${timestamp()}.svg`)
@@ -50,6 +54,8 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
     } catch (err) {
       console.error('SVG export failed', err)
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
+    } finally {
+      restore()
     }
     close()
   }
