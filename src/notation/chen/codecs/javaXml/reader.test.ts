@@ -1,6 +1,11 @@
 // src/notation/chen/codecs/javaXml/reader.test.ts
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { parseJavaXml } from './reader'
+
+const FIX = (name: string): string =>
+  readFileSync(join(__dirname, '../../../../../tests/fixtures/supsi', name), 'utf8')
 
 const MINIMAL = `<?xml version="1.0" encoding="UTF-8"?>
 <ERDatabaseModel>
@@ -248,5 +253,70 @@ describe('parseJavaXml — error paths', () => {
   <ERDatabaseDiagram />
 </ERDatabaseModel>`
     expect(() => parseJavaXml(xml)).toThrow(/Expected "true" or "false"/)
+  })
+})
+
+describe('parseJavaXml — SUPSI fixtures', () => {
+  it('conference-sol.xml: 11 entities, 13 relationships, 0 generalizations, lastId=78', () => {
+    const m = parseJavaXml(FIX('conference-sol.xml'))
+    expect(m.schema.lastId).toBe(78)
+    expect(m.schema.entities).toHaveLength(11)
+    expect(m.schema.relationships).toHaveLength(13)
+    expect(m.schema.generalizations).toHaveLength(0)
+    // 9 strong + 2 weak
+    expect(m.schema.entities.filter((e) => e._kind === 'StrongEntitySet')).toHaveLength(9)
+    expect(m.schema.entities.filter((e) => e._kind === 'WeakEntitySet')).toHaveLength(2)
+    // includes IdentifyingRelationshipSetOneToN
+    expect(m.schema.relationships.some((r) => r._kind === 'IdentifyingRelationshipSetOneToN')).toBe(true)
+  })
+
+  it('test.xml: 3 entities (1 weak), 1 relationship', () => {
+    const m = parseJavaXml(FIX('test.xml'))
+    expect(m.schema.entities).toHaveLength(3)
+    expect(m.schema.relationships).toHaveLength(1)
+    const weak = m.schema.entities.find((e) => e._kind === 'WeakEntitySet')
+    expect(weak?.name).toBe("ENTITA'_3")
+    expect(m.schema.relationships[0]?._kind).toBe('RelationshipSetOneToOne')
+  })
+
+  it('xml.xml: 7 entities, 3 relationships, includes a 4-branch RelationshipSetNToN', () => {
+    const m = parseJavaXml(FIX('xml.xml'))
+    expect(m.schema.entities).toHaveLength(7)
+    expect(m.schema.relationships).toHaveLength(3)
+    expect(m.schema.generalizations).toHaveLength(0)
+    const big = m.schema.relationships.find((r) => r.branches.length === 4)
+    expect(big?._kind).toBe('RelationshipSetNToN')
+  })
+
+  it('er-java.xml: 2 entities, 1 RelationshipSetOneToOne, lastId=7', () => {
+    const m = parseJavaXml(FIX('er-java.xml'))
+    expect(m.schema.lastId).toBe(7)
+    expect(m.schema.entities).toHaveLength(2)
+    expect(m.schema.relationships).toHaveLength(1)
+    expect(m.schema.relationships[0]?._kind).toBe('RelationshipSetOneToOne')
+  })
+
+  it('er-diagram-java-1767873101060.xml: lastId=0 quirk, 3 entities, max element id=12', () => {
+    const m = parseJavaXml(FIX('er-diagram-java-1767873101060.xml'))
+    expect(m.schema.lastId).toBe(0)
+    expect(m.schema.entities).toHaveLength(3)
+    // lastId=0 is a Java quirk; the actual highest id in the file is 12
+    const allEntityIds = m.schema.entities.flatMap((e) => [e.id, ...e.attributes.map((a) => a.id)])
+    const allBranchIds = m.schema.relationships.flatMap((r) => r.branches.map((b) => b.id))
+    const allRelIds = m.schema.relationships.map((r) => r.id)
+    const allIds = [...allEntityIds, ...allBranchIds, ...allRelIds]
+    expect(Math.max(...allIds)).toBe(12)
+  })
+
+  it('every fixture parses without throwing', () => {
+    for (const name of [
+      'conference-sol.xml',
+      'test.xml',
+      'xml.xml',
+      'er-java.xml',
+      'er-diagram-java-1767873101060.xml',
+    ]) {
+      expect(() => parseJavaXml(FIX(name))).not.toThrow()
+    }
   })
 })
