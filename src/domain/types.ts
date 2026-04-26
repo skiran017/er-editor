@@ -85,6 +85,26 @@ export interface Diagram {
   readonly edgesById: Readonly<Record<EdgeId, ERLink>>
   readonly nodeOrder: readonly NodeId[]
   readonly edgeOrder: readonly EdgeId[]
+  /** Stored verbatim during Java XML round-trip; codec writes it back on export. */
+  readonly databaseName?: string
+  /** Stored verbatim during Java XML round-trip; codec writes it back on export. */
+  readonly databaseLastId?: number
+  /**
+   * Verbatim ordered positions from the original Java XML ERDatabaseDiagram section.
+   * Stored as [javaId, {x, y}][] to preserve document order for byte-clean round-trip.
+   * Not persisted via uiStore — transient import/export metadata only.
+   */
+  readonly _javaXmlPositions?: readonly (readonly [number, Point])[]
+  /**
+   * Per-entity ordered key/discriminant attribute node ID lists, as parsed from the
+   * original Java XML. Preserves the PrimaryKey/Discriminant list order from the source
+   * XML for byte-clean round-trip. Not persisted via uiStore.
+   */
+  readonly _javaXmlKeyOrders?: readonly {
+    readonly entityNodeId: NodeId
+    readonly keyAttrNodeIds: readonly NodeId[]
+    readonly discriminantAttrNodeIds: readonly NodeId[]
+  }[]
 }
 
 // Canonical empty-diagram factory.

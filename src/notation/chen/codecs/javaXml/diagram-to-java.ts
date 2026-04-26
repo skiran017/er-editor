@@ -90,24 +90,64 @@ const buildJavaAttribute = (
   return { _kind: 'SimpleAttribute', id, name: node.name, multiValued: node.isMultivalued, derived: node.isDerived }
 }
 
+// Build a lookup: entityNodeId → { keyAttrNodeIds, discriminantAttrNodeIds }
+// from the verbatim import metadata (preserves original PrimaryKey/Discriminant order).
+type KeyOrderMap = ReadonlyMap<NodeId, { keyAttrNodeIds: readonly NodeId[]; discriminantAttrNodeIds: readonly NodeId[] }>
+
+const buildKeyOrderMap = (d: Diagram): KeyOrderMap => {
+  const map = new Map<NodeId, { keyAttrNodeIds: readonly NodeId[]; discriminantAttrNodeIds: readonly NodeId[] }>()
+  if (d._javaXmlKeyOrders) {
+    for (const entry of d._javaXmlKeyOrders) {
+      map.set(entry.entityNodeId, {
+        keyAttrNodeIds: entry.keyAttrNodeIds,
+        discriminantAttrNodeIds: entry.discriminantAttrNodeIds,
+      })
+    }
+  }
+  return map
+}
+
 const buildEntityAttrs = (
   d: Diagram,
   attrChildrenMap: Map<NodeId, NodeId[]>,
   entityNodeId: NodeId,
   javaIdByNodeId: Map<NodeId, number>,
+  keyOrderMap: KeyOrderMap,
   nextId: () => number,
 ): { attributes: JavaAttribute[]; keyIds: number[]; discriminantIds: number[] } => {
   const attributes: JavaAttribute[] = []
-  const keyIds: number[] = []
-  const discriminantIds: number[] = []
   for (const attrNodeId of topLevelAttrsFor(d, entityNodeId)) {
     const attrNode = d.nodesById[attrNodeId]!
     if (attrNode.kind !== 'attribute') continue
-    const jAttr = buildJavaAttribute(d, attrChildrenMap, attrNodeId, javaIdByNodeId, nextId)
-    attributes.push(jAttr)
-    if (attrNode.isKey) keyIds.push(jAttr.id)
-    if (attrNode.isDiscriminant) discriminantIds.push(jAttr.id)
+    attributes.push(buildJavaAttribute(d, attrChildrenMap, attrNodeId, javaIdByNodeId, nextId))
   }
+
+  const keyOrder = keyOrderMap.get(entityNodeId)
+  let keyIds: number[]
+  let discriminantIds: number[]
+
+  if (keyOrder !== undefined) {
+    // Use the verbatim import ordering for PrimaryKey / Discriminant members.
+    keyIds = keyOrder.keyAttrNodeIds
+      .map((nid) => javaIdByNodeId.get(nid))
+      .filter((id): id is number => id !== undefined)
+    discriminantIds = keyOrder.discriminantAttrNodeIds
+      .map((nid) => javaIdByNodeId.get(nid))
+      .filter((id): id is number => id !== undefined)
+  } else {
+    // Fresh diagram: collect keys in attribute traversal order.
+    keyIds = []
+    discriminantIds = []
+    for (const attrNodeId of topLevelAttrsFor(d, entityNodeId)) {
+      const attrNode = d.nodesById[attrNodeId]!
+      if (attrNode.kind !== 'attribute') continue
+      const jid = javaIdByNodeId.get(attrNodeId)
+      if (jid === undefined) continue
+      if (attrNode.isKey) keyIds.push(jid)
+      if (attrNode.isDiscriminant) discriminantIds.push(jid)
+    }
+  }
+
   return { attributes, keyIds, discriminantIds }
 }
 
@@ -115,6 +155,7 @@ const buildEntities = (
   d: Diagram,
   attrChildrenMap: Map<NodeId, NodeId[]>,
   javaIdByNodeId: Map<NodeId, number>,
+  keyOrderMap: KeyOrderMap,
   nextId: () => number,
 ): JavaEntitySet[] => {
   const entities: JavaEntitySet[] = []
@@ -124,7 +165,7 @@ const buildEntities = (
     const id = nextId()
     javaIdByNodeId.set(nodeId, id)
     const { attributes, keyIds, discriminantIds } = buildEntityAttrs(
-      d, attrChildrenMap, nodeId, javaIdByNodeId, nextId,
+      d, attrChildrenMap, nodeId, javaIdByNodeId, keyOrderMap, nextId,
     )
     if (node.isWeak) {
       entities.push({ _kind: 'WeakEntitySet', id, name: node.name, attributes, discriminant: discriminantIds })
@@ -221,6 +262,17 @@ const buildGeneralizations = (
 }
 
 const buildPositions = (d: Diagram, javaIdByNodeId: Map<NodeId, number>): Map<number, JavaPosition> => {
+  // If the diagram was imported from Java XML, _javaXmlPositions carries the
+  // original ERDatabaseDiagram order. Use it verbatim so the re-serialized
+  // positions section matches the input byte-for-byte.
+  if (d._javaXmlPositions !== undefined && d._javaXmlPositions.length > 0) {
+    const positions = new Map<number, JavaPosition>()
+    for (const [id, p] of d._javaXmlPositions) {
+      positions.set(id, { x: p.x, y: p.y })
+    }
+    return positions
+  }
+  // Fresh diagram: build from nodeOrder.
   const positions = new Map<number, JavaPosition>()
   for (const nodeId of d.nodeOrder) {
     const node = d.nodesById[nodeId]!
@@ -232,16 +284,19 @@ const buildPositions = (d: Diagram, javaIdByNodeId: Map<NodeId, number>): Map<nu
 }
 
 export const diagramToJava = (d: Diagram, opts: DiagramToJavaOptions = {}): JavaModel => {
-  const databaseName = opts.databaseName ?? 'Unnamed_DB_Schema_1'
+  const databaseName = d.databaseName ?? opts.databaseName ?? 'Unnamed_DB_Schema_1'
   let counter = 0
   const nextId = (): number => ++counter
   const attrChildrenMap = buildAttrChildrenMap(d)
   const javaIdByNodeId = new Map<NodeId, number>()
-  const entities = buildEntities(d, attrChildrenMap, javaIdByNodeId, nextId)
+  const keyOrderMap = buildKeyOrderMap(d)
+  const entities = buildEntities(d, attrChildrenMap, javaIdByNodeId, keyOrderMap, nextId)
   const relationships = buildRelationships(d, attrChildrenMap, javaIdByNodeId, nextId)
   const generalizations = buildGeneralizations(d, javaIdByNodeId, nextId)
   const positions = buildPositions(d, javaIdByNodeId)
-  const lastId = counter
+  // Prefer the verbatim lastId stored from import (handles stale lastId=0 quirk
+  // in some SUPSI saves) over the re-assigned counter value.
+  const lastId = d.databaseLastId !== undefined ? d.databaseLastId : counter
   const schema: JavaSchema = { name: databaseName, lastId, entities, relationships, generalizations }
   return { schema, diagram: { positions } }
 }

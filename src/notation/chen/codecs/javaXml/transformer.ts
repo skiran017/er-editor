@@ -111,18 +111,34 @@ const NO_ENTITY: JavaEntitySet = {
   primaryKey: [],
 }
 
-const addAttributeWithEdge = (
+const cardinalityToParticipation = (totalParticipation: boolean): 'total' | 'partial' =>
+  totalParticipation ? 'total' : 'partial'
+
+// Internal state threaded through the transformer so relationship branches can
+// resolve which entity node corresponds to a given Java entity id.
+interface TransformState {
+  diagram: Diagram
+  /** Java integer id → our NodeId (entities only). */
+  entityNodeIdByJavaId: Map<number, NodeId>
+  /** Java integer id → our NodeId (attributes only, for key order preservation). */
+  attrNodeIdByJavaId: Map<number, NodeId>
+}
+
+// Returns the Diagram AND the top-level attribute node created (for id tracking).
+const addAttributeWithEdgeTracked = (
   d: Diagram,
   model: JavaModel,
   parentId: NodeId,
   a: JavaAttribute,
   e: JavaEntitySet,
+  attrNodeIdByJavaId: Map<number, NodeId>,
 ): Diagram => {
   const node = buildAttributeNode(
     model, a,
     isAttributeKeyMember(e, a),
     isAttributeDiscriminantMember(e, a),
   )
+  attrNodeIdByJavaId.set(a.id, node.id)
   const edge: ERLink = {
     id: newEdgeId(),
     kind: 'attribute-of',
@@ -135,27 +151,17 @@ const addAttributeWithEdge = (
   // Composite children fold under the composite attribute itself, not under the entity.
   if (isCompositeAttribute(a)) {
     for (const child of a.children) {
-      next = addAttributeWithEdge(next, model, node.id, child, e)
+      next = addAttributeWithEdgeTracked(next, model, node.id, child, e, attrNodeIdByJavaId)
     }
   }
   return next
-}
-
-const cardinalityToParticipation = (totalParticipation: boolean): 'total' | 'partial' =>
-  totalParticipation ? 'total' : 'partial'
-
-// Internal state threaded through the transformer so relationship branches can
-// resolve which entity node corresponds to a given Java entity id.
-interface TransformState {
-  diagram: Diagram
-  /** Java integer id → our NodeId (entities only). */
-  entityNodeIdByJavaId: Map<number, NodeId>
 }
 
 export const javaToDiagram = (model: JavaModel): Diagram => {
   const state: TransformState = {
     diagram: emptyDiagram(),
     entityNodeIdByJavaId: new Map(),
+    attrNodeIdByJavaId: new Map(),
   }
 
   // --- Entities ---
@@ -164,7 +170,9 @@ export const javaToDiagram = (model: JavaModel): Diagram => {
     state.entityNodeIdByJavaId.set(e.id, node.id)
     state.diagram = addNode(state.diagram, node)
     for (const a of e.attributes) {
-      state.diagram = addAttributeWithEdge(state.diagram, model, node.id, a, e)
+      state.diagram = addAttributeWithEdgeTracked(
+        state.diagram, model, node.id, a, e, state.attrNodeIdByJavaId,
+      )
     }
   }
 
@@ -175,7 +183,9 @@ export const javaToDiagram = (model: JavaModel): Diagram => {
 
     // Relationship attributes attach to the relationship node.
     for (const a of r.attributes) {
-      state.diagram = addAttributeWithEdge(state.diagram, model, relNode.id, a, NO_ENTITY)
+      state.diagram = addAttributeWithEdgeTracked(
+        state.diagram, model, relNode.id, a, NO_ENTITY, state.attrNodeIdByJavaId,
+      )
     }
 
     // One entity-relationship edge per branch.
@@ -230,5 +240,35 @@ export const javaToDiagram = (model: JavaModel): Diagram => {
     }
   }
 
-  return state.diagram
+  // Preserve the original positions map (insertion order = XML document order)
+  // so diagramToJava can emit them in the same order for byte-clean round-trip.
+  const _javaXmlPositions: (readonly [number, { x: number; y: number }])[] =
+    Array.from(model.diagram.positions.entries()).map(([id, p]) => [id, { x: p.x, y: p.y }] as const)
+
+  // Preserve PrimaryKey / Discriminant member ordering from the original XML.
+  // These lists can differ from attribute definition order (Java allows arbitrary ordering).
+  const _javaXmlKeyOrders: {
+    entityNodeId: NodeId
+    keyAttrNodeIds: NodeId[]
+    discriminantAttrNodeIds: NodeId[]
+  }[] = []
+  for (const e of model.schema.entities) {
+    const entityNodeId = state.entityNodeIdByJavaId.get(e.id)
+    if (entityNodeId === undefined) continue
+    const keyAttrNodeIds: NodeId[] = isStrongEntity(e)
+      ? e.primaryKey.map((jid) => state.attrNodeIdByJavaId.get(jid)).filter((id): id is NodeId => id !== undefined)
+      : []
+    const discriminantAttrNodeIds: NodeId[] = isWeakEntity(e)
+      ? e.discriminant.map((jid) => state.attrNodeIdByJavaId.get(jid)).filter((id): id is NodeId => id !== undefined)
+      : []
+    _javaXmlKeyOrders.push({ entityNodeId, keyAttrNodeIds, discriminantAttrNodeIds })
+  }
+
+  return {
+    ...state.diagram,
+    databaseName: model.schema.name,
+    databaseLastId: model.schema.lastId,
+    _javaXmlPositions,
+    _javaXmlKeyOrders,
+  }
 }
