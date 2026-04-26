@@ -12,6 +12,12 @@ const timestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-').s
 const findCanvas = (): HTMLElement | null =>
   document.querySelector('.react-flow__viewport') as HTMLElement | null
 
+/** Yield one animation frame so React commits the overlay before we flip the
+ * dark class — otherwise same-frame batching makes the overlay and the theme
+ * flip happen simultaneously and the flicker leaks through. */
+const nextFrame = (): Promise<void> =>
+  new Promise<void>((r) => requestAnimationFrame(() => r()))
+
 export interface ExportHandlers {
   readonly exportPng: () => Promise<void>
   readonly exportSvg: () => Promise<void>
@@ -19,6 +25,7 @@ export interface ExportHandlers {
 
 export const useExportHandlers = (close: () => void): ExportHandlers => {
   const pushToast = useUiStore((s) => s.pushToast)
+  const setExporting = useUiStore((s) => s.setExporting)
 
   const exportPng = async (): Promise<void> => {
     const el = findCanvas()
@@ -26,6 +33,14 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
       return
     }
+
+    setExporting(true)
+    // Yield one frame so React commits the overlay BEFORE we strip the
+    // dark class — otherwise the same-frame batching makes the overlay
+    // and the theme flip happen simultaneously and the flicker leaks
+    // through.
+    await nextFrame()
+
     const restoreLight = forceLightMode()
     const restoreInline = inlineComputedStyles(el)
     try {
@@ -41,6 +56,7 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       // dark UI between the two restores.
       restoreInline()
       restoreLight()
+      setExporting(false)
     }
     close()
   }
@@ -51,6 +67,14 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
       return
     }
+
+    setExporting(true)
+    // Yield one frame so React commits the overlay BEFORE we strip the
+    // dark class — otherwise the same-frame batching makes the overlay
+    // and the theme flip happen simultaneously and the flicker leaks
+    // through.
+    await nextFrame()
+
     const restoreLight = forceLightMode()
     const restoreInline = inlineComputedStyles(el)
     try {
@@ -66,6 +90,7 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       // dark UI between the two restores.
       restoreInline()
       restoreLight()
+      setExporting(false)
     }
     close()
   }

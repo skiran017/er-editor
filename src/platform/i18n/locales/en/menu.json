@@ -54,7 +54,8 @@
     "languageEn": "English",
     "languageIt": "Italian",
     "exportSuccess": "Diagram exported.",
-    "exportFailure": "Export failed. See console for details."
+    "exportFailure": "Export failed. See console for details.",
+    "exporting": "Exporting…"
   },
   "notYetAvailable": "Available in Phase 5 (I/O codecs)."
 }

@@ -68,6 +68,12 @@ export interface UiStoreState {
   // persisted; URL is the source of truth.
   readonly readonly: boolean
   readonly embed: boolean
+  // Exporting — set to true for the duration of a PNG / SVG capture so that
+  // ExportOverlay can render a backdrop-blur loader. The overlay masks the
+  // brief light-mode flicker that happens because the export temporarily
+  // strips the `dark` class from <html> to force light-mode rasterisation.
+  // Transient runtime flag — NOT persisted.
+  readonly exporting: boolean
   setTheme: (t: Theme) => void
   setLanguage: (l: Language) => void
   togglePanel: (id: string) => void
@@ -83,6 +89,7 @@ export interface UiStoreState {
   setExamMode: (on: boolean) => void
   setReadonly: (b: boolean) => void
   setEmbed: (b: boolean) => void
+  setExporting: (on: boolean) => void
 }
 
 export const useUiStore = create<UiStoreState>()(
@@ -105,6 +112,7 @@ export const useUiStore = create<UiStoreState>()(
         examMode: false,
         readonly: false,
         embed: false,
+        exporting: false,
 
         setTheme: (t) => set((state) => { state.theme = t }),
         setLanguage: (l) => set((state) => { state.language = l }),
@@ -147,6 +155,7 @@ export const useUiStore = create<UiStoreState>()(
         setExamMode: (on) => set((state) => { state.examMode = on }),
         setReadonly: (b) => set((state) => { state.readonly = b }),
         setEmbed: (b) => set((state) => { state.embed = b }),
+        setExporting: (on) => set((state) => { state.exporting = on }),
       })),
       {
         name: 'er-editor:ui',

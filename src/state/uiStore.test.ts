@@ -139,3 +139,23 @@ describe('uiStore — readonly + embed flags', () => {
     expect(persisted.state.language).toBe('it')
   })
 })
+
+describe('uiStore — exporting flag', () => {
+  beforeEach(() => useUiStore.setState({ exporting: false }))
+
+  it('setExporting toggles only the exporting flag', () => {
+    useUiStore.setState({ exporting: false })
+    useUiStore.getState().setExporting(true)
+    expect(useUiStore.getState().exporting).toBe(true)
+    useUiStore.getState().setExporting(false)
+    expect(useUiStore.getState().exporting).toBe(false)
+  })
+
+  it('exporting is NOT persisted', () => {
+    useUiStore.setState({ exporting: true, language: 'it' })
+    // Force the persist middleware to write — call any persisted setter.
+    useUiStore.getState().setLanguage('it')
+    const persisted = JSON.parse(localStorage.getItem('er-editor:ui') ?? '{}')
+    expect(persisted.state.exporting).toBeUndefined()
+  })
+})

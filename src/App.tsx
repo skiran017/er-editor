@@ -6,6 +6,7 @@ import { PropertyPanel } from './ui/properties/PropertyPanel'
 import { ToastStack } from './ui/overlays/ToastStack'
 import { ModalStack } from './ui/overlays/ModalStack'
 import { ContextMenu } from './ui/overlays/ContextMenu'
+import { ExportOverlay } from './ui/overlays/ExportOverlay'
 
 export const App = () => (
   <AppShell
@@ -22,6 +23,7 @@ export const App = () => (
         <ToastStack />
         <ModalStack />
         <ContextMenu />
+        <ExportOverlay />
       </>
     }
   />

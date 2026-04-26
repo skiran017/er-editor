@@ -54,7 +54,8 @@
     "languageEn": "Inglese",
     "languageIt": "Italiano",
     "exportSuccess": "Diagramma esportato.",
-    "exportFailure": "Esportazione non riuscita. Consulta la console per i dettagli."
+    "exportFailure": "Esportazione non riuscita. Consulta la console per i dettagli.",
+    "exporting": "Esportazione…"
   },
   "notYetAvailable": "Disponibile nella Fase 5 (codec I/O)."
 }
