@@ -1,17 +1,8 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useUiStore } from '@/state/uiStore'
 import { useSelectionStore } from '@/state/selectionStore'
 import { usePanelMode } from './usePanelMode'
 import { PropertyDrawer } from './PropertyDrawer'
-
-const closeDrawer = (): void => {
-  // The drawer is gated on `hasSelection`; deselecting closes it without
-  // touching the persisted `panels.properties` toggle. Flipping that toggle
-  // here was a bug — it would survive reloads and silently disable the
-  // property panel on every screen size until the user manually flipped it
-  // back via the menu.
-  useSelectionStore.getState().clear()
-}
 
 export interface AppShellProps {
   readonly canvas: ReactNode
@@ -26,11 +17,25 @@ export interface AppShellProps {
 
 export const AppShell = ({ canvas, properties, chrome, overlays }: AppShellProps) => {
   const panelToggled = useUiStore((s) => s.panels.properties !== false)
-  const hasSelection = useSelectionStore(
-    (s) => s.selectedNodeIds.size + s.selectedEdgeIds.size > 0,
-  )
+  // Subscribe to the actual Sets (not just sizes) so the drawer-dismissed
+  // effect below fires whenever the SET reference changes — selection store
+  // creates a new Set on every mutation, so even re-selecting the same node
+  // produces a new reference.
+  const selectedNodeIds = useSelectionStore((s) => s.selectedNodeIds)
+  const selectedEdgeIds = useSelectionStore((s) => s.selectedEdgeIds)
+  const hasSelection = selectedNodeIds.size + selectedEdgeIds.size > 0
   const showProperties = panelToggled && hasSelection
   const mode = usePanelMode()
+  // On mobile / tablet the drawer covers the canvas, so the user needs a
+  // way to dismiss it (e.g. after rubberband-selecting multiple nodes they
+  // want to drag) WITHOUT losing the selection. Per-selection transient
+  // flag: tapping the backdrop or close button hides the drawer for the
+  // current selection set; a new selection (different ids OR re-tapping
+  // anything — selectionStore always replaces the Set) reopens it.
+  const [drawerDismissed, setDrawerDismissed] = useState(false)
+  useEffect(() => {
+    setDrawerDismissed(false)
+  }, [selectedNodeIds, selectedEdgeIds])
   return (
     <div className="relative flex h-screen w-screen bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
       <main className="flex flex-1 overflow-hidden">{canvas}</main>
@@ -43,7 +48,11 @@ export const AppShell = ({ canvas, properties, chrome, overlays }: AppShellProps
         </aside>
       )}
       {mode !== 'desktop' && (
-        <PropertyDrawer mode={mode} open={showProperties} onClose={closeDrawer}>
+        <PropertyDrawer
+          mode={mode}
+          open={showProperties && !drawerDismissed}
+          onClose={() => setDrawerDismissed(true)}
+        >
           {properties}
         </PropertyDrawer>
       )}

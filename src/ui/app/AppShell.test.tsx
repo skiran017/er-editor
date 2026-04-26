@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { AppShell } from './AppShell'
 import { useUiStore } from '@/state/uiStore'
 import { useSelectionStore } from '@/state/selectionStore'
@@ -100,19 +100,39 @@ describe('AppShell', () => {
     expect(document.querySelector('[data-role="property-drawer"]')!.getAttribute('data-mode')).toBe('tablet')
   })
 
-  it('PropertyDrawer onClose deselects (closes the drawer) without touching the persisted panels toggle', () => {
-    // Important: the drawer's close handler must NOT flip uiStore.panels.properties.
-    // That flag is persisted, and flipping it from a transient mobile gesture
-    // would survive reload and silently disable the property panel on every
-    // screen size until the user manually flipped it back from the menu.
+  it('PropertyDrawer onClose hides the drawer for the current selection without losing the selection', async () => {
+    // The drawer covers the canvas on mobile, so users dismissing it want to
+    // interact with their selected elements (drag, etc.) — NOT lose the
+    // selection. Tapping the backdrop / close button must keep selection
+    // intact and just hide the drawer.
     vi.mocked(usePanelMode).mockReturnValue('mobile')
-    render(<AppShell canvas={<div />} properties={<div />} />)
     const panelsBefore = useUiStore.getState().panels.properties
+    const selectedBefore = useSelectionStore.getState().selectedNodeIds
+    render(<AppShell canvas={<div />} properties={<div />} />)
+    expect(document.querySelector('[data-role="property-drawer"]')).not.toBeNull()
     const backdrop = screen.getByTestId('drawer-backdrop')
-    backdrop.click()
-    // Selection cleared → drawer closes for this selection.
-    expect(useSelectionStore.getState().selectedNodeIds.size).toBe(0)
-    // Persisted toggle UNCHANGED — re-selecting any node will reopen the drawer.
+    await act(async () => { backdrop.click() })
+    // Drawer is gone …
+    expect(document.querySelector('[data-role="property-drawer"]')).toBeNull()
+    // … but the selection is intact (user can still drag the nodes) …
+    expect(useSelectionStore.getState().selectedNodeIds).toBe(selectedBefore)
+    // … and the persisted toggle is UNCHANGED.
     expect(useUiStore.getState().panels.properties).toBe(panelsBefore)
+  })
+
+  it('PropertyDrawer reopens when the selection changes (e.g. user picks a different node)', async () => {
+    vi.mocked(usePanelMode).mockReturnValue('mobile')
+    const { rerender } = render(<AppShell canvas={<div />} properties={<div />} />)
+    expect(document.querySelector('[data-role="property-drawer"]')).not.toBeNull()
+    // Dismiss
+    await act(async () => { screen.getByTestId('drawer-backdrop').click() })
+    expect(document.querySelector('[data-role="property-drawer"]')).toBeNull()
+    // Selecting a different node creates a new Set instance — the drawer
+    // re-opens automatically because the dismissal flag resets per-selection.
+    await act(async () => {
+      useSelectionStore.getState().select({ nodes: ['n2' as NodeId], edges: [] })
+    })
+    rerender(<AppShell canvas={<div />} properties={<div />} />)
+    expect(document.querySelector('[data-role="property-drawer"]')).not.toBeNull()
   })
 })
