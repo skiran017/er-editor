@@ -1,4 +1,4 @@
-import { toPng, canvasToSvg, inlineComputedStyles } from '@/platform/imageExport'
+import { toPng, canvasToSvg, inlineComputedStyles, forceLightMode } from '@/platform/imageExport'
 import { downloadBlob } from '@/platform/fs'
 import { useUiStore } from '@/state/uiStore'
 
@@ -26,7 +26,8 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
       return
     }
-    const restore = inlineComputedStyles(el)
+    const restoreLight = forceLightMode()
+    const restoreInline = inlineComputedStyles(el)
     try {
       const dataUrl = await toPng(el)
       await downloadDataUrl(dataUrl, `diagram-${timestamp()}.png`)
@@ -35,7 +36,11 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       console.error('PNG export failed', err)
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
     } finally {
-      restore()
+      // Order matters: remove our inlined overrides first, then restore the
+      // dark class. Reverse order would briefly show light-mode values on a
+      // dark UI between the two restores.
+      restoreInline()
+      restoreLight()
     }
     close()
   }
@@ -46,7 +51,8 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
       return
     }
-    const restore = inlineComputedStyles(el)
+    const restoreLight = forceLightMode()
+    const restoreInline = inlineComputedStyles(el)
     try {
       const dataUrl = await canvasToSvg(el)
       await downloadDataUrl(dataUrl, `diagram-${timestamp()}.svg`)
@@ -55,7 +61,11 @@ export const useExportHandlers = (close: () => void): ExportHandlers => {
       console.error('SVG export failed', err)
       pushToast({ id: `export-${Date.now()}`, kind: 'error', messageKey: 'menu:app.exportFailure' })
     } finally {
-      restore()
+      // Order matters: remove our inlined overrides first, then restore the
+      // dark class. Reverse order would briefly show light-mode values on a
+      // dark UI between the two restores.
+      restoreInline()
+      restoreLight()
     }
     close()
   }
