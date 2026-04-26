@@ -34,14 +34,20 @@ const makePointerEvent = (init: { clientX: number; clientY: number; pointerType?
 }) as unknown as React.PointerEvent<HTMLElement>
 
 describe('useTouch — single-finger gesture state machine', () => {
-  it('quick tap (down + up under 500ms, no movement) dispatches NOTHING from useTouch', () => {
-    // Quick taps on empty canvas are routed to RF\'s onPaneClick / onNodeClick
-    // synthesised from the underlying click event — useTouch deliberately
-    // does NOT fire CANVAS_POINTER_DOWN/UP for them.
+  it('quick tap on empty canvas (down + up under 500ms, no movement) dispatches CANVAS_POINTER_DOWN+UP', () => {
+    // Placement tools (placing.entity etc.) listen for CANVAS_POINTER_UP, so
+    // a quick tap MUST fire the down/up pair to drop a new node where the
+    // user tapped. Under the select tool this pair is a brief empty-marquee
+    // cycle that clears selection (matches desktop click-on-pane behaviour).
     const { result } = renderHook(() => useTouch(), RF_OPTS)
     result.current.onPointerDown(makePointerEvent({ clientX: 10, clientY: 20 }))
+    expect(sendSpy).not.toHaveBeenCalled() // pending — waiting for long-press / movement / up
     result.current.onPointerUp(makePointerEvent({ clientX: 10, clientY: 20 }))
-    expect(sendSpy).not.toHaveBeenCalled()
+    const calls = sendSpy.mock.calls.map(([ev]) => ev)
+    expect(calls).toEqual([
+      { type: 'CANVAS_POINTER_DOWN', point: { x: 10, y: 20 }, modifiers: { shift: false, ctrl: false, alt: false, meta: false }, button: 'left' },
+      { type: 'CANVAS_POINTER_UP', point: { x: 10, y: 20 } },
+    ])
   })
 
   it('long-press (500ms idle) seeds CANVAS_POINTER_DOWN, opening rubberband at the touch origin', () => {

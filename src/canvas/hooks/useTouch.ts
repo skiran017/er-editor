@@ -253,16 +253,15 @@ export const useTouch = (): TouchHandlers => {
 
       if (e.pointerId !== activePointerId.current) return;
 
-      // The active finger lifted. Close out whatever single-finger gesture
-      // was in progress.
-      const wasRubberband = gestureMode.current === "rubberband";
+      // The active finger lifted. Capture the mode BEFORE resetting state.
+      const endedMode = gestureMode.current;
       activePointerId.current = null;
       secondPointerId.current = null;
       lastDist.current = 0;
       lastMidClient.current = null;
       resetSingleFingerState();
 
-      if (wasRubberband) {
+      if (endedMode === "rubberband") {
         // Commit the marquee selection.
         useInteractionStore.getState().send({
           type: "CANVAS_POINTER_UP",
@@ -270,9 +269,25 @@ export const useTouch = (): TouchHandlers => {
         });
         return;
       }
-      // 'pending' (quick tap) and 'panning' both end silently from the
-      // FSM's point of view. Quick taps on empty pane are handled by RF's
-      // onPaneClick → useRfEvents PANE_CLICK; pans are direct viewport updates.
+      if (endedMode === "pending") {
+        // Quick tap on empty canvas (no movement, no long-press fired).
+        // Dispatch the full down/up pair so placement tools react —
+        // placing.* states listen for CANVAS_POINTER_UP. Under select tool
+        // the pair is a brief empty-marquee cycle that just clears the
+        // selection (matches desktop click-on-pane behaviour).
+        const point = toFlow(e);
+        useInteractionStore.getState().send({
+          type: "CANVAS_POINTER_DOWN",
+          point,
+          modifiers: NO_MODIFIERS,
+          button: "left",
+        });
+        useInteractionStore.getState().send({
+          type: "CANVAS_POINTER_UP",
+          point,
+        });
+      }
+      // 'panning' ends silently — viewport was updated directly per move.
     },
     onPointerCancel: (e) => {
       if (e.pointerType === "pen") {
