@@ -1,9 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { AppShell } from './AppShell'
 import { useUiStore } from '@/state/uiStore'
 import { useSelectionStore } from '@/state/selectionStore'
+import { usePanelMode } from './usePanelMode'
 import type { NodeId } from '@/domain/types'
+
+vi.mock('./usePanelMode', () => ({
+  usePanelMode: vi.fn(() => 'desktop' as const),
+}))
 
 const reset = () => {
   useUiStore.setState({ panels: { properties: true, minimap: false } })
@@ -12,12 +17,14 @@ const reset = () => {
     selectedEdgeIds: new Set(),
     rubberband: null,
   })
+  vi.mocked(usePanelMode).mockReturnValue('desktop')
 }
 
 describe('AppShell', () => {
   beforeEach(reset)
 
-  it('renders canvas, properties, chrome, and overlays when a node is selected', () => {
+  it('renders canvas, properties, chrome, and overlays when a node is selected (desktop)', () => {
+    // existing assertion — both inline panel and chrome appear
     render(
       <AppShell
         canvas={<div data-testid="canvas">Canvas</div>}
@@ -30,16 +37,14 @@ describe('AppShell', () => {
     expect(screen.getByTestId('props')).toBeInTheDocument()
     expect(screen.getByTestId('chrome')).toBeInTheDocument()
     expect(screen.getByTestId('overlay')).toBeInTheDocument()
+    // Desktop renders the inline aside, NOT the drawer.
+    expect(document.querySelector('[data-role="properties-panel"]')).not.toBeNull()
+    expect(document.querySelector('[data-role="property-drawer"]')).toBeNull()
   })
 
   it('hides properties pane when uiStore.panels.properties is false', () => {
     useUiStore.setState({ panels: { properties: false, minimap: false } })
-    render(
-      <AppShell
-        canvas={<div />}
-        properties={<div data-testid="props" />}
-      />,
-    )
+    render(<AppShell canvas={<div />} properties={<div data-testid="props" />} />)
     expect(screen.queryByTestId('props')).not.toBeInTheDocument()
   })
 
@@ -49,12 +54,7 @@ describe('AppShell', () => {
       selectedEdgeIds: new Set(),
       rubberband: null,
     })
-    render(
-      <AppShell
-        canvas={<div />}
-        properties={<div data-testid="props" />}
-      />,
-    )
+    render(<AppShell canvas={<div />} properties={<div data-testid="props" />} />)
     expect(screen.queryByTestId('props')).not.toBeInTheDocument()
   })
 
@@ -73,5 +73,39 @@ describe('AppShell', () => {
     )
     expect(screen.queryByTestId('props')).not.toBeInTheDocument()
     expect(screen.getByTestId('chrome')).toBeInTheDocument()
+  })
+
+  it('renders PropertyDrawer (not inline aside) on mobile', () => {
+    vi.mocked(usePanelMode).mockReturnValue('mobile')
+    render(
+      <AppShell
+        canvas={<div />}
+        properties={<div data-testid="props" />}
+      />,
+    )
+    expect(document.querySelector('[data-role="properties-panel"]')).toBeNull()
+    expect(document.querySelector('[data-role="property-drawer"]')).not.toBeNull()
+    expect(screen.getByTestId('props')).toBeInTheDocument()
+  })
+
+  it('renders PropertyDrawer on tablet', () => {
+    vi.mocked(usePanelMode).mockReturnValue('tablet')
+    render(
+      <AppShell
+        canvas={<div />}
+        properties={<div data-testid="props" />}
+      />,
+    )
+    expect(document.querySelector('[data-role="property-drawer"]')).not.toBeNull()
+    expect(document.querySelector('[data-role="property-drawer"]')!.getAttribute('data-mode')).toBe('tablet')
+  })
+
+  it('PropertyDrawer onClose toggles uiStore.panels.properties', () => {
+    vi.mocked(usePanelMode).mockReturnValue('mobile')
+    render(<AppShell canvas={<div />} properties={<div />} />)
+    // panel is open → click backdrop should call togglePanel('properties') → panels.properties becomes false
+    const backdrop = screen.getByTestId('drawer-backdrop')
+    backdrop.click()
+    expect(useUiStore.getState().panels.properties).toBe(false)
   })
 })
