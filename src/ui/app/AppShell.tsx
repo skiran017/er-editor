@@ -4,6 +4,15 @@ import { useSelectionStore } from '@/state/selectionStore'
 import { usePanelMode } from './usePanelMode'
 import { PropertyDrawer } from './PropertyDrawer'
 
+const closeDrawer = (): void => {
+  // The drawer is gated on `hasSelection`; deselecting closes it without
+  // touching the persisted `panels.properties` toggle. Flipping that toggle
+  // here was a bug — it would survive reloads and silently disable the
+  // property panel on every screen size until the user manually flipped it
+  // back via the menu.
+  useSelectionStore.getState().clear()
+}
+
 export interface AppShellProps {
   readonly canvas: ReactNode
   readonly properties: ReactNode
@@ -17,7 +26,6 @@ export interface AppShellProps {
 
 export const AppShell = ({ canvas, properties, chrome, overlays }: AppShellProps) => {
   const panelToggled = useUiStore((s) => s.panels.properties !== false)
-  const togglePanel = useUiStore((s) => s.togglePanel)
   const hasSelection = useSelectionStore(
     (s) => s.selectedNodeIds.size + s.selectedEdgeIds.size > 0,
   )
@@ -35,7 +43,7 @@ export const AppShell = ({ canvas, properties, chrome, overlays }: AppShellProps
         </aside>
       )}
       {mode !== 'desktop' && (
-        <PropertyDrawer mode={mode} open={showProperties} onClose={() => togglePanel('properties')}>
+        <PropertyDrawer mode={mode} open={showProperties} onClose={closeDrawer}>
           {properties}
         </PropertyDrawer>
       )}

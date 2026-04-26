@@ -100,12 +100,19 @@ describe('AppShell', () => {
     expect(document.querySelector('[data-role="property-drawer"]')!.getAttribute('data-mode')).toBe('tablet')
   })
 
-  it('PropertyDrawer onClose toggles uiStore.panels.properties', () => {
+  it('PropertyDrawer onClose deselects (closes the drawer) without touching the persisted panels toggle', () => {
+    // Important: the drawer's close handler must NOT flip uiStore.panels.properties.
+    // That flag is persisted, and flipping it from a transient mobile gesture
+    // would survive reload and silently disable the property panel on every
+    // screen size until the user manually flipped it back from the menu.
     vi.mocked(usePanelMode).mockReturnValue('mobile')
     render(<AppShell canvas={<div />} properties={<div />} />)
-    // panel is open → click backdrop should call togglePanel('properties') → panels.properties becomes false
+    const panelsBefore = useUiStore.getState().panels.properties
     const backdrop = screen.getByTestId('drawer-backdrop')
     backdrop.click()
-    expect(useUiStore.getState().panels.properties).toBe(false)
+    // Selection cleared → drawer closes for this selection.
+    expect(useSelectionStore.getState().selectedNodeIds.size).toBe(0)
+    // Persisted toggle UNCHANGED — re-selecting any node will reopen the drawer.
+    expect(useUiStore.getState().panels.properties).toBe(panelsBefore)
   })
 })
