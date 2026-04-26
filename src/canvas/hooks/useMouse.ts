@@ -21,6 +21,21 @@ const isRfChromeTarget = (target: EventTarget | null): boolean => {
   return target.closest('.react-flow__panel, .react-flow__attribution') !== null
 }
 
+// React Flow v12 does NOT stop propagation on node/edge pointer events, so a
+// pointerdown on a node bubbles up to this wrapper-level listener as well as
+// RF's own onNodeClick / onNodeDrag handlers (in useRfEvents). Without this
+// filter, clicking-and-dragging a node fires BOTH CANVAS_POINTER_DOWN
+// (entering selecting.rubberBand) AND RF's native node drag — the user sees
+// a phantom rubberband draw under their cursor while the node moves. Skip
+// CANVAS_POINTER_DOWN when the gesture starts on a node or an edge; those
+// targets get their semantic events from useRfEvents instead. We do NOT
+// filter pointerUp — a rubberband started on empty canvas can legitimately
+// end over a node, and CANVAS_POINTER_UP must fire to commit the selection.
+const isNodeOrEdgeTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) return false
+  return target.closest('.react-flow__node, .react-flow__edge') !== null
+}
+
 export interface MouseHandlers {
   readonly onPointerDown: (e: ReactPointerEvent<HTMLElement>) => void
   readonly onPointerMove: (e: ReactPointerEvent<HTMLElement>) => void
@@ -46,6 +61,7 @@ export const useMouse = (): MouseHandlers => {
     onPointerDown: (e) => {
       if (e.pointerType === 'touch') return
       if (isRfChromeTarget(e.target)) return
+      if (isNodeOrEdgeTarget(e.target)) return
       useInteractionStore.getState().send({
         type: 'CANVAS_POINTER_DOWN',
         point: toFlow(e),

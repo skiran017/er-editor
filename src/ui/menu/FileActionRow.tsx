@@ -6,10 +6,11 @@ export interface FileActionRowProps {
   readonly t: TFunction
 }
 
-// Single file-action menu row. Gated actions (Open / Save / Export under
-// exam mode) are filtered out upstream — we render exactly what reaches us,
-// no disabled branch. A `disabled` attribute is one devtools flick from
-// being flipped back on, so hiding is the lockdown mechanism, not styling.
+// Single file-action menu row. Security-gated actions (Open / Save / Export
+// under exam mode) are filtered out upstream — those are HIDDEN, never
+// rendered with `disabled`, since a disabled attribute is one devtools
+// flick from being flipped back on. The `disabled` flag here is for UX
+// gating only (e.g. Save / Export on an empty canvas).
 export const FileActionRow = ({ item, t }: FileActionRowProps) => {
   const Icon = item.icon
   return (
@@ -17,7 +18,8 @@ export const FileActionRow = ({ item, t }: FileActionRowProps) => {
       type="button"
       role="menuitem"
       onClick={item.onSelect}
-      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
+      disabled={item.disabled}
+      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:text-slate-200 dark:hover:bg-slate-700 dark:disabled:hover:bg-transparent"
     >
       <Icon size={18} className="text-slate-500 dark:text-slate-400" aria-hidden />
       <span className="flex-1">{t(item.labelKey)}</span>

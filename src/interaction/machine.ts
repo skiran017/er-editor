@@ -127,11 +127,28 @@ export const editorMachine = setup({
     fit: ({ context, event }) => fitAction(context, event),
     beginRenameSelected: () => beginRenameSelected(),
     // Flow-hint toasts (entry / exit of multi-step tools).
-    toastConnectPickSource: () => toastConnectPickSource(),
+    //
+    // The "pick first / source / parent" toasts are gated against
+    // NODE_POINTER_DOWN re-entries. After a user completes a connection,
+    // the FSM returns to its tool's `idle` state — re-firing the
+    // "pick first" hint there read as "the state reset itself" and
+    // confused users. The success transition runs `clearFlowToast` so
+    // the "pick second / target / child" hint doesn't linger; on cancel
+    // paths (PICK_TOOL, PANE_CLICK, ESCAPE) the hint still re-shows.
+    toastConnectPickSource: ({ event }) => {
+      if (event.type === 'NODE_POINTER_DOWN' || event.type === 'NODE_POINTER_UP') return
+      toastConnectPickSource()
+    },
     toastConnectPickTarget: () => toastConnectPickTarget(),
-    toastQuickRelPickFirst: () => toastQuickRelPickFirst(),
+    toastQuickRelPickFirst: ({ event }) => {
+      if (event.type === 'NODE_POINTER_DOWN') return
+      toastQuickRelPickFirst()
+    },
     toastQuickRelPickSecond: () => toastQuickRelPickSecond(),
-    toastQuickGenPickParent: () => toastQuickGenPickParent(),
+    toastQuickGenPickParent: ({ event }) => {
+      if (event.type === 'NODE_POINTER_DOWN') return
+      toastQuickGenPickParent()
+    },
     toastQuickGenPickChild: () => toastQuickGenPickChild(),
     toastAddChildToIsa: () => toastAddChildToIsa(),
     clearFlowToast: () => clearFlowToast(),
@@ -349,11 +366,11 @@ export const editorMachine = setup({
                 // the quickRelationship and quickGeneralization flows.
                 NODE_POINTER_DOWN: {
                   target: '#editor.drawing.idle',
-                  actions: ['connectNodesAction', 'resetContext'],
+                  actions: ['connectNodesAction', 'resetContext', 'clearFlowToast'],
                 },
                 NODE_POINTER_UP: {
                   target: '#editor.drawing.idle',
-                  actions: ['connectNodesAction', 'resetContext'],
+                  actions: ['connectNodesAction', 'resetContext', 'clearFlowToast'],
                 },
                 // Cancel on blank-pane click (only signal that distinguishes
                 // a true pane click from a node click — RF fires onPaneClick
@@ -393,7 +410,7 @@ export const editorMachine = setup({
                 event.type === 'NODE_POINTER_DOWN' && event.button === 'left'
                   && context.quickFirstId !== null && event.nodeId !== context.quickFirstId,
               target: '#editor.quickRelationship.idle',
-              actions: ['connectNodesAction', 'resetContext'],
+              actions: ['connectNodesAction', 'resetContext', 'clearFlowToast'],
             },
             PANE_CLICK: {
               target: '#editor.quickRelationship.idle',
@@ -428,7 +445,7 @@ export const editorMachine = setup({
                 event.type === 'NODE_POINTER_DOWN' && event.button === 'left'
                   && context.quickFirstId !== null && event.nodeId !== context.quickFirstId,
               target: '#editor.quickGeneralization.idle',
-              actions: ['connectNodesAction', 'resetContext'],
+              actions: ['connectNodesAction', 'resetContext', 'clearFlowToast'],
             },
             PANE_CLICK: {
               target: '#editor.quickGeneralization.idle',

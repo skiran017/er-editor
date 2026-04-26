@@ -55,6 +55,7 @@
     "languageIt": "Italian",
     "openSuccess": "Diagram opened.",
     "openFailure": "Could not open the file. Check the format.",
+    "openConfirmReplace": "The canvas already has content. Replace it with the imported file?",
     "saveSuccess": "Diagram saved.",
     "saveFailure": "Could not save the diagram.",
     "exportSuccess": "Diagram exported.",

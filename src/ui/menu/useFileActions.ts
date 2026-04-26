@@ -15,7 +15,10 @@ const timestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-').s
 export const useFileActions = (close: () => void): FileActionHandlers => {
   const pushToast = useUiStore((s) => s.pushToast)
 
-  const open = async (): Promise<void> => {
+  // Inner pipeline: file picker → parse → replace store. Used directly when
+  // the canvas is empty, and via the ConfirmModal's onConfirm when not. The
+  // dropdown closes here regardless of which entry path triggered it.
+  const performOpen = async (): Promise<void> => {
     const file = await openFile({ accept: '.xml' })
     if (!file) { close(); return }
     try {
@@ -36,6 +39,25 @@ export const useFileActions = (close: () => void): FileActionHandlers => {
       pushToast({ id: `open-${Date.now()}`, kind: 'error', messageKey: 'menu:app.openFailure' })
     }
     close()
+  }
+
+  const open = async (): Promise<void> => {
+    // Empty canvas — go straight to the file picker, no prompt.
+    const isEmpty = useDiagramStore.getState().diagram.nodeOrder.length === 0
+    if (isEmpty) { await performOpen(); return }
+    // Non-empty — confirm before clobbering. The ConfirmModal lives in the
+    // ModalStack; close the dropdown so visual focus shifts onto the dialog.
+    close()
+    useUiStore.getState().pushModal({
+      id: `open-confirm-${Date.now()}`,
+      kind: 'confirm',
+      props: {
+        titleKey: 'menu:file.open',
+        messageKey: 'menu:app.openConfirmReplace',
+        danger: true,
+        onConfirm: () => { void performOpen() },
+      },
+    })
   }
 
   const save = async (): Promise<void> => {

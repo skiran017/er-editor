@@ -55,6 +55,7 @@
     "languageIt": "Italiano",
     "openSuccess": "Diagramma aperto.",
     "openFailure": "Impossibile aprire il file. Controlla il formato.",
+    "openConfirmReplace": "Il diagramma contiene già elementi. Sostituirli con il file importato?",
     "saveSuccess": "Diagramma salvato.",
     "saveFailure": "Impossibile salvare il diagramma.",
     "exportSuccess": "Diagramma esportato.",
