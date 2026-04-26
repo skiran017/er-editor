@@ -241,4 +241,46 @@ describe('useMouse — wheel', () => {
     expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'CANVAS_POINTER_UP' }))
     document.body.removeChild(node)
   })
+
+  it('pen pointerdown fires CANVAS_POINTER_DOWN like a mouse (no filter)', () => {
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
+    const target = document.createElement('div')
+    result.current.onPointerDown({
+      pointerType: 'pen', clientX: 10, clientY: 20, button: 0,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      preventDefault: vi.fn(), target,
+    } as unknown as React.PointerEvent<HTMLElement>)
+    expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'CANVAS_POINTER_DOWN',
+      point: { x: 10, y: 20 },
+      button: 'left',
+    }))
+  })
+
+  it('pen pointermove fires CANVAS_POINTER_MOVE', () => {
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
+    result.current.onPointerMove({
+      pointerType: 'pen', clientX: 30, clientY: 40,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      preventDefault: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>)
+    expect(sendSpy).toHaveBeenCalledWith({
+      type: 'CANVAS_POINTER_MOVE',
+      point: { x: 30, y: 40 },
+    })
+  })
+
+  it('pen pointerup fires CANVAS_POINTER_UP', () => {
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
+    const target = document.createElement('div')
+    result.current.onPointerUp({
+      pointerType: 'pen', clientX: 50, clientY: 60, button: 0,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      preventDefault: vi.fn(), target,
+    } as unknown as React.PointerEvent<HTMLElement>)
+    expect(sendSpy).toHaveBeenCalledWith({
+      type: 'CANVAS_POINTER_UP',
+      point: { x: 50, y: 60 },
+    })
+  })
 })
