@@ -80,6 +80,10 @@ Chen EER notation supports a **disjoint (d) vs overlapping (o)** constraint on g
 - **M:N with relationship attributes → associative entity hint** — soft hint suggesting the M:N should be decomposed into a new associative entity + two 1:N relationships.
 - **A7 "simple attribute must not be subdivided"** — currently covered obliquely by rule 3.12 (sub-attributes cannot be composite); re-evaluate if an explicit rule adds value.
 
+## Phase 7 follow-ups
+
+- **Native Italian-speaker review of UI translations** — Phase 7 shipped translations for all 6 IT bundles (`common`, `toolbar`, `menu`, `properties`, `modals`, `validation`) as best-effort by the implementer. Strings should pass a native-speaker review for register / phrasing nuance before SUPSI deployment. Likely candidates for nuance: `examModeBanner`, `attributeNeedsParent`, validation rule messages.
+
 ## Phase 0 follow-ups (track for Phase 1 or later)
 
 - **`eslint-plugin-import/order`** — spec §8.6 item 8 lists it as a required rule; Phase 0 did not install it. Revisit when Phase 1 lands the first domain files; if import ordering is intentionally deferred, update the spec to match.

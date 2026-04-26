@@ -1,58 +1,58 @@
 {
   "file": {
     "title": "File",
-    "new": "New diagram",
-    "open": "Open…",
-    "save": "Save",
-    "saveAs": "Save as…",
-    "export": "Export",
-    "exportPng": "Export PNG",
-    "exportSvg": "Export SVG",
-    "exportMermaid": "Export Mermaid"
+    "new": "Nuovo diagramma",
+    "open": "Apri…",
+    "save": "Salva",
+    "saveAs": "Salva con nome…",
+    "export": "Esporta",
+    "exportPng": "Esporta PNG",
+    "exportSvg": "Esporta SVG",
+    "exportMermaid": "Esporta Mermaid"
   },
   "edit": {
-    "title": "Edit",
-    "undo": "Undo",
-    "redo": "Redo",
-    "cut": "Cut",
-    "copy": "Copy",
-    "paste": "Paste",
-    "duplicate": "Duplicate",
-    "delete": "Delete",
-    "selectAll": "Select all",
-    "invertSelection": "Invert selection"
+    "title": "Modifica",
+    "undo": "Annulla",
+    "redo": "Ripeti",
+    "cut": "Taglia",
+    "copy": "Copia",
+    "paste": "Incolla",
+    "duplicate": "Duplica",
+    "delete": "Elimina",
+    "selectAll": "Seleziona tutto",
+    "invertSelection": "Inverti selezione"
   },
   "view": {
-    "title": "View",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out",
-    "fitView": "Fit to view",
-    "grid": "Grid",
-    "alignment": "Alignment guides",
-    "properties": "Properties panel"
+    "title": "Visualizza",
+    "zoomIn": "Ingrandisci",
+    "zoomOut": "Riduci",
+    "fitView": "Adatta alla vista",
+    "grid": "Griglia",
+    "alignment": "Guide di allineamento",
+    "properties": "Pannello proprietà"
   },
   "help": {
-    "title": "Help",
-    "cheatsheet": "Keyboard shortcuts",
-    "about": "About"
+    "title": "Aiuto",
+    "cheatsheet": "Scorciatoie da tastiera",
+    "about": "Informazioni"
   },
   "isa": {
-    "addChild": "Add child entity"
+    "addChild": "Aggiungi entità figlio"
   },
   "app": {
     "title": "Menu",
-    "validation": "Validation",
-    "theme": "Theme",
-    "themeLight": "Light",
-    "themeDark": "Dark",
-    "themeSystem": "System",
-    "reset": "Reset the canvas",
-    "resetConfirm": "Reset the canvas? This will delete every element.",
-    "resetDone": "Canvas reset",
-    "examModeBanner": "Exam mode — file I/O and validation toggle are locked.",
-    "language": "Language",
-    "languageEn": "English",
-    "languageIt": "Italian"
+    "validation": "Validazione",
+    "theme": "Tema",
+    "themeLight": "Chiaro",
+    "themeDark": "Scuro",
+    "themeSystem": "Sistema",
+    "reset": "Reimposta il diagramma",
+    "resetConfirm": "Reimpostare il diagramma? Tutti gli elementi verranno eliminati.",
+    "resetDone": "Diagramma reimpostato",
+    "examModeBanner": "Modalità esame — apertura, salvataggio, esportazione e validazione bloccati.",
+    "language": "Lingua",
+    "languageEn": "Inglese",
+    "languageIt": "Italiano"
   },
-  "notYetAvailable": "Available in Phase 5 (I/O codecs)."
+  "notYetAvailable": "Disponibile nella Fase 5 (codec I/O)."
 }
