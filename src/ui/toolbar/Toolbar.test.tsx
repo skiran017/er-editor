@@ -151,15 +151,16 @@ describe('Toolbar — readonly mode', () => {
 describe('Toolbar — responsive positioning', () => {
   beforeEach(reset)
 
-  it('pins to the bottom on mobile (no sm breakpoint) and to the top on sm+', () => {
-    // Toolbar uses Tailwind utility classes; the bottom-pinned position must
-    // appear unprefixed (default = mobile-first) and the top-pinned class must
-    // appear with the sm: prefix so it overrides at >=640px.
+  it('pins to the top at every breakpoint and clamps to viewport on narrow phones', () => {
     const { container } = render(<Toolbar />)
     const nav = container.querySelector('[data-role="toolbar"]')!
-    expect(nav.className).toContain('bottom-4')
-    expect(nav.className).toContain('sm:top-4')
-    expect(nav.className).toContain('sm:bottom-auto')
+    // Top-pinned everywhere — the bottom-pinned mobile variant was reverted
+    // because it collided with the on-screen keyboard and the property drawer.
+    expect(nav.className).toContain('top-4')
+    // Horizontal-overflow scroll keeps the full tool set reachable on phones
+    // narrower than ~360px without clipping either end of the centered pill.
+    expect(nav.className).toContain('max-w-[calc(100vw-1rem)]')
+    expect(nav.className).toContain('overflow-x-auto')
   })
 })
 

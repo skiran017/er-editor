@@ -154,7 +154,12 @@ const ERCanvasInner = () => {
 
   return (
     <div
-      className="h-full w-full flex-1 relative"
+      // touch-manipulation disables iOS / Android double-tap-to-zoom on the
+      // canvas surface — without it, double-tapping a node to enter inline
+      // rename triggers the browser's pinch-zoom gesture and `dblclick`
+      // never fires. We still get pinch-zoom from useTouch's two-finger
+      // gesture, so this only suppresses the OS gesture, not ours.
+      className="relative h-full w-full flex-1 touch-manipulation"
       onPointerDown={(e) => {
         mouse.onPointerDown(e)
         touch.onPointerDown(e)

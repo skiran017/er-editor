@@ -33,6 +33,18 @@ export interface TouchHandlers {
 //    restoring single-finger behaviour immediately — no FSM event is sent.
 const PINCH_ZOOM_FACTOR = 0.005;
 
+// React Flow v12 doesn't stop propagation on node/edge pointer events, so a
+// touch on a node bubbles up to the wrapper-level useTouch handler too. Without
+// this filter, tapping a node fires both CANVAS_POINTER_DOWN (entering
+// selecting.rubberBand) AND React Flow's native node-click handling, producing
+// a phantom rubberband under the user's finger. Mirrors the same filter in
+// useMouse. We only filter pointerdown — a rubberband started on empty canvas
+// can legitimately end over a node.
+const isNodeOrEdgeTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) return false;
+  return target.closest(".react-flow__node, .react-flow__edge") !== null;
+};
+
 export const useTouch = (): TouchHandlers => {
   const activePointerId = useRef<number | null>(null);
   const secondPointerId = useRef<number | null>(null);
@@ -59,6 +71,10 @@ export const useTouch = (): TouchHandlers => {
       }
       if (e.pointerType !== "touch") return;
       if (penActiveRef.current) return; // palm rejection — pen is active, drop touch
+      // Skip when the gesture started on a node / edge — RF's onNodeClick will
+      // synthesise NODE_POINTER_DOWN; CANVAS_POINTER_DOWN here would produce a
+      // phantom rubberband under the user's finger.
+      if (isNodeOrEdgeTarget(e.target)) return;
 
       // Record pointer position regardless of which finger this is.
       pointerById.current.set(e.pointerId, { x: e.clientX, y: e.clientY });

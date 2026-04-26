@@ -61,7 +61,12 @@ export const Toolbar = memo(() => {
     <nav
       aria-label={t('toolbar:group.elements')}
       data-role="toolbar"
-      className="fixed left-1/2 bottom-4 z-40 flex h-12 -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white/90 px-3 text-slate-700 shadow-lg backdrop-blur-md sm:bottom-auto sm:top-4 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200"
+      // Top-pinned at every breakpoint. max-w + overflow-x-auto keeps the
+      // toolbar inside the viewport on narrow phones — the full tool set
+      // is wider than ~360px, so without this the centered fixed nav clips
+      // both ends. Horizontal scroll feels natural on a thin pill and lets
+      // the user reach every tool.
+      className="fixed left-1/2 top-4 z-40 flex h-12 max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white/90 px-3 text-slate-700 shadow-lg backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200"
     >
       {/* Element / tool groups from chenPlugin (select, elements, connections).
           Every group is followed by a separator (history group sits after).
