@@ -166,10 +166,17 @@ const parseSchema = (root: Element): JavaSchema => {
   }
 }
 
-// Diagram parsing lands in Task 3. Stub for now — returns empty positions.
 const parseDiagram = (root: Element): { readonly positions: ReadonlyMap<number, JavaPosition> } => {
-  void root
-  return { positions: new Map() }
+  const diagramEl = childByName(root, 'ERDatabaseDiagram')
+  const positions = new Map<number, JavaPosition>()
+  if (!diagramEl) return { positions }
+  for (const child of Array.from(diagramEl.children)) {
+    const refid = intAttr(child, 'refid')
+    const positionEl = childByName(child, 'Position')
+    if (!positionEl) continue
+    positions.set(refid, { x: intAttr(positionEl, 'x'), y: intAttr(positionEl, 'y') })
+  }
+  return { positions }
 }
 
 export const parseJavaXml = (xml: string): JavaModel => {

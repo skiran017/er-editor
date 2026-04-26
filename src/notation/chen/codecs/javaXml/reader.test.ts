@@ -170,6 +170,36 @@ describe('parseJavaXml — schema section', () => {
   })
 })
 
+describe('parseJavaXml — diagram section', () => {
+  it('parses ERDatabaseDiagram positions keyed by refid', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel>
+  <ERDatabaseSchema name="T" lastId="2"><EntitySets>
+    <StrongEntitySet id="1" name="E"><Attributes>
+      <SimpleAttribute id="2" name="x" multiValued="false" derived="false" />
+    </Attributes></StrongEntitySet>
+  </EntitySets><RelationshipSets /><Generalizations /></ERDatabaseSchema>
+  <ERDatabaseDiagram>
+    <SimpleAttribute refid="2"><Position x="100" y="200" /></SimpleAttribute>
+    <StrongEntitySet refid="1"><Position x="50" y="60" /></StrongEntitySet>
+  </ERDatabaseDiagram>
+</ERDatabaseModel>`
+    const m = parseJavaXml(xml)
+    expect(m.diagram.positions.get(1)).toEqual({ x: 50, y: 60 })
+    expect(m.diagram.positions.get(2)).toEqual({ x: 100, y: 200 })
+  })
+
+  it('returns an empty map for an empty <ERDatabaseDiagram />', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel>
+  <ERDatabaseSchema name="T" lastId="0"><EntitySets /><RelationshipSets /><Generalizations /></ERDatabaseSchema>
+  <ERDatabaseDiagram />
+</ERDatabaseModel>`
+    const m = parseJavaXml(xml)
+    expect(m.diagram.positions.size).toBe(0)
+  })
+})
+
 describe('parseJavaXml — error paths', () => {
   it('throws on malformed XML', () => {
     expect(() => parseJavaXml('<unclosed')).toThrow(/XML parse error/)
