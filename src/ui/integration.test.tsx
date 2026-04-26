@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import i18next from 'i18next'
 import { App } from '../App'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
@@ -11,6 +12,10 @@ import { useInteractionStore } from '@/interaction/interactionStore'
 import { emptyDiagram, type Diagram } from '@/domain/types'
 import { NO_MODIFIERS } from '@/interaction/events'
 import { initI18n } from '@/platform/i18n'
+import { applyLanguageFromUrl } from '@/app/applyLanguage'
+import { applyModeFromUrl } from '@/app/applyMode'
+import { applyValidationFromUrl } from '@/app/applyValidation'
+import { applyExamModeFromUrl } from '@/app/examMode'
 
 beforeAll(async () => { await initI18n() })
 
@@ -121,5 +126,66 @@ describe('UI integration — save/reopen simulated round-trip', () => {
     render(<App />)
     expect(await screen.findByText('A')).toBeInTheDocument()
     expect(await screen.findByText('B')).toBeInTheDocument()
+  })
+})
+
+describe('Phase 7 — URL-driven session', () => {
+  // Restore English after each test in this block so Italian strings don't
+  // bleed into subsequent test suites.
+  afterEach(async () => {
+    await i18next.changeLanguage('en')
+    // Reset transient URL-driven flags so each test starts clean.
+    useUiStore.getState().setReadonly(false)
+    useUiStore.getState().setEmbed(false)
+    useUiStore.getState().setExamMode(false)
+  })
+
+  it('?lang=it&readonly=true&validation=off applies all gates and renders Italian', async () => {
+    resetAll()
+    const search = '?lang=it&readonly=true&validation=off'
+    applyLanguageFromUrl(search)
+    applyModeFromUrl(search)
+    applyValidationFromUrl(search)
+    // applyExamModeFromUrl reads window.location.search directly;
+    // jsdom default is '' so examMode resolves to false (no ?embed).
+    applyExamModeFromUrl()
+    // Synchronise i18next to Italian — the bootstrap subscriber would do this
+    // at runtime but tests run synchronously without the subscriber wired.
+    await i18next.changeLanguage('it')
+
+    render(<App />)
+
+    // Menu chrome remains under readonly+validation+lang — only embed hides it.
+    // aria-label is t('menu:app.title') = "Menu" (same in EN and IT).
+    expect(screen.getByRole('button', { name: /^menu$/i })).toBeInTheDocument()
+
+    // Element tool buttons are hidden under readonly — only select/pan survive.
+    // aria-labels in Italian: "Entità", "Relazione", "Attributo".
+    expect(screen.queryByRole('button', { name: /entit/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /relazion/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /attribut/i })).toBeNull()
+
+    // Select tool still rendered with its Italian aria-label ("Seleziona").
+    expect(screen.getByRole('button', { name: /seleziona/i })).toBeInTheDocument()
+
+    // Validation disabled by ?validation=off.
+    expect(useValidationStore.getState().enabled).toBe(false)
+  })
+
+  it('?embed=true hides Menu + Toolbar; canvas remains', async () => {
+    resetAll()
+    const search = '?embed=true'
+    applyModeFromUrl(search)
+    // embed=true auto-sets examMode=true via parseQueryParams default.
+    applyExamModeFromUrl()
+
+    render(<App />)
+
+    // Menu returns null under embed.
+    expect(screen.queryByRole('button', { name: /^menu$/i })).toBeNull()
+    // Toolbar returns null under embed (it has data-role="toolbar" on a <nav>).
+    expect(document.querySelector('[data-role="toolbar"]')).toBeNull()
+    // React Flow canvas still mounted.
+    expect(document.querySelector('.react-flow')).toBeTruthy()
   })
 })

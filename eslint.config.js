@@ -101,6 +101,16 @@ export default defineConfig([
     }] },
   },
 
+  // Test files may import across layers (they are composition roots too — they
+  // wire the apply helpers + stores together to exercise full integration paths).
+  // Only the legacy/ fence is kept.
+  {
+    files: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
+    rules: { 'no-restricted-imports': ['error', {
+      patterns: [{ group: ['**/legacy/**', '*/legacy/*'], message: 'legacy/ is reference-only.' }],
+    }] },
+  },
+
   // Config files can use default exports.
   {
     files: ['*.config.{js,ts}', 'vite.config.ts', 'vitest.config.ts', 'playwright.config.ts', 'tailwind.config.js', 'eslint.config.js'],

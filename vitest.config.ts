@@ -133,6 +133,18 @@ export default defineConfig({
           functions: 80,
           lines: 80,
         },
+        'src/platform/fs/**': {
+          statements: 85,
+          branches: 70,
+          functions: 85,
+          lines: 85,
+        },
+        'src/platform/imageExport/**': {
+          statements: 85,
+          branches: 70,
+          functions: 85,
+          lines: 85,
+        },
         'src/platform/i18n/**': {
           statements: 80,
           branches: 70,
