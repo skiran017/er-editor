@@ -40,7 +40,13 @@ const stringAttr = (el: Element, name: string): string => {
   return raw
 }
 
-const boolAttr = (el: Element, name: string): boolean => stringAttr(el, name) === 'true'
+const boolAttr = (el: Element, name: string): boolean => {
+  const raw = stringAttr(el, name)
+  if (raw !== 'true' && raw !== 'false') {
+    throw new Error(`Expected "true" or "false" for "${name}" on <${el.tagName}>, got "${raw}"`)
+  }
+  return raw === 'true'
+}
 
 const parseSimpleAttribute = (el: Element): JavaSimpleAttribute => ({
   _kind: 'SimpleAttribute',
@@ -117,10 +123,10 @@ const parseBranch = (el: Element): JavaRelationshipSetBranch => {
 }
 
 const parseRelationship = (el: Element): JavaRelationshipSet => {
-  const kind = el.tagName as JavaRelationshipSetKind
-  if (!RELATIONSHIP_KINDS.has(kind)) {
+  if (!RELATIONSHIP_KINDS.has(el.tagName as JavaRelationshipSetKind)) {
     throw new Error(`Unexpected relationship element <${el.tagName}>`)
   }
+  const kind = el.tagName as JavaRelationshipSetKind
   return {
     _kind: kind,
     id: intAttr(el, 'id'),

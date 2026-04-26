@@ -169,3 +169,54 @@ describe('parseJavaXml — schema section', () => {
     expect(g.children.map((c) => c.refid)).toEqual([2, 3])
   })
 })
+
+describe('parseJavaXml — error paths', () => {
+  it('throws on malformed XML', () => {
+    expect(() => parseJavaXml('<unclosed')).toThrow(/XML parse error/)
+  })
+
+  it('throws when the root element is not <ERDatabaseModel>', () => {
+    expect(() => parseJavaXml('<?xml version="1.0"?><Foo />')).toThrow(/Expected <ERDatabaseModel>/)
+  })
+
+  it('throws on an unknown relationship kind', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel>
+  <ERDatabaseSchema name="T" lastId="3">
+    <EntitySets><StrongEntitySet id="1" name="A"><Attributes /></StrongEntitySet></EntitySets>
+    <RelationshipSets>
+      <RelationshipSetManyToMany id="2" name="R">
+        <Attributes /><Branches /></RelationshipSetManyToMany>
+    </RelationshipSets>
+    <Generalizations />
+  </ERDatabaseSchema>
+  <ERDatabaseDiagram />
+</ERDatabaseModel>`
+    expect(() => parseJavaXml(xml)).toThrow(/Unexpected relationship element/)
+  })
+
+  it('throws when totalParticipation is neither "true" nor "false"', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel>
+  <ERDatabaseSchema name="T" lastId="4">
+    <EntitySets>
+      <StrongEntitySet id="1" name="A"><Attributes /></StrongEntitySet>
+      <StrongEntitySet id="2" name="B"><Attributes /></StrongEntitySet>
+    </EntitySets>
+    <RelationshipSets>
+      <RelationshipSetOneToOne id="3" name="R">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="4" cardinality="1" totalParticipation="yes" role="">
+            <StrongEntitySet refid="1" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToOne>
+    </RelationshipSets>
+    <Generalizations />
+  </ERDatabaseSchema>
+  <ERDatabaseDiagram />
+</ERDatabaseModel>`
+    expect(() => parseJavaXml(xml)).toThrow(/Expected "true" or "false"/)
+  })
+})
