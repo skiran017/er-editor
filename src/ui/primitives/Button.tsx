@@ -33,7 +33,7 @@ export const Button = ({
   <button
     {...rest}
     type={type}
-    className={`inline-flex items-center justify-center gap-1.5 rounded font-medium transition-colors disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+    className={`inline-flex items-center justify-center gap-1.5 rounded font-medium transition-colors touch-manipulation disabled:cursor-not-allowed pointer-coarse:min-h-[44px] ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
   >
     {children}
   </button>

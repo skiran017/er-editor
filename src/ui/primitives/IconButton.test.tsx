@@ -53,4 +53,13 @@ describe('IconButton', () => {
     render(<IconButton aria-label="go" icon={<span>x</span>} />)
     expect(screen.getByRole('button')).toHaveAttribute('type', 'button')
   })
+
+  it('exposes a 44px minimum hit target via the pointer-coarse variant', () => {
+    const { container } = render(<IconButton aria-label="x" icon={<span>i</span>} />)
+    const btn = container.querySelector('button')!
+    // Tailwind v4 emits `pointer-coarse:min-h-[44px]` and `pointer-coarse:min-w-[44px]`.
+    // The class must be present so the variant kicks in on tablets / phones.
+    expect(btn.className).toContain('pointer-coarse:min-h-[44px]')
+    expect(btn.className).toContain('pointer-coarse:min-w-[44px]')
+  })
 })
