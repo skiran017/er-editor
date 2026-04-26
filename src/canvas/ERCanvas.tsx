@@ -167,6 +167,9 @@ const ERCanvasInner = () => {
         mouse.onPointerUp(e)
         touch.onPointerUp(e)
       }}
+      onPointerCancel={(e) => {
+        touch.onPointerCancel(e)
+      }}
       onWheel={(e) => {
         mouse.onWheel(e)
       }}
