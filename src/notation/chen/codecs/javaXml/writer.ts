@@ -12,6 +12,9 @@ import { isStrongEntity, isWeakEntity, isCompositeAttribute } from './types'
 
 const INDENT = '  '
 
+// Apostrophe is intentionally NOT escaped: attribute values use double-quote
+// delimiters, so bare ' is legal XML and the SUPSI fixtures contain it
+// literally (e.g. ENTITA'). Escaping to &apos; would break byte-clean round-trip.
 const escape = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 

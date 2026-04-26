@@ -97,4 +97,117 @@ describe('serializeJavaXml — schema section', () => {
     const out = serializeJavaXml(m)
     expect(out).toContain('<Generalization id="3" total="false">')
   })
+
+})
+
+describe('serializeJavaXml — coverage gaps', () => {
+  it('emits TotalGeneralization tag (not Generalization) when _kind is TotalGeneralization', () => {
+    const m: JavaModel = {
+      schema: {
+        name: 'T', lastId: 3,
+        entities: [
+          { _kind: 'StrongEntitySet', id: 1, name: 'P', attributes: [], primaryKey: [] },
+          { _kind: 'StrongEntitySet', id: 2, name: 'C', attributes: [], primaryKey: [] },
+        ],
+        relationships: [],
+        generalizations: [{
+          _kind: 'TotalGeneralization', id: 3, total: true,
+          parent: { _kind: 'StrongEntitySet', refid: 1 },
+          children: [{ _kind: 'StrongEntitySet', refid: 2 }],
+        }],
+      },
+      diagram: { positions: new Map() },
+    }
+    const out = serializeJavaXml(m)
+    expect(out).toContain('<TotalGeneralization id="3" total="true">')
+    expect(out).toContain('</TotalGeneralization>')
+    expect(out).not.toContain('<Generalization ')
+  })
+
+  it('emits CompositeAttribute with non-empty children wrapped in <Children>', () => {
+    const m: JavaModel = {
+      schema: {
+        name: 'T', lastId: 3,
+        entities: [{
+          _kind: 'StrongEntitySet', id: 1, name: 'E',
+          attributes: [{
+            _kind: 'CompositeAttribute', id: 2, name: 'addr',
+            multiValued: false, derived: false,
+            children: [{
+              _kind: 'SimpleAttribute', id: 3, name: 'street',
+              multiValued: false, derived: false,
+            }],
+          }],
+          primaryKey: [],
+        }],
+        relationships: [], generalizations: [],
+      },
+      diagram: { positions: new Map() },
+    }
+    const out = serializeJavaXml(m)
+    expect(out).toContain('<CompositeAttribute id="2" name="addr" multiValued="false" derived="false">')
+    expect(out).toContain('<Children>')
+    expect(out).toContain('<SimpleAttribute id="3" name="street" multiValued="false" derived="false" />')
+    expect(out).toContain('</Children>')
+    expect(out).toContain('</CompositeAttribute>')
+  })
+
+  it('emits empty CompositeAttribute as self-closing', () => {
+    const m: JavaModel = {
+      schema: {
+        name: 'T', lastId: 2,
+        entities: [{
+          _kind: 'StrongEntitySet', id: 1, name: 'E',
+          attributes: [{
+            _kind: 'CompositeAttribute', id: 2, name: 'addr',
+            multiValued: false, derived: false,
+            children: [],
+          }],
+          primaryKey: [],
+        }],
+        relationships: [], generalizations: [],
+      },
+      diagram: { positions: new Map() },
+    }
+    const out = serializeJavaXml(m)
+    expect(out).toContain('<CompositeAttribute id="2" name="addr" multiValued="false" derived="false" />')
+    expect(out).not.toContain('<Children>')
+  })
+
+  it('emits a WeakEntitySet with Discriminant refs', () => {
+    const m: JavaModel = {
+      schema: {
+        name: 'T', lastId: 2,
+        entities: [{
+          _kind: 'WeakEntitySet', id: 1, name: 'W',
+          attributes: [{ _kind: 'SimpleAttribute', id: 2, name: 'd', multiValued: false, derived: false }],
+          discriminant: [2],
+        }],
+        relationships: [], generalizations: [],
+      },
+      diagram: { positions: new Map() },
+    }
+    const out = serializeJavaXml(m)
+    expect(out).toContain('<WeakEntitySet id="1" name="W">')
+    expect(out).toContain('<Discriminant>')
+    expect(out).toContain('<SimpleAttribute refid="2" />')
+    expect(out).toContain('</Discriminant>')
+    expect(out).toContain('</WeakEntitySet>')
+  })
+
+})
+
+describe('serializeJavaXml — options', () => {
+  it('omits the final newline when trailingNewline is false', () => {
+    const m: JavaModel = {
+      schema: { name: 'T', lastId: 0, entities: [], relationships: [], generalizations: [] },
+      diagram: { positions: new Map() },
+    }
+    const withNl = serializeJavaXml(m)
+    const withoutNl = serializeJavaXml(m, { trailingNewline: false })
+    expect(withNl.endsWith('\n')).toBe(true)
+    expect(withoutNl.endsWith('\n')).toBe(false)
+    // Body content must be identical except for the trailing newline.
+    expect(withNl).toBe(withoutNl + '\n')
+  })
 })
