@@ -53,12 +53,35 @@ export type JavaRelationshipSetKind =
   | 'IdentifyingRelationshipSetOneToN'
   | 'IdentifyingRelationshipSetNToOne'
 
+export type JavaIdentifyingRelationshipSetKind =
+  | 'IdentifyingRelationshipSetOneToOne'
+  | 'IdentifyingRelationshipSetOneToN'
+  | 'IdentifyingRelationshipSetNToOne'
+
+/**
+ * Single interface for all 7 Java relationship-set classes.
+ *
+ * Design note: every concrete Java class (RelationshipSetOneToOne,
+ * RelationshipSetOneToN, RelationshipSetNToOne, RelationshipSetNToN,
+ * IdentifyingRelationshipSetOneToOne, IdentifyingRelationshipSetOneToN,
+ * IdentifyingRelationshipSetNToOne) carries exactly the same fields —
+ * id, name, attributes, branches. There is NO structural difference
+ * between variants, so we model them with ONE interface and use `_kind`
+ * purely as a tag for logic dispatch (cardinality extraction,
+ * identifying-flag check). Transformer code MUST branch on `_kind`
+ * (or use `isIdentifyingRelationship`) rather than expecting per-variant
+ * structural narrowing.
+ */
 export interface JavaRelationshipSet {
   readonly _kind: JavaRelationshipSetKind
   readonly id: number
   readonly name: string
   readonly attributes: readonly JavaAttribute[]
   readonly branches: readonly JavaRelationshipSetBranch[]
+}
+
+export interface JavaIdentifyingRelationshipSet extends JavaRelationshipSet {
+  readonly _kind: JavaIdentifyingRelationshipSetKind
 }
 
 export interface JavaRelationshipSetBranch {
@@ -81,6 +104,13 @@ export interface JavaPartialGeneralization {
   readonly children: readonly { readonly _kind: 'StrongEntitySet' | 'WeakEntitySet'; readonly refid: number }[]
 }
 
+/**
+ * Class invariant: `total` is ALWAYS `true` for a TotalGeneralization per
+ * Java's class hierarchy. Readers must set `total: true`; writers must NOT
+ * rely on the `total` field alone to choose the XML element name — use
+ * `_kind` instead (a PartialGeneralization with `total: true` set in the
+ * XML would still have `_kind: 'Generalization'`).
+ */
 export interface JavaTotalGeneralization {
   readonly _kind: 'TotalGeneralization'
   readonly id: number
@@ -103,7 +133,14 @@ export interface JavaPosition {
 }
 
 export interface JavaDiagram {
-  /** Keyed by element id. Branches are NOT in this map (Java doesn't store branch positions). */
+  /**
+   * Position map keyed by integer element id.
+   * Covers entities (StrongEntitySet, WeakEntitySet), relationships
+   * (all 7 RelationshipSet kinds), generalizations (Generalization,
+   * TotalGeneralization), and attributes — including composite children.
+   * Branches (RelationshipSetBranch) are the ONLY diagrammable construct
+   * excluded; Java does not store branch positions.
+   */
   readonly positions: ReadonlyMap<number, JavaPosition>
 }
 
@@ -122,14 +159,16 @@ export const isWeakEntity = (e: JavaEntitySet): e is JavaWeakEntitySet =>
 export const isCompositeAttribute = (a: JavaAttribute): a is JavaCompositeAttribute =>
   a._kind === 'CompositeAttribute'
 
-const IDENTIFYING_KINDS: ReadonlySet<JavaRelationshipSetKind> = new Set([
+const IDENTIFYING_KINDS: ReadonlySet<JavaIdentifyingRelationshipSetKind> = new Set([
   'IdentifyingRelationshipSetOneToOne',
   'IdentifyingRelationshipSetOneToN',
   'IdentifyingRelationshipSetNToOne',
 ])
 
-export const isIdentifyingRelationship = (r: JavaRelationshipSet): boolean =>
-  IDENTIFYING_KINDS.has(r._kind)
+export const isIdentifyingRelationship = (
+  r: JavaRelationshipSet,
+): r is JavaIdentifyingRelationshipSet =>
+  IDENTIFYING_KINDS.has(r._kind as JavaIdentifyingRelationshipSetKind)
 
 export const isTotalGeneralization = (g: JavaGeneralization): g is JavaTotalGeneralization =>
   g._kind === 'TotalGeneralization'
