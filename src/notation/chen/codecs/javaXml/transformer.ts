@@ -33,8 +33,16 @@ const DEFAULT_ATTRIBUTE_SIZE = { width: 90, height: 50 }
 const DEFAULT_RELATIONSHIP_SIZE = { width: 140, height: 70 }
 const DEFAULT_ISA_SIZE = { width: 100, height: 60 }
 
-const positionOf = (model: JavaModel, id: number): { x: number; y: number } =>
-  model.diagram.positions.get(id) ?? { x: 0, y: 0 }
+// Java app positions are tightly packed; scaling on import gives the diagram
+// breathing room without losing relative layout. `_javaXmlPositions` keeps the
+// raw values so byte-clean round-trip via diagramToJava is unaffected (the
+// reverse path emits the unscaled metadata verbatim).
+const IMPORT_POSITION_SCALE = 1.7
+
+const positionOf = (model: JavaModel, id: number): { x: number; y: number } => {
+  const raw = model.diagram.positions.get(id) ?? { x: 0, y: 0 }
+  return { x: raw.x * IMPORT_POSITION_SCALE, y: raw.y * IMPORT_POSITION_SCALE }
+}
 
 const buildEntityNode = (model: JavaModel, e: JavaEntitySet): EntityNode => ({
   id: newNodeId(),

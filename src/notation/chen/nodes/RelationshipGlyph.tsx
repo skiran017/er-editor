@@ -48,7 +48,7 @@ export const RelationshipGlyph = ({
       y={height / 2}
       textAnchor="middle"
       dominantBaseline="central"
-      className="fill-slate-900 text-sm font-medium select-none pointer-events-none dark:fill-slate-100"
+      className="fill-slate-900 text-xs font-medium select-none pointer-events-none dark:fill-slate-100"
     >
       {name}
     </text>

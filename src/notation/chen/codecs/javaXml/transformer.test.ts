@@ -106,7 +106,7 @@ describe('javaToDiagram — entities + attributes', () => {
     expect(composite.kind === 'attribute' && composite.isComposite).toBe(true)
   })
 
-  it('honours position from the diagram section if present, else uses (0, 0)', () => {
+  it('scales position from the diagram section by the import factor (1.7×)', () => {
     const m: JavaModel = {
       schema: {
         name: 'T', lastId: 1,
@@ -117,7 +117,9 @@ describe('javaToDiagram — entities + attributes', () => {
     }
     const d = javaToDiagram(m)
     const node = d.nodesById[d.nodeOrder[0]!]!
-    expect(node.position).toEqual({ x: 50, y: 60 })
+    // Imported positions are scaled to spread out the tightly-packed Java layout.
+    // Raw (50, 60) × 1.7 → scaled (85, 102). Round-trip metadata stores the raw values.
+    expect(node.position).toEqual({ x: 85, y: 102 })
   })
 })
 
