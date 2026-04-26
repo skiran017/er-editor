@@ -25,6 +25,7 @@ export const Toolbar = memo(() => {
   const { t } = useTranslation(['toolbar', 'menu'])
   const currentTool = useInteractionStore((s) => s.snapshot.context.tool)
   const readonly = useUiStore((s) => s.readonly)
+  const embed = useUiStore((s) => s.embed)
 
   // zundo exposes `temporal` as a zustand store; subscribe via useStore so the
   // undo/redo buttons disable/enable reactively as history grows and shrinks.
@@ -37,6 +38,9 @@ export const Toolbar = memo(() => {
   )
 
   const send = useInteractionStore.getState().send
+
+  // Hide entire toolbar chrome under embed (iframe/Moodle host provides its own UI).
+  if (embed) return null
 
   // In readonly mode, filter out element + connection groups; keep select group only.
   const visibleGroups = readonly

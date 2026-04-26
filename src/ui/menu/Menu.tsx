@@ -53,6 +53,7 @@ export const Menu = () => {
   // (`?examMode=true` or default-on under `?embed=true`) during startup.
   const examMode = useUiStore((s) => s.examMode)
   const readonly = useUiStore((s) => s.readonly)
+  const embed = useUiStore((s) => s.embed)
 
   const validationEnabled = useValidationStore((s) => s.enabled)
   const setValidationEnabled = useValidationStore((s) => s.setEnabled)
@@ -97,6 +98,9 @@ export const Menu = () => {
     })
     close()
   }
+
+  // Hide entire menu chrome under embed (iframe/Moodle host provides its own UI).
+  if (embed) return null
 
   // File actions vanish entirely under exam mode. Hiding rather than
   // disabling is the honest lockdown — a disabled attribute on a button is

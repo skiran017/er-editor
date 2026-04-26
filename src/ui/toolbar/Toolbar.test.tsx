@@ -107,6 +107,17 @@ describe('Toolbar — history group (undo / redo)', () => {
   })
 })
 
+describe('Toolbar — embed mode', () => {
+  beforeEach(reset)
+  afterEach(() => useUiStore.setState({ embed: false }))
+
+  it('renders nothing when uiStore.embed is true', () => {
+    useUiStore.setState({ embed: true })
+    const { container } = render(<Toolbar />)
+    expect(container.firstChild).toBeNull()
+  })
+})
+
 describe('Toolbar — readonly mode', () => {
   beforeEach(reset)
   afterEach(() => useUiStore.setState({ readonly: false }))

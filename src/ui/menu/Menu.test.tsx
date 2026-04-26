@@ -130,6 +130,17 @@ describe('Menu — readonly mode', () => {
   })
 })
 
+describe('Menu — embed mode', () => {
+  beforeEach(reset)
+  afterEach(() => useUiStore.setState({ embed: false }))
+
+  it('renders nothing when uiStore.embed is true', () => {
+    useUiStore.setState({ embed: true })
+    const { container } = render(<Menu />)
+    expect(container.firstChild).toBeNull()
+  })
+})
+
 describe('Menu — exam mode', () => {
   beforeEach(reset)
 
