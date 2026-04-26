@@ -121,6 +121,14 @@ describe('Menu — hamburger dropdown', () => {
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(1)
     confirmSpy.mockRestore()
   })
+
+  it('pressing Escape while the dropdown is open closes it', async () => {
+    render(<Menu />)
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
 })
 
 describe('Menu — readonly mode', () => {

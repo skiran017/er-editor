@@ -6,6 +6,7 @@ import { useDiagramStore } from '@/state/diagramStore'
 import { useUiStore } from '@/state/uiStore'
 import { emptyDiagram } from '@/domain/types'
 import * as fs from '@/platform/fs'
+import * as codecs from '@/notation/chen/codecs'
 
 vi.mock('@/platform/fs', () => ({
   openFile: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock('@/platform/fs', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.restoreAllMocks()
   useDiagramStore.setState({ diagram: emptyDiagram() })
   useUiStore.setState({ toasts: [] })
 })
@@ -86,5 +88,47 @@ describe('useFileActions', () => {
     const [, filename] = vi.mocked(fs.downloadBlob).mock.calls[0]!
     expect(filename).toMatch(/\.mmd$/)
     expect(useUiStore.getState().toasts.some((t) => t.messageKey === 'menu:app.exportSuccess')).toBe(true)
+  })
+
+  it('open: toasts failure when file.text() throws', async () => {
+    const file = new File([''], 'throw.xml')
+    Object.defineProperty(file, 'text', { value: () => Promise.reject(new Error('read error')) })
+    vi.mocked(fs.openFile).mockResolvedValue(file)
+    const close = vi.fn()
+    const { result } = renderHook(() => useFileActions(close))
+
+    await act(async () => { await result.current.open() })
+
+    expect(useUiStore.getState().toasts.some((t) => t.messageKey === 'menu:app.openFailure')).toBe(true)
+    expect(close).toHaveBeenCalled()
+  })
+
+  it('save: toasts failure when chenJavaXmlCodec.serialize throws', async () => {
+    // serialize is optional in the Codec type; double-cast to mutate it per test.
+    const codec = codecs.chenJavaXmlCodec as unknown as Record<string, unknown>
+    const origSerialize = codec['serialize']
+    codec['serialize'] = () => { throw new Error('serialize error') }
+    const close = vi.fn()
+    const { result } = renderHook(() => useFileActions(close))
+
+    await act(async () => { await result.current.save() })
+
+    codec['serialize'] = origSerialize
+    expect(useUiStore.getState().toasts.some((t) => t.messageKey === 'menu:app.saveFailure')).toBe(true)
+    expect(close).toHaveBeenCalled()
+  })
+
+  it('exportMermaid: toasts failure when mermaidCodec.serialize throws', async () => {
+    const codec = codecs.mermaidCodec as unknown as Record<string, unknown>
+    const origSerialize = codec['serialize']
+    codec['serialize'] = () => { throw new Error('mermaid error') }
+    const close = vi.fn()
+    const { result } = renderHook(() => useFileActions(close))
+
+    await act(async () => { await result.current.exportMermaid() })
+
+    codec['serialize'] = origSerialize
+    expect(useUiStore.getState().toasts.some((t) => t.messageKey === 'menu:app.exportFailure')).toBe(true)
+    expect(close).toHaveBeenCalled()
   })
 })

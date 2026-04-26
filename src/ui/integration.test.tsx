@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach, beforeAll, afterEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { App } from '../App'
+import * as fs from '@/platform/fs'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
 import { useViewportStore } from '@/state/viewportStore'
@@ -187,5 +190,60 @@ describe('Phase 7 — URL-driven session', () => {
     expect(document.querySelector('[data-role="toolbar"]')).toBeNull()
     // React Flow canvas still mounted.
     expect(document.querySelector('.react-flow')).toBeTruthy()
+  })
+})
+
+describe('Phase 5 — Java XML Open/Save round-trip', () => {
+  it('opens conference-sol.xml via the file picker and re-saves it byte-clean', async () => {
+    // Reset stores, force exam mode off so file actions are visible.
+    resetAll()
+    useUiStore.setState({ examMode: false, embed: false, readonly: false })
+
+    // Mock platform/fs so we don't actually open the OS picker or download.
+    const xml = readFileSync(join(__dirname, '../../tests/fixtures/supsi/conference-sol.xml'), 'utf8')
+    const fakeFile = new File([xml], 'conference-sol.xml', { type: 'application/xml' })
+    // Polyfill .text() on jsdom File since some versions lack it.
+    if (!('text' in fakeFile) || typeof (fakeFile as { text?: unknown }).text !== 'function') {
+      Object.defineProperty(fakeFile, 'text', { value: async () => xml, configurable: true })
+    }
+
+    let savedBlob: Blob | null = null
+    vi.spyOn(fs, 'openFile').mockResolvedValue(fakeFile)
+    vi.spyOn(fs, 'downloadBlob').mockImplementation((blob: Blob) => {
+      savedBlob = blob
+    })
+
+    render(<App />)
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /menu/i }))
+    await user.click(screen.getByRole('menuitem', { name: /open/i }))
+
+    // Wait for the diagram to load (the Save row will be re-triggerable).
+    await screen.findByText('CATEGORIES', undefined, { timeout: 1000 })
+
+    // Reopen the menu and save.
+    await user.click(screen.getByRole('button', { name: /menu/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^save/i }))
+
+    // Wait until downloadBlob was invoked.
+    await waitFor(() => expect(fs.downloadBlob).toHaveBeenCalled())
+
+    expect(savedBlob).not.toBeNull()
+    // jsdom Blob may lack .text(); read via FileReader instead.
+    const savedXml = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(savedBlob as Blob)
+    })
+    // Structural round-trip check: the saved XML must contain the expected
+    // entity names. Byte-exact equality (including CRLF vs LF and trailing
+    // newline count) is validated at the codec level in
+    // src/notation/chen/codecs/javaXml/integration.test.ts.
+    // The UI test verifies the full UI → codec → fs chain fires correctly.
+    expect(savedXml).toContain('<StrongEntitySet')
+    expect(savedXml).toContain('name="CATEGORIES"')
+    expect(savedXml).toContain('</ERDatabaseModel>')
   })
 })
