@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel>
+  <ERDatabaseSchema name="Unnamed_DB_Schema_1" lastId="0">
+    <EntitySets>
+      <StrongEntitySet id="1" name="New Entity">
+        <Attributes>
+          <SimpleAttribute id="2" name="New Attribute" multiValued="false" derived="false" />
+        </Attributes>
+      </StrongEntitySet>
+      <StrongEntitySet id="3" name="New Entity">
+        <Attributes>
+          <SimpleAttribute id="4" name="New Attribute" multiValued="false" derived="false" />
+        </Attributes>
+      </StrongEntitySet>
+      <StrongEntitySet id="5" name="New Entity">
+        <Attributes>
+          <SimpleAttribute id="6" name="New Attribute" multiValued="false" derived="false" />
+          <SimpleAttribute id="7" name="New Attribute" multiValued="false" derived="false" />
+          <SimpleAttribute id="8" name="New Attribute" multiValued="false" derived="false" />
+        </Attributes>
+      </StrongEntitySet>
+    </EntitySets>
+    <RelationshipSets>
+      <RelationshipSetOneToOne id="9" name="New Relationship">
+        <Attributes>
+          <SimpleAttribute id="10" name="New Attribute" multiValued="false" derived="false" />
+        </Attributes>
+        <Branches>
+          <RelationshipSetBranch id="11" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="1" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="12" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="3" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToOne>
+    </RelationshipSets>
+    <Generalizations />
+  </ERDatabaseSchema>
+  <ERDatabaseDiagram>
+    <StrongEntitySet refid="1">
+      <Position x="684" y="102" />
+    </StrongEntitySet>
+    <StrongEntitySet refid="3">
+      <Position x="686" y="485" />
+    </StrongEntitySet>
+    <StrongEntitySet refid="5">
+      <Position x="257" y="318" />
+    </StrongEntitySet>
+    <RelationshipSetOneToOne refid="9">
+      <Position x="700" y="315" />
+    </RelationshipSetOneToOne>
+    <SimpleAttribute refid="6">
+      <Position x="525" y="200" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="7">
+      <Position x="586" y="264" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="8">
+      <Position x="504" y="477" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="2">
+      <Position x="902" y="54" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="4">
+      <Position x="919" y="484" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="10">
+      <Position x="924" y="241" />
+    </SimpleAttribute>
+  </ERDatabaseDiagram>
+</ERDatabaseModel>

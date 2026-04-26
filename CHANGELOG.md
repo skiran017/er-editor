@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v2 / Phase 5] — 2026-04-26
+
+### Added
+- [src/notation/chen/codecs/](src/notation/chen/codecs/) — codec layer.
+  - [chenJavaXmlCodec](src/notation/chen/codecs/javaXml/index.ts) — the SUPSI Java XML format. Two-layer architecture: reader/writer (1:1 mirror of `XMLReader.java` / `XMLWriter.java`) ↔ JavaModel intermediate ↔ transformer ↔ Diagram. Byte-clean SUPSI fixture round-trip on all 5 fixtures (`conference-sol.xml`, `xml.xml`, `test.xml`, `er-java.xml`, `er-diagram-java-1767873101060.xml`).
+  - [mermaidCodec](src/notation/chen/codecs/mermaid.ts) — Mermaid `erDiagram` export. Crow's-foot syntax, identifying vs non-identifying connectors, generalizations as comments.
+  - Codec registry at [index.ts](src/notation/chen/codecs/index.ts) with `codecs[]` + `codecById(id)`.
+- [src/notation/chen/codecs/types.ts](src/notation/chen/codecs/types.ts) — `Codec` contract from spec §6.5 with `Result<T>` for parse failures.
+- [tests/fixtures/supsi/](tests/fixtures/supsi/) — 5 SUPSI fixtures + JAR-decompiler reference under `/Users/kiri/SUPSI/` (outside repo).
+- [src/ui/menu/useFileActions.ts](src/ui/menu/useFileActions.ts) — Menu's Open / Save / Export Mermaid handlers wired through `chenJavaXmlCodec` + `mermaidCodec` + `platform/fs`.
+- Transient `Diagram.databaseName`, `Diagram.databaseLastId`, `Diagram._javaXmlPositions`, `Diagram._javaXmlKeyOrders` fields preserve Java XML round-trip metadata. Not persisted, prefixed with `_javaXml` to mark them as codec-private.
+- Coverage thresholds for `src/notation/chen/codecs/**` (90/85/90/90).
+
+### Changed
+- [src/ui/menu/Menu.tsx](src/ui/menu/Menu.tsx) — `toastPhase5` stubs replaced with real handlers. `Export PNG`, `Export SVG`, `Export Mermaid` rows all functional.
+
+### Hard acceptance gate cleared
+- **SUPSI Java XML byte-clean fixture round-trip** (spec §10.7): `conference-sol.xml` and 4 other fixtures load → save → diff = 0 lines.
+
+### Deferred
+- Moodle postMessage bridge (still parked — needs a host script).
+- Cross-document clipboard paste (Sub-project 4).
+- Native JSON codec (skipped per project decision — Java XML IS the save format).
+- ISA disjoint/overlapping constraint (BACKLOG.md, pre-Phase-4 spec addendum).
+
 ## [v2 / Phase 7] — 2026-04-26
 
 ### Added

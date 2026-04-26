@@ -27,6 +27,12 @@ export default defineConfig({
           functions: 95,
           lines: 95,
         },
+        'src/notation/chen/codecs/**': {
+          statements: 90,
+          branches: 85,
+          functions: 90,
+          lines: 90,
+        },
         'src/notation/chen/rules/**': {
           statements: 90,
           branches: 85,

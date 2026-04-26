@@ -54,17 +54,26 @@ export const chooseSide = (a: FloatableNode, b: FloatableNode): EdgePosition => 
   return dy >= 0 ? 'bottom' : 'top'
 }
 
-/** Cardinal midpoint of the given side, in world coordinates. */
-export const sidePort = (n: FloatableNode, side: EdgePosition): Point => {
+/**
+ * Port location along the given side. With `offset` = 0 (default) returns the
+ * cardinal midpoint; offset ∈ [-1, +1] slides the port along the side from
+ * one end (-1) to the other (+1). For top/bottom the offset varies the x
+ * coordinate; for left/right it varies the y coordinate. Used to distribute
+ * multiple edges sharing the same side so they don't visually stack at the
+ * midpoint.
+ */
+export const sidePort = (n: FloatableNode, side: EdgePosition, offset = 0): Point => {
   const w = n.measured?.width ?? n.width ?? 0
   const h = n.measured?.height ?? n.height ?? 0
   const x = n.position.x
   const y = n.position.y
+  const tx = 0.5 + offset / 2  // [-1,+1] → [0,1] along the side
+  const ty = 0.5 + offset / 2
   switch (side) {
-    case 'top': return { x: x + w / 2, y }
-    case 'right': return { x: x + w, y: y + h / 2 }
-    case 'bottom': return { x: x + w / 2, y: y + h }
-    case 'left': return { x, y: y + h / 2 }
+    case 'top': return { x: x + w * tx, y }
+    case 'right': return { x: x + w, y: y + h * ty }
+    case 'bottom': return { x: x + w * tx, y: y + h }
+    case 'left': return { x, y: y + h * ty }
   }
 }
 
@@ -336,6 +345,65 @@ export const assignNodePorts = (
   return assignment
 }
 
+// ——— along-side offset distribution ———
+
+// Fraction of a side's length used for distributed ports — 70% means the
+// outermost ports sit 15% from each corner, leaving room so edges still
+// clearly belong to the side they exit (and don't visually merge into the
+// adjacent corner).
+const SIDE_OFFSET_SPREAD = 0.7
+
+const projectAngleAlongSide = (side: EdgePosition, angle: number): number => {
+  // The output ranges in [-1, +1] and gives the natural ordering of where
+  // an edge "wants" to sit along the side, based on its approach angle.
+  // For horizontal sides (top/bottom): cos(angle) is -1 (left) ... +1 (right).
+  // For vertical sides (left/right): sin(angle) is -1 (up) ... +1 (down).
+  return side === 'top' || side === 'bottom' ? Math.cos(angle) : Math.sin(angle)
+}
+
+/**
+ * Compute per-edge along-side offsets for edges sharing a side. Multiple
+ * incident edges with the same `assignedSide` get spread evenly across
+ * `SIDE_OFFSET_SPREAD` of that side; edges alone on a side stay at the
+ * midpoint (offset 0). Returns a map keyed by edgeId.
+ */
+export const distributePortOffsets = (
+  node: FloatableNode,
+  incident: readonly IncidentEdge[],
+  assignment: ReadonlyMap<string, EdgePosition>,
+): Map<string, number> => {
+  const nodeCentre = centreOf(node)
+  // Build per-side groups with each edge's approach angle.
+  const bySide: Record<EdgePosition, { edgeId: string; angle: number }[]> = {
+    top: [], right: [], bottom: [], left: [],
+  }
+  for (const { edgeId, other } of incident) {
+    const side = assignment.get(edgeId)
+    if (!side) continue
+    const oc = centreOf(other)
+    const angle = Math.atan2(oc.y - nodeCentre.y, oc.x - nodeCentre.x)
+    bySide[side].push({ edgeId, angle })
+  }
+  const result = new Map<string, number>()
+  for (const side of ALL_SIDES) {
+    const group = bySide[side]
+    if (group.length === 0) continue
+    if (group.length === 1) {
+      result.set(group[0]!.edgeId, 0)
+      continue
+    }
+    const sorted = [...group].sort(
+      (a, b) => projectAngleAlongSide(side, a.angle) - projectAngleAlongSide(side, b.angle),
+    )
+    const n = sorted.length
+    sorted.forEach((entry, i) => {
+      const offset = SIDE_OFFSET_SPREAD * (2 * i / (n - 1) - 1)
+      result.set(entry.edgeId, offset)
+    })
+  }
+  return result
+}
+
 export interface FloatingAttachment {
   readonly sx: number
   readonly sy: number
@@ -370,46 +438,55 @@ export const useFloatingEdge = (
     const t = targetNode as unknown as FloatableNode
     if (!hasDimensions(s) || !hasDimensions(t)) return null
 
-    const sSide = resolveSide(s, sourceId, edgeId, diagram) ?? chooseSide(s, t)
-    const tSide = resolveSide(t, targetId, edgeId, diagram) ?? chooseSide(t, s)
+    const sAtt = resolveAttachment(s, sourceId, edgeId, diagram) ?? { side: chooseSide(s, t), offset: 0 }
+    const tAtt = resolveAttachment(t, targetId, edgeId, diagram) ?? { side: chooseSide(t, s), offset: 0 }
     // ISA endpoints use triangle-aware ports so lines visually touch the
     // slanted edges instead of stopping at the bbox cardinals. Other kinds
-    // keep their rectangular / diamond bbox-midpoint geometry.
+    // keep their rectangular / diamond bbox-midpoint geometry. ISA ports
+    // don't take a distribution offset — the inverted-triangle apex/base
+    // geometry doesn't have a meaningful "spread along the side" axis.
     const sIsIsa = diagram.nodesById[sourceId as NodeId]?.kind === 'isa'
     const tIsIsa = diagram.nodesById[targetId as NodeId]?.kind === 'isa'
-    const sp = sIsIsa ? isaTrianglePort(s, sSide) : sidePort(s, sSide)
-    const tp = tIsIsa ? isaTrianglePort(t, tSide) : sidePort(t, tSide)
+    const sp = sIsIsa ? isaTrianglePort(s, sAtt.side) : sidePort(s, sAtt.side, sAtt.offset)
+    const tp = tIsIsa ? isaTrianglePort(t, tAtt.side) : sidePort(t, tAtt.side, tAtt.offset)
     return {
       sx: sp.x,
       sy: sp.y,
       tx: tp.x,
       ty: tp.y,
-      sourcePosition: sSide,
-      targetPosition: tSide,
+      sourcePosition: sAtt.side,
+      targetPosition: tAtt.side,
     }
   }, [sourceNode, targetNode, sourceId, targetId, edgeId, diagram])
 }
 
-// Resolve the chosen side for one end of `edgeId` attached to `nodeId`, using
-// the collision-aware assignment over ALL edges incident to that node. Returns
-// null when the node / edge can't be found (caller falls back to naive
-// chooseSide).
+// Resolve the chosen side AND along-side offset for one end of `edgeId`
+// attached to `nodeId`, using the collision-aware assignment over ALL edges
+// incident to that node. Returns null when the node / edge can't be found
+// (caller falls back to naive chooseSide with offset 0).
 //
 // Special case: ISA nodes are inverted triangles, so their port geometry is
 // NOT symmetric. Parent edges always enter from the top-midpoint (centre of
 // the base), every child edge exits from the bottom-midpoint (the apex).
 // Hard-code those ports here; the collision-aware rotation logic would
 // otherwise scatter children across the sides and break the Chen visual.
-const resolveSide = (
+// ISA returns offset 0 — its apex/base/slant geometry doesn't lend itself
+// to along-side distribution.
+interface ResolvedAttachment {
+  readonly side: EdgePosition
+  readonly offset: number
+}
+
+const resolveAttachment = (
   node: FloatableNode,
   nodeId: string,
   edgeId: string | undefined,
   diagram: ReturnType<typeof useDiagramStore.getState>['diagram'],
-): EdgePosition | null => {
+): ResolvedAttachment | null => {
   if (!edgeId) return null
 
   const isaSide = resolveIsaSideIfApplicable(node, nodeId, edgeId, diagram)
-  if (isaSide !== undefined) return isaSide
+  if (isaSide !== undefined) return { side: isaSide, offset: 0 }
 
   const incident: IncidentEdge[] = []
   for (const eid of diagram.edgeOrder) {
@@ -434,6 +511,9 @@ const resolveSide = (
     })
   }
   if (incident.length === 0) return null
-  const map = assignNodePorts(node, incident)
-  return map.get(edgeId) ?? null
+  const sides = assignNodePorts(node, incident)
+  const side = sides.get(edgeId)
+  if (!side) return null
+  const offsets = distributePortOffsets(node, incident, sides)
+  return { side, offset: offsets.get(edgeId) ?? 0 }
 }

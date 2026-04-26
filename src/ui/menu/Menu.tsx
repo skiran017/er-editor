@@ -23,6 +23,7 @@ import {
   type ThemeOption,
 } from './MenuDropdownBody'
 import { useExportHandlers } from './useExportHandlers'
+import { useFileActions } from './useFileActions'
 
 const THEMES: readonly ThemeOption[] = [
   { value: 'light', icon: Sun, labelKey: 'menu:app.themeLight' },
@@ -72,11 +73,7 @@ export const Menu = () => {
   const close = () => setIsOpen(false)
 
   const { exportPng, exportSvg } = useExportHandlers(close)
-
-  const toastPhase5 = () => {
-    pushToast({ id: `phase5-${Date.now()}`, kind: 'info', messageKey: 'menu:notYetAvailable' })
-    close()
-  }
+  const fileActionsHook = useFileActions(close)
 
   const handleShortcuts = () => {
     useInteractionStore.getState().send({ type: 'TOGGLE_CHEATSHEET' })
@@ -112,10 +109,16 @@ export const Menu = () => {
   const fileActions: readonly FileAction[] = examMode
     ? []
     : [
-        { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O', onSelect: toastPhase5 },
-        { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S', onSelect: toastPhase5 },
-        { id: 'exportPng', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: () => { void exportPng() } },
-        { id: 'exportSvg', labelKey: 'menu:file.exportSvg', icon: ImageIcon, onSelect: () => { void exportSvg() } },
+        { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O',
+          onSelect: () => { void fileActionsHook.open() } },
+        { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S',
+          onSelect: () => { void fileActionsHook.save() } },
+        { id: 'exportPng', labelKey: 'menu:file.exportPng', icon: ImageIcon,
+          onSelect: () => { void exportPng() } },
+        { id: 'exportSvg', labelKey: 'menu:file.exportSvg', icon: ImageIcon,
+          onSelect: () => { void exportSvg() } },
+        { id: 'exportMermaid', labelKey: 'menu:file.exportMermaid', icon: ImageIcon,
+          onSelect: () => { void fileActionsHook.exportMermaid() } },
       ]
 
   return (
