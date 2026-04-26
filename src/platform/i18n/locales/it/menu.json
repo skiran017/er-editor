@@ -52,7 +52,9 @@
     "examModeBanner": "Modalità esame — apertura, salvataggio, esportazione e validazione bloccati.",
     "language": "Lingua",
     "languageEn": "Inglese",
-    "languageIt": "Italiano"
+    "languageIt": "Italiano",
+    "exportSuccess": "Diagramma esportato.",
+    "exportFailure": "Esportazione non riuscita. Consulta la console per i dettagli."
   },
   "notYetAvailable": "Disponibile nella Fase 5 (codec I/O)."
 }

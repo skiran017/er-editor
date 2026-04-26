@@ -22,6 +22,7 @@ import {
   type FileAction,
   type ThemeOption,
 } from './MenuDropdownBody'
+import { useExportHandlers } from './useExportHandlers'
 
 const THEMES: readonly ThemeOption[] = [
   { value: 'light', icon: Sun, labelKey: 'menu:app.themeLight' },
@@ -70,6 +71,8 @@ export const Menu = () => {
 
   const close = () => setIsOpen(false)
 
+  const { exportPng, exportSvg } = useExportHandlers(close)
+
   const toastPhase5 = () => {
     pushToast({ id: `phase5-${Date.now()}`, kind: 'info', messageKey: 'menu:notYetAvailable' })
     close()
@@ -111,7 +114,8 @@ export const Menu = () => {
     : [
         { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O', onSelect: toastPhase5 },
         { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S', onSelect: toastPhase5 },
-        { id: 'exportImage', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: toastPhase5 },
+        { id: 'exportPng', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: () => { void exportPng() } },
+        { id: 'exportSvg', labelKey: 'menu:file.exportSvg', icon: ImageIcon, onSelect: () => { void exportSvg() } },
       ]
 
   return (

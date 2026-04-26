@@ -52,7 +52,9 @@
     "examModeBanner": "Exam mode — file I/O and validation toggle are locked.",
     "language": "Language",
     "languageEn": "English",
-    "languageIt": "Italian"
+    "languageIt": "Italian",
+    "exportSuccess": "Diagram exported.",
+    "exportFailure": "Export failed. See console for details."
   },
   "notYetAvailable": "Available in Phase 5 (I/O codecs)."
 }
