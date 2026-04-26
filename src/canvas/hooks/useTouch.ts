@@ -15,13 +15,24 @@ export interface TouchHandlers {
 // is mounted, so unit tests keep working unchanged.
 export const useTouch = (): TouchHandlers => {
   const activePointerId = useRef<number | null>(null)
+  // Palm rejection: track whether a pen pointer is currently down. When a pen
+  // is active, any simultaneous touch event is treated as an accidental palm
+  // contact and silently dropped. The pen itself flows through useMouse, so
+  // we never dispatch FSM events for pen here — only update this flag.
+  const penActiveRef = useRef<boolean>(false)
   const { screenToFlowPosition } = useReactFlow()
   const toFlow = (e: { clientX: number; clientY: number }) =>
     screenToFlowPosition({ x: e.clientX, y: e.clientY })
 
   return {
     onPointerDown: (e) => {
+      if (e.pointerType === 'pen') {
+        // Record that a pen is in contact so concurrent touches can be rejected.
+        penActiveRef.current = true
+        return
+      }
       if (e.pointerType !== 'touch') return
+      if (penActiveRef.current) return  // palm rejection — pen is active, drop touch
       if (activePointerId.current !== null) return  // ignore second finger (pinch = Sub-project 4)
       activePointerId.current = e.pointerId
       useInteractionStore.getState().send({
@@ -33,6 +44,8 @@ export const useTouch = (): TouchHandlers => {
     },
     onPointerMove: (e) => {
       if (e.pointerType !== 'touch') return
+      // Touches rejected at pointerdown never set activePointerId, so the
+      // pointerId check below already silences their subsequent moves.
       if (e.pointerId !== activePointerId.current) return
       useInteractionStore.getState().send({
         type: 'CANVAS_POINTER_MOVE',
@@ -40,6 +53,11 @@ export const useTouch = (): TouchHandlers => {
       })
     },
     onPointerUp: (e) => {
+      if (e.pointerType === 'pen') {
+        // Clear the pen-active flag so subsequent touches are accepted again.
+        penActiveRef.current = false
+        return
+      }
       if (e.pointerType !== 'touch') return
       if (e.pointerId !== activePointerId.current) return
       activePointerId.current = null

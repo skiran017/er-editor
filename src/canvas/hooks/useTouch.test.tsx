@@ -88,4 +88,36 @@ describe('useTouch', () => {
     result.current.onPointerUp(makePointerEvent({ clientX: 50, clientY: 50, pointerId: 2 }))
     expect(sendSpy).not.toHaveBeenCalled()
   })
+
+  it('drops touch pointerdown while a pen pointer is active (palm rejection)', () => {
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
+    // 1. Pen pointer goes down — should NOT dispatch (useTouch only handles touch)
+    //    but MUST set the internal pen-active flag.
+    result.current.onPointerDown(makePointerEvent({
+      clientX: 0, clientY: 0, pointerType: 'pen', pointerId: 99,
+    }))
+    expect(sendSpy).not.toHaveBeenCalled()
+    // 2. Concurrent touch pointer (palm) — must be ignored while pen is active.
+    result.current.onPointerDown(makePointerEvent({
+      clientX: 50, clientY: 50, pointerType: 'touch', pointerId: 100,
+    }))
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
+  it('clears the pen-active flag on pen pointerup so subsequent touches are accepted', () => {
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
+    result.current.onPointerDown(makePointerEvent({
+      clientX: 0, clientY: 0, pointerType: 'pen', pointerId: 99,
+    }))
+    result.current.onPointerUp(makePointerEvent({
+      clientX: 0, clientY: 0, pointerType: 'pen', pointerId: 99,
+    }))
+    // Now a touch should go through.
+    result.current.onPointerDown(makePointerEvent({
+      clientX: 10, clientY: 20, pointerType: 'touch', pointerId: 1,
+    }))
+    expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'CANVAS_POINTER_DOWN',
+    }))
+  })
 })
