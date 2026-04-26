@@ -185,9 +185,10 @@ const writeDiagram = (depth: number, model: JavaModel): string => {
   const positions = Array.from(model.diagram.positions.entries())
   if (positions.length === 0) return empty(depth, 'ERDatabaseDiagram', [])
   const kinds = buildKindLookup(model.schema)
-  const sorted = positions
-    .filter(([id]) => kinds.has(id))
-    .sort(([a], [b]) => b - a)   // descending refid
+  // Preserve Map insertion order (= XML document order from the reader).
+  // The SUPSI Java app writes diagram entries in varying orders across files,
+  // so we must not sort — the reader's Map preserves document order faithfully.
+  const sorted = positions.filter(([id]) => kinds.has(id))
   const lines = [
     open(depth, 'ERDatabaseDiagram', []),
     ...sorted.map(([id, p]) => {
@@ -205,6 +206,14 @@ const writeDiagram = (depth: number, model: JavaModel): string => {
 
 export interface SerializeOptions {
   readonly trailingNewline?: boolean
+  /** Line ending to use. Defaults to '\n'. Pass '\r\n' for CRLF files. */
+  readonly lineEnding?: '\n' | '\r\n'
+  /**
+   * Exact bytes to append after `</ERDatabaseModel>`. When set, takes
+   * precedence over `trailingNewline`. Use this to round-trip files that
+   * have an unusual number of trailing newlines (e.g. two CRLF sequences).
+   */
+  readonly trailingSuffix?: string
 }
 
 export const serializeJavaXml = (model: JavaModel, opts: SerializeOptions = {}): string => {
@@ -215,5 +224,15 @@ export const serializeJavaXml = (model: JavaModel, opts: SerializeOptions = {}):
     writeDiagram(1, model),
     '</ERDatabaseModel>',
   ].join('\n')
-  return decl + body + (opts.trailingNewline === false ? '' : '\n')
+  const suffix =
+    opts.trailingSuffix !== undefined
+      ? opts.trailingSuffix
+      : opts.trailingNewline === false
+        ? ''
+        : '\n'
+  const result = decl + body + suffix
+  // Convert LF to CRLF when requested, so all internal write functions can
+  // stay simple and use '\n'. Attribute values in SUPSI fixtures contain no
+  // raw '\r', so a global replace is safe.
+  return opts.lineEnding === '\r\n' ? result.replace(/\n/g, '\r\n') : result
 }

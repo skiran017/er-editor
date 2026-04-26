@@ -213,7 +213,7 @@ describe('serializeJavaXml — options', () => {
 })
 
 describe('serializeJavaXml — diagram section', () => {
-  it('emits diagram positions in descending refid order with correct element names', () => {
+  it('emits diagram positions in Map insertion order with correct element names', () => {
     const m: JavaModel = {
       schema: {
         name: 'T', lastId: 3,
@@ -224,10 +224,12 @@ describe('serializeJavaXml — diagram section', () => {
         }],
         relationships: [], generalizations: [],
       },
-      diagram: { positions: new Map([[1, { x: 50, y: 60 }], [2, { x: 100, y: 200 }]]) },
+      // Insert id=2 first, then id=1: that insertion order must be preserved
+      diagram: { positions: new Map([[2, { x: 100, y: 200 }], [1, { x: 50, y: 60 }]]) },
     }
     const out = serializeJavaXml(m)
-    // 2 (SimpleAttribute) appears BEFORE 1 (StrongEntitySet)
+    // 2 (SimpleAttribute) appears BEFORE 1 (StrongEntitySet) because it was
+    // inserted first into the Map — writer preserves Map iteration order.
     const idxAttr = out.indexOf('<SimpleAttribute refid="2">')
     const idxEnt = out.indexOf('<StrongEntitySet refid="1">')
     expect(idxAttr).toBeGreaterThan(0)
