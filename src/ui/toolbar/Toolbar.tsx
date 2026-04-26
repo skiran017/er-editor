@@ -90,6 +90,9 @@ export const Toolbar = memo(() => {
         data-group-id="history"
         className="mr-2 flex items-center gap-0.5 border-r border-slate-200 pr-2 dark:border-slate-700"
       >
+        {/* Undo/Redo stay visible but disabled under readonly — the user gets a
+            visible signal that the session is locked. The UNDO/REDO actions are
+            also gated in actions.ts (Task 8), so there is no DevTools bypass. */}
         <IconButton
           aria-label={t('menu:edit.undo')}
           title={`${t('menu:edit.undo')} (Ctrl+Z)`}

@@ -80,6 +80,11 @@ export const Menu = () => {
   }
 
   const handleReset = () => {
+    // Defence-in-depth: the Reset row is hidden in readonly mode (showReset
+    // prop), but a DevTools flick that re-renders the button would otherwise
+    // call this handler — which writes diagramStore directly, bypassing the
+    // FSM gate from Task 8. Mirror the examMode-locked file actions.
+    if (readonly) return
     // Confirm via window.confirm — modal-less for now. Phase 6 can replace
     // this with a ModalStack-driven AlertDialog once a modal primitive exists.
     if (!window.confirm(t('menu:app.resetConfirm'))) return
