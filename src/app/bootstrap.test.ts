@@ -6,17 +6,34 @@ import { useUiStore } from '@/state/uiStore'
 import { emptyDiagram } from '@/domain/types'
 import type { NodeInput } from '@/state/types'
 
+vi.mock('i18next', () => {
+  const store = { initialized: false, lang: 'en' }
+  return {
+    default: {
+      get isInitialized() { return store.initialized },
+      get language() { return store.lang },
+      changeLanguage: vi.fn((l: string) => { store.lang = l; return Promise.resolve() }),
+      _setInitialized: (v: boolean) => { store.initialized = v },
+    },
+  }
+})
+
 const entity = (name = 'Lonely'): Extract<NodeInput, { kind: 'entity' }> => ({
   kind: 'entity', name, isWeak: false,
   position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
 })
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.useFakeTimers()
   useDiagramStore.setState({ diagram: emptyDiagram() })
   useDiagramStore.temporal.getState().clear()
   useValidationStore.setState({ errorsById: {}, enabled: true })
   useUiStore.getState().setExamMode(false)
+  useUiStore.setState({ language: 'en' })
+  const i18next = (await import('i18next')).default
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(i18next as any)._setInitialized(false)
+  vi.mocked(i18next.changeLanguage).mockClear()
 })
 afterEach(() => { vi.useRealTimers() })
 
@@ -80,6 +97,25 @@ describe('installSubscribers', () => {
     // Intentionally sticky: validation stays off until the user toggles it
     // on themselves, so exam mode doesn't masquerade as "always re-enable".
     expect(useValidationStore.getState().enabled).toBe(false)
+    cleanup()
+  })
+
+  it('language subscriber calls i18next.changeLanguage when language changes and i18next is initialized', async () => {
+    const i18next = (await import('i18next')).default
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(i18next as any)._setInitialized(true)
+    const cleanup = installSubscribers()
+    useUiStore.getState().setLanguage('it')
+    expect(vi.mocked(i18next.changeLanguage)).toHaveBeenCalledWith('it')
+    cleanup()
+  })
+
+  it('language subscriber is a no-op when i18next is not yet initialized', async () => {
+    const i18next = (await import('i18next')).default
+    // _setInitialized stays false from beforeEach
+    const cleanup = installSubscribers()
+    useUiStore.getState().setLanguage('it')
+    expect(vi.mocked(i18next.changeLanguage)).not.toHaveBeenCalled()
     cleanup()
   })
 })

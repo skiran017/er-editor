@@ -1,21 +1,21 @@
 {
   "group": {
-    "select": "Select",
-    "elements": "Elements",
-    "connections": "Connections"
+    "select": "Selezione",
+    "elements": "Elementi",
+    "connections": "Collegamenti"
   },
   "tool": {
-    "select": "Select",
-    "pan": "Pan",
-    "entity": "Entity",
-    "relationship": "Relationship",
-    "attribute": "Attribute",
-    "isa": "Generalization",
-    "connect": "Connect",
-    "quickRelationship11": "Relationship 1:1",
-    "quickRelationship1N": "Relationship 1:N",
-    "quickRelationshipNN": "Relationship N:N",
-    "quickGeneralization": "Generalization (ISA)",
-    "quickGeneralizationTotal": "Generalization (Total)"
+    "select": "Seleziona",
+    "pan": "Sposta vista",
+    "entity": "Entità",
+    "relationship": "Relazione",
+    "attribute": "Attributo",
+    "isa": "Generalizzazione",
+    "connect": "Collega",
+    "quickRelationship11": "Relazione 1:1",
+    "quickRelationship1N": "Relazione 1:N",
+    "quickRelationshipNN": "Relazione N:N",
+    "quickGeneralization": "Generalizzazione (ISA)",
+    "quickGeneralizationTotal": "Generalizzazione (Totale)"
   }
 }

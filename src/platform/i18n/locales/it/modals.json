@@ -1,58 +1,58 @@
 {
   "cheatsheet": {
-    "title": "Keyboard shortcuts",
+    "title": "Scorciatoie da tastiera",
     "category": {
-      "tool": "Tools",
-      "operation": "Operations",
-      "contextual": "Contextual",
-      "navigation": "Navigation"
+      "tool": "Strumenti",
+      "operation": "Operazioni",
+      "contextual": "Contestuali",
+      "navigation": "Navigazione"
     }
   },
   "confirm": {
-    "title": "Please confirm"
+    "title": "Conferma"
   },
   "error": {
-    "title": "Something went wrong",
-    "dismiss": "Dismiss"
+    "title": "Si è verificato un errore",
+    "dismiss": "Chiudi"
   },
   "keybinding": {
     "tool": {
-      "select": "Select tool",
-      "pan": "Pan tool",
-      "entity": "Entity tool",
-      "relationship": "Relationship tool",
-      "attribute": "Attribute tool",
-      "isa": "Generalization tool",
-      "connect": "Connect tool"
+      "select": "Strumento Selezione",
+      "pan": "Strumento Sposta vista",
+      "entity": "Strumento Entità",
+      "relationship": "Strumento Relazione",
+      "attribute": "Strumento Attributo",
+      "isa": "Strumento Generalizzazione",
+      "connect": "Strumento Collega"
     },
     "op": {
-      "undo": "Undo",
-      "redo": "Redo",
-      "copy": "Copy",
-      "cut": "Cut",
-      "paste": "Paste",
-      "duplicate": "Duplicate",
-      "selectAll": "Select all",
-      "fit": "Fit to view",
-      "zoomIn": "Zoom in",
-      "zoomOut": "Zoom out"
+      "undo": "Annulla",
+      "redo": "Ripeti",
+      "copy": "Copia",
+      "cut": "Taglia",
+      "paste": "Incolla",
+      "duplicate": "Duplica",
+      "selectAll": "Seleziona tutto",
+      "fit": "Adatta alla vista",
+      "zoomIn": "Ingrandisci",
+      "zoomOut": "Riduci"
     },
     "ctx": {
-      "delete": "Delete selection",
-      "escape": "Clear selection / cancel",
-      "rename": "Rename",
-      "cheatsheet": "Show keyboard shortcuts",
-      "nudgeUp": "Nudge up",
-      "nudgeDown": "Nudge down",
-      "nudgeLeft": "Nudge left",
-      "nudgeRight": "Nudge right",
-      "nudgeUpBig": "Nudge up (large)",
-      "nudgeDownBig": "Nudge down (large)",
-      "nudgeLeftBig": "Nudge left (large)",
-      "nudgeRightBig": "Nudge right (large)",
-      "cycleForward": "Cycle selection forward",
-      "cycleBackward": "Cycle selection backward",
-      "invertSelection": "Invert selection"
+      "delete": "Elimina selezione",
+      "escape": "Cancella selezione / annulla",
+      "rename": "Rinomina",
+      "cheatsheet": "Mostra scorciatoie da tastiera",
+      "nudgeUp": "Sposta su",
+      "nudgeDown": "Sposta giù",
+      "nudgeLeft": "Sposta a sinistra",
+      "nudgeRight": "Sposta a destra",
+      "nudgeUpBig": "Sposta su (ampio)",
+      "nudgeDownBig": "Sposta giù (ampio)",
+      "nudgeLeftBig": "Sposta a sinistra (ampio)",
+      "nudgeRightBig": "Sposta a destra (ampio)",
+      "cycleForward": "Scorri selezione in avanti",
+      "cycleBackward": "Scorri selezione indietro",
+      "invertSelection": "Inverti selezione"
     }
   }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Menu } from './Menu'
@@ -16,6 +16,7 @@ const reset = () => {
     theme: 'system', language: 'en',
     panels: { properties: true, minimap: false },
     modals: [], toasts: [], contextMenu: null, inlineRename: null,
+    readonly: false,
   })
   useValidationStore.setState({ errorsById: {}, enabled: true })
   useDiagramStore.setState({ diagram: emptyDiagram() })
@@ -42,6 +43,15 @@ describe('Menu — hamburger dropdown', () => {
     expect(screen.getByRole('menuitem', { name: /Reset/ })).toBeInTheDocument()
     // Theme radiogroup.
     expect(screen.getByRole('radiogroup', { name: /Theme/ })).toBeInTheDocument()
+    // Language radiogroup.
+    expect(screen.getByRole('radiogroup', { name: /Language/ })).toBeInTheDocument()
+  })
+
+  it('clicking IT in the language toggle writes "it" to uiStore.language', async () => {
+    render(<Menu />)
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    await userEvent.click(screen.getByRole('radio', { name: /italian/i }))
+    expect(useUiStore.getState().language).toBe('it')
   })
 
   it('Phase-5 file actions push an info toast with the "not yet available" key', async () => {
@@ -104,6 +114,30 @@ describe('Menu — hamburger dropdown', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: /Reset/ }))
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(1)
     confirmSpy.mockRestore()
+  })
+})
+
+describe('Menu — readonly mode', () => {
+  beforeEach(reset)
+  afterEach(() => useUiStore.setState({ readonly: false }))
+
+  it('hides the Reset row when uiStore.readonly is true', async () => {
+    const user = userEvent.setup()
+    useUiStore.setState({ readonly: true })
+    render(<Menu />)
+    await user.click(screen.getByRole('button', { name: /menu/i }))
+    expect(screen.queryByRole('menuitem', { name: /reset/i })).toBeNull()
+  })
+})
+
+describe('Menu — embed mode', () => {
+  beforeEach(reset)
+  afterEach(() => useUiStore.setState({ embed: false }))
+
+  it('renders nothing when uiStore.embed is true', () => {
+    useUiStore.setState({ embed: true })
+    const { container } = render(<Menu />)
+    expect(container.firstChild).toBeNull()
   })
 })
 

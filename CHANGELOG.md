@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v2 / Phase 7] — 2026-04-26
+
+### Added
+- [src/app/queryParams.ts](src/app/queryParams.ts) — central, case-insensitive parser for `?lang`, `?validation`, `?readonly`, `?embed`, `?examMode`. `examMode` delegates to it (no separate parser).
+- [src/platform/fs/](src/platform/fs/) — `openFile` (handles `change` AND `cancel` events) + `downloadBlob` primitives.
+- [src/platform/imageExport/](src/platform/imageExport/) — `toPng` (wraps `html-to-image` since React Flow v12 dropped its built-in helper) + `toSvg` (DOM serialiser, namespace-aware).
+- [src/app/applyLanguage.ts](src/app/applyLanguage.ts) + [src/app/applyValidation.ts](src/app/applyValidation.ts) + [src/app/applyMode.ts](src/app/applyMode.ts) — URL → store apply helpers, called once at boot from main.tsx.
+- `uiStore.readonly` + `uiStore.embed` — transient (non-persisted) flags driven by `?readonly` / `?embed`.
+- Action-layer readonly gate in [src/interaction/actions.ts](src/interaction/actions.ts) — early-returns 13 mutating actions when `uiStore.readonly === true`. Selection / viewport / toast / cheatsheet stay live.
+- UI-layer readonly hiding — Toolbar element tools, panel delete buttons, attribute add input, menu Reset row all disappear under readonly. Hide-not-disable mirrors the examMode discipline.
+- Embed-mode chrome hiding — Menu and Toolbar both early-return null under `?embed=true`; Canvas + property panel + overlays remain live for iframe/Moodle hosts.
+- [src/ui/primitives/LanguageToggle.tsx](src/ui/primitives/LanguageToggle.tsx) — EN/IT segmented pill rendered next to the Theme selector inside the Menu.
+- i18next subscriber in [src/app/bootstrap.ts](src/app/bootstrap.ts) — keeps `i18next.language` in sync with `uiStore.language`. Both URL and toggle write the same flag.
+- Italian translations for all six UI bundles (`common`, `toolbar`, `menu`, `properties`, `modals`, `validation`). Best-effort by the implementer; native-speaker review tracked in BACKLOG.md.
+- `pnpm lint:locales` ([scripts/check-locales.ts](scripts/check-locales.ts)) — EN/IT key-parity audit + orphan/unresolved `t()` call detection. Wired into CI as a new step before Typecheck.
+- Coverage thresholds for `src/platform/fs/**` and `src/platform/imageExport/**` (85/70/85/85).
+
+### Changed
+- [src/platform/i18n/init.ts](src/platform/i18n/init.ts) — `initI18n(lng?: Language)` accepts a parameter instead of hardcoding `'en'`. main.tsx reads `useUiStore.getState().language` (resolved by `applyLanguageFromUrl` earlier in boot) and passes it through. Layer rule preserved (`platform/` does NOT import `state/`; `Language` type duplicated locally).
+- [src/state/uiStore.ts](src/state/uiStore.ts) — adds `readonly`, `embed`, `setReadonly`, `setEmbed`. Both excluded from the persist whitelist.
+- [src/ui/menu/MenuDropdownBody.tsx](src/ui/menu/MenuDropdownBody.tsx) — Reset row gated behind a `showReset` prop (Menu.tsx passes `!readonly`). `ThemeSection` and `LanguageSection` extracted as local components to keep the parent under the 100-line lint cap.
+- [src/app/examMode.ts](src/app/examMode.ts) — `resolveExamModeFromSearch` delegates to the central `parseQueryParams`.
+
+### Deferred
+- Moodle postMessage bridge — moves to the tail of Phase 5 once codecs land (so the `load` / `save` events can carry real payloads).
+- Native-speaker review of the Italian bundles — tracked in BACKLOG.md.
+- Wiring the Menu's Open / Save / Export actions to codecs via the new `platform/fs` + `platform/imageExport` primitives — Phase 5.
+
 ## [v2 / Phase 6] — 2026-04-23
 
 ### Added

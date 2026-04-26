@@ -1,29 +1,29 @@
 {
-  "cancel": "Cancel",
-  "confirm": "Confirm",
-  "delete": "Delete",
-  "rename": "Rename",
+  "cancel": "Annulla",
+  "confirm": "Conferma",
+  "delete": "Elimina",
+  "rename": "Rinomina",
   "ok": "OK",
-  "close": "Close",
-  "save": "Save",
-  "open": "Open",
-  "loading": "Loading…",
-  "readOnly": "Read-only",
-  "examMode": "Exam mode",
-  "attributeNeedsParent": "Attributes must be attached to an entity, relationship, or composite attribute. Click a parent node.",
+  "close": "Chiudi",
+  "save": "Salva",
+  "open": "Apri",
+  "loading": "Caricamento…",
+  "readOnly": "Sola lettura",
+  "examMode": "Modalità esame",
+  "attributeNeedsParent": "Gli attributi devono essere collegati a un'entità, una relazione o un attributo composto. Fai clic su un nodo padre.",
   "flow": {
     "connect": {
-      "pickSource": "Connect: click the first node to start.",
-      "pickTarget": "Connect: click the second node to complete the link."
+      "pickSource": "Connessione: fai clic sul primo nodo per iniziare.",
+      "pickTarget": "Connessione: fai clic sul secondo nodo per completare il collegamento."
     },
     "quickRel": {
-      "pickFirst": "Quick relationship: click the first entity.",
-      "pickSecond": "Quick relationship: click the second entity."
+      "pickFirst": "Relazione rapida: fai clic sulla prima entità.",
+      "pickSecond": "Relazione rapida: fai clic sulla seconda entità."
     },
     "quickGen": {
-      "pickParent": "Quick generalization: click the parent entity.",
-      "pickChild": "Quick generalization: click the child entity."
+      "pickParent": "Generalizzazione rapida: fai clic sull'entità padre.",
+      "pickChild": "Generalizzazione rapida: fai clic sull'entità figlio."
     },
-    "addChildToIsa": "Click the child entity to add it to this generalization."
+    "addChildToIsa": "Fai clic sull'entità figlio per aggiungerla a questa generalizzazione."
   }
 }

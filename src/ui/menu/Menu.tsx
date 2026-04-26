@@ -22,6 +22,7 @@ import {
   type FileAction,
   type ThemeOption,
 } from './MenuDropdownBody'
+import { useExportHandlers } from './useExportHandlers'
 
 const THEMES: readonly ThemeOption[] = [
   { value: 'light', icon: Sun, labelKey: 'menu:app.themeLight' },
@@ -46,10 +47,14 @@ export const Menu = () => {
 
   const theme = useUiStore((s) => s.theme)
   const setTheme = useUiStore((s) => s.setTheme)
+  const language = useUiStore((s) => s.language)
+  const setLanguage = useUiStore((s) => s.setLanguage)
   const pushToast = useUiStore((s) => s.pushToast)
   // Exam mode gates file I/O + the Validation toggle. Sourced from the URL
   // (`?examMode=true` or default-on under `?embed=true`) during startup.
   const examMode = useUiStore((s) => s.examMode)
+  const readonly = useUiStore((s) => s.readonly)
+  const embed = useUiStore((s) => s.embed)
 
   const validationEnabled = useValidationStore((s) => s.enabled)
   const setValidationEnabled = useValidationStore((s) => s.setEnabled)
@@ -66,6 +71,8 @@ export const Menu = () => {
 
   const close = () => setIsOpen(false)
 
+  const { exportPng, exportSvg } = useExportHandlers(close)
+
   const toastPhase5 = () => {
     pushToast({ id: `phase5-${Date.now()}`, kind: 'info', messageKey: 'menu:notYetAvailable' })
     close()
@@ -77,6 +84,11 @@ export const Menu = () => {
   }
 
   const handleReset = () => {
+    // Defence-in-depth: the Reset row is hidden in readonly mode (showReset
+    // prop), but a DevTools flick that re-renders the button would otherwise
+    // call this handler — which writes diagramStore directly, bypassing the
+    // FSM gate from Task 8. Mirror the examMode-locked file actions.
+    if (readonly) return
     // Confirm via window.confirm — modal-less for now. Phase 6 can replace
     // this with a ModalStack-driven AlertDialog once a modal primitive exists.
     if (!window.confirm(t('menu:app.resetConfirm'))) return
@@ -90,6 +102,9 @@ export const Menu = () => {
     close()
   }
 
+  // Hide entire menu chrome under embed (iframe/Moodle host provides its own UI).
+  if (embed) return null
+
   // File actions vanish entirely under exam mode. Hiding rather than
   // disabling is the honest lockdown — a disabled attribute on a button is
   // one devtools flick away from being re-enabled and clicked. The Reset,
@@ -99,7 +114,8 @@ export const Menu = () => {
     : [
         { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O', onSelect: toastPhase5 },
         { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S', onSelect: toastPhase5 },
-        { id: 'exportImage', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: toastPhase5 },
+        { id: 'exportPng', labelKey: 'menu:file.exportPng', icon: ImageIcon, onSelect: () => { void exportPng() } },
+        { id: 'exportSvg', labelKey: 'menu:file.exportSvg', icon: ImageIcon, onSelect: () => { void exportSvg() } },
       ]
 
   return (
@@ -123,6 +139,8 @@ export const Menu = () => {
           themes={THEMES}
           theme={theme}
           onSetTheme={setTheme}
+          language={language}
+          onSetLanguage={setLanguage}
           validationEnabled={validationEnabled}
           onSetValidationEnabled={setValidationEnabled}
           examMode={examMode}
@@ -131,6 +149,7 @@ export const Menu = () => {
           onClickOutside={close}
           resetIcon={Trash2}
           keyboardIcon={Keyboard}
+          showReset={!readonly}
         />
       )}
     </div>

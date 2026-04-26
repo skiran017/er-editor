@@ -5,6 +5,7 @@ import { validateChen } from '@/notation/chen/rules'
 import { checkInvariants } from '@/domain/invariants'
 import type { Diagram } from '@/domain/types'
 import { debounce } from './debounce'
+import i18next from 'i18next'
 
 const VALIDATION_DEBOUNCE_MS = 150
 
@@ -63,9 +64,25 @@ export const installSubscribers = (): (() => void) => {
     },
   )
 
+  // Keeps i18next in sync whenever uiStore.language changes — including at
+  // boot time (fireImmediately). applyLanguageFromUrl runs before initI18n, so
+  // the first immediate fire may precede i18next being ready; the guard
+  // `i18next.isInitialized` makes it a no-op until i18next is up, then the
+  // subscriber handles subsequent runtime toggles via LanguageToggle.
+  const unsubscribeLanguage = useUiStore.subscribe(
+    (s) => s.language,
+    (lang) => {
+      if (i18next.isInitialized && i18next.language !== lang) {
+        void i18next.changeLanguage(lang)
+      }
+    },
+    { fireImmediately: true },
+  )
+
   return () => {
     unsubscribeDiagram()
     unsubscribeValidationToggle()
     unsubscribeExamMode()
+    unsubscribeLanguage()
   }
 }

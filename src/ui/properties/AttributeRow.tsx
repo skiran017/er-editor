@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Key, Trash2 } from 'lucide-react'
 import { useDiagramStore } from '@/state/diagramStore'
+import { useUiStore } from '@/state/uiStore'
 import type { AttributeNode } from '@/domain/types'
 
 interface ChipConfig {
@@ -58,6 +59,7 @@ export const AttributeRow = ({ attribute }: AttributeRowProps) => {
   const { t } = useTranslation('properties')
   const updateNode = useDiagramStore((s) => s.updateNode)
   const removeNode = useDiagramStore((s) => s.removeNode)
+  const readonly = useUiStore((s) => s.readonly)
 
   const patch = (p: Partial<AttributeNode>) => {
     updateNode(attribute.id, p as Partial<AttributeNode>)
@@ -88,17 +90,20 @@ export const AttributeRow = ({ attribute }: AttributeRowProps) => {
           onChange={(e) => patch({ name: e.target.value })}
           aria-label={t('name')}
           placeholder={t('attr.namePlaceholder')}
+          disabled={readonly}
           className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
-        <button
-          type="button"
-          onClick={() => removeNode(attribute.id)}
-          aria-label={t('attr.delete')}
-          title={t('attr.delete')}
-          className="grid h-7 w-7 place-items-center rounded text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
-        >
-          <Trash2 size={14} aria-hidden />
-        </button>
+        {!readonly && (
+          <button
+            type="button"
+            onClick={() => removeNode(attribute.id)}
+            aria-label={t('attr.delete')}
+            title={t('attr.delete')}
+            className="grid h-7 w-7 place-items-center rounded text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+          >
+            <Trash2 size={14} aria-hidden />
+          </button>
+        )}
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
         {CHIPS.map((chip) => {
@@ -112,6 +117,7 @@ export const AttributeRow = ({ attribute }: AttributeRowProps) => {
                 type="checkbox"
                 checked={attribute[chip.field]}
                 onChange={handleToggle(chip.field)}
+                disabled={readonly}
                 className="h-3.5 w-3.5 rounded border-slate-300 focus:ring-1 dark:border-slate-600"
               />
               {Icon && <Icon size={12} aria-hidden />}

@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Toolbar } from './Toolbar'
 import { useInteractionStore } from '@/interaction/interactionStore'
 import { useDiagramStore } from '@/state/diagramStore'
 import { useSelectionStore } from '@/state/selectionStore'
+import { useUiStore } from '@/state/uiStore'
 import { emptyDiagram } from '@/domain/types'
 import type { NodeId } from '@/domain/types'
 import { initI18n } from '@/platform/i18n'
@@ -18,6 +19,7 @@ const reset = () => {
   useSelectionStore.setState({
     selectedNodeIds: new Set<NodeId>(), selectedEdgeIds: new Set(), rubberband: null,
   })
+  useUiStore.setState({ readonly: false })
 }
 
 describe('Toolbar — tool picker', () => {
@@ -102,6 +104,47 @@ describe('Toolbar — history group (undo / redo)', () => {
     await userEvent.click(undoBtn)
     // UNDO event is routed through the FSM; verify the node was actually undone.
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(0)
+  })
+})
+
+describe('Toolbar — embed mode', () => {
+  beforeEach(reset)
+  afterEach(() => useUiStore.setState({ embed: false }))
+
+  it('renders nothing when uiStore.embed is true', () => {
+    useUiStore.setState({ embed: true })
+    const { container } = render(<Toolbar />)
+    expect(container.firstChild).toBeNull()
+  })
+})
+
+describe('Toolbar — readonly mode', () => {
+  beforeEach(reset)
+  afterEach(() => useUiStore.setState({ readonly: false }))
+
+  it('hides element + connection tool groups when uiStore.readonly is true', () => {
+    useUiStore.setState({ readonly: true })
+    render(<Toolbar />)
+    // The select group still renders
+    expect(screen.getByRole('button', { name: /select/i })).toBeInTheDocument()
+    // The element group is gone
+    expect(screen.queryByRole('button', { name: /entity/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /relationship/i })).toBeNull()
+  })
+
+  it('disables undo/redo when uiStore.readonly is true', () => {
+    useUiStore.setState({ readonly: true })
+    render(<Toolbar />)
+    expect(screen.getByRole('button', { name: /undo/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /redo/i })).toBeDisabled()
+  })
+
+  it('hides the delete trash icon when uiStore.readonly is true', () => {
+    // seed selection so the trash would normally render
+    useSelectionStore.setState({ selectedNodeIds: new Set(['n1' as NodeId]), selectedEdgeIds: new Set(), rubberband: null })
+    useUiStore.setState({ readonly: true })
+    render(<Toolbar />)
+    expect(screen.queryByRole('button', { name: /delete/i })).toBeNull()
   })
 })
 

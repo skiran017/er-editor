@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
+import { useUiStore } from '@/state/uiStore'
 
 export interface AttributesAddInputProps {
   readonly focusClass: string // e.g. 'focus:border-blue-500'
@@ -16,7 +17,10 @@ export const AttributesAddInput = ({
   onAdd,
 }: AttributesAddInputProps) => {
   const { t } = useTranslation('properties')
+  const readonly = useUiStore((s) => s.readonly)
   const [name, setName] = useState('')
+
+  if (readonly) return null
 
   const commit = (): void => {
     const trimmed = name.trim()

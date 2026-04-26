@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Database, Circle, Link, GitBranch, Trash2 } from 'lucide-react'
 import { useSelectionStore } from '@/state/selectionStore'
 import { useInteractionStore } from '@/interaction/interactionStore'
+import { useUiStore } from '@/state/uiStore'
 import type { NodeKind, EdgeKind } from '@/domain/types'
 
 export type PanelKind = NodeKind | EdgeKind
@@ -36,6 +37,7 @@ const KIND_STYLES: Record<PanelKind, KindStyle> = {
 export const PanelHeader = ({ titleKey, kind }: PanelHeaderProps) => {
   const { t } = useTranslation('properties')
   const clear = useSelectionStore((s) => s.clear)
+  const readonly = useUiStore((s) => s.readonly)
   const style = KIND_STYLES[kind]
   const Icon = style.icon
 
@@ -49,18 +51,20 @@ export const PanelHeader = ({ titleKey, kind }: PanelHeaderProps) => {
       <h2 className="flex-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
         {t(titleKey)}
       </h2>
-      <button
-        type="button"
-        onClick={() => {
-          useInteractionStore.getState().send({ type: 'DELETE' })
-        }}
-        aria-label={t('delete')}
-        title={t('delete')}
-        className="grid h-7 w-7 place-items-center rounded text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
-        data-role="panel-delete"
-      >
-        <Trash2 size={16} aria-hidden />
-      </button>
+      {!readonly && (
+        <button
+          type="button"
+          onClick={() => {
+            useInteractionStore.getState().send({ type: 'DELETE' })
+          }}
+          aria-label={t('delete')}
+          title={t('delete')}
+          className="grid h-7 w-7 place-items-center rounded text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+          data-role="panel-delete"
+        >
+          <Trash2 size={16} aria-hidden />
+        </button>
+      )}
       <button
         type="button"
         onClick={clear}
