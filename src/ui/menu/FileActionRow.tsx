@@ -24,7 +24,7 @@ export const FileActionRow = ({ item, t }: FileActionRowProps) => {
       <Icon size={18} className="text-slate-500 dark:text-slate-400" aria-hidden />
       <span className="flex-1">{t(item.labelKey)}</span>
       {item.shortcut && (
-        <span className="font-mono text-xs text-slate-400 dark:text-slate-500">{item.shortcut}</span>
+        <span className="hidden font-mono text-xs text-slate-400 sm:inline dark:text-slate-500">{item.shortcut}</span>
       )}
     </button>
   )
