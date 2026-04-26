@@ -53,4 +53,12 @@ const domainEdgeToRf = (e: ERLink): CanvasEdge => ({
   target: e.targetId,
   type: e.kind,
   data: { edgeId: e.id },
+  // Edges are NOT user-selectable. Cardinality / participation / role live on
+  // the relationship node's property panel (see RelationshipLegsEditor), so
+  // direct line selection is redundant — and historically caused a class of
+  // bugs (delete an entity-relationship edge → relationship left orphaned
+  // with one branch, hard to reconnect cleanly). Deleting the relationship
+  // node still cascades and removes its incident edges.
+  selectable: false,
+  focusable: false,
 })

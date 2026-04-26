@@ -63,6 +63,10 @@ describe('diagramToRf', () => {
       target: b.id,
       type: 'entity-relationship',
       data: { edgeId: edge.id },
+      // Edges are non-selectable / non-focusable: cardinality is edited via
+      // the relationship node's property panel, never the line itself.
+      selectable: false,
+      focusable: false,
     })
   })
 
@@ -92,6 +96,8 @@ describe('diagramToRf', () => {
       target: entity.id,
       type: 'attribute-of',
       data: { edgeId: attrEdge.id },
+      selectable: false,
+      focusable: false,
     })
     expect(byId[isaEdge.id]).toEqual({
       id: isaEdge.id,
@@ -99,6 +105,8 @@ describe('diagramToRf', () => {
       target: isa.id,
       type: 'isa-link',
       data: { edgeId: isaEdge.id },
+      selectable: false,
+      focusable: false,
     })
   })
 })

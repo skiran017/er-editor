@@ -183,7 +183,9 @@ const ERCanvasInner = () => {
         onEdgesChange={handleEdgesChange}
         onNodeClick={rfEvents.onNodeClick}
         onNodeDoubleClick={rfEvents.onNodeDoubleClick}
-        onEdgeClick={rfEvents.onEdgeClick}
+        // onEdgeClick intentionally NOT wired — edges are non-selectable
+        // (see diagramToRf.domainEdgeToRf). Cardinality / participation /
+        // role are edited via the relationship node's property panel.
         onPaneClick={rfEvents.onPaneClick}
         viewport={{ x: pan.x, y: pan.y, zoom }}
         onViewportChange={handleViewportChange}

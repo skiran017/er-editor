@@ -184,7 +184,11 @@ export const editorMachine = setup({
           && (event.tool === 'quickGeneralization' || event.tool === 'quickGeneralizationTotal'),
         target: '.quickGeneralization', actions: ['setTool', 'resetContext'] },
     ],
-    ESCAPE: { target: '.selecting', actions: ['resetContext', 'clearSelectionAction'] },
+    // ESCAPE from any state: drop to select tool, reset transient context,
+    // clear the current selection. `setTool` falls through to 'select' for
+    // any non-PICK_TOOL event — without it, the toolbar's active-tool
+    // highlight stayed on the previous tool after a tool-exiting ESC.
+    ESCAPE: { target: '.selecting', actions: ['setTool', 'resetContext', 'clearSelectionAction'] },
     UNDO: { actions: 'undoAction' },
     REDO: { actions: 'redoAction' },
     DELETE: { actions: 'deleteSelectionAction' },
@@ -379,6 +383,15 @@ export const editorMachine = setup({
                   target: '#editor.drawing.idle',
                   actions: 'resetContext',
                 },
+                // Two-stage ESC: first ESC cancels just the partial connection
+                // and returns to drawing.idle (still in connect tool); a
+                // second ESC fired from idle falls through to the root
+                // ESCAPE handler and drops to the select tool. Overrides the
+                // root ESCAPE for this state only.
+                ESCAPE: {
+                  target: '#editor.drawing.idle',
+                  actions: 'resetContext',
+                },
               },
             },
           },
@@ -416,6 +429,11 @@ export const editorMachine = setup({
               target: '#editor.quickRelationship.idle',
               actions: 'resetContext',
             },
+            // Two-stage ESC — see drawing.connection.fromPicked for rationale.
+            ESCAPE: {
+              target: '#editor.quickRelationship.idle',
+              actions: 'resetContext',
+            },
           },
         },
       },
@@ -448,6 +466,11 @@ export const editorMachine = setup({
               actions: ['connectNodesAction', 'resetContext', 'clearFlowToast'],
             },
             PANE_CLICK: {
+              target: '#editor.quickGeneralization.idle',
+              actions: 'resetContext',
+            },
+            // Two-stage ESC — see drawing.connection.fromPicked for rationale.
+            ESCAPE: {
               target: '#editor.quickGeneralization.idle',
               actions: 'resetContext',
             },
