@@ -16,101 +16,155 @@ export interface TouchHandlers {
 // for the rationale. screenToFlowPosition is an identity when no <ReactFlow>
 // is mounted, so unit tests keep working unchanged.
 //
-// Two-finger gesture contract:
-//  - `activePointerId` tracks the FIRST finger (primary touch for drag/selection).
-//  - `secondPointerId` tracks the SECOND finger when present.
+// Single-finger gesture state machine (mirrors the legacy app):
+//  - QUICK TAP (down + up under LONG_PRESS_MS, no movement above PAN_THRESHOLD_PX):
+//    no FSM event from useTouch. RF synthesises onNodeClick / onPaneClick from
+//    the underlying click event so taps still select / clear via useRfEvents.
+//  - DRAG (down + move > PAN_THRESHOLD_PX before LONG_PRESS_MS): viewport pan.
+//    Updates `viewportStore.pan` directly per move — no FSM event. Cancels
+//    the long-press timer.
+//  - LONG-PRESS THEN DRAG (down + 500ms idle, then drag): rubberband select.
+//    On long-press fire we dispatch CANVAS_POINTER_DOWN at the original start
+//    so `selecting.rubberBand` opens at the touch origin, then every move
+//    fires CANVAS_POINTER_MOVE, and pointer-up fires CANVAS_POINTER_UP.
+//    Haptic via `navigator.vibrate(50)` if available.
+//
+// Two-finger gesture contract (unchanged):
 //  - While both fingers are down, each pointermove decides between zoom and pan:
-//      zoom: Math.abs(distChange) > midShift  → dispatch WHEEL_ZOOM (pinch)
-//      pan:  midShift >= Math.abs(distChange) → update viewportStore.pan directly
-//    The heuristic favours zoom when fingers spread/squeeze more than they
-//    translate, and pan when fingers translate together with little distance change.
-//    Pan bypasses the FSM because two-finger pan is a transient gesture, not a
-//    tool-mode change — a direct store update gives immediate feedback without
-//    polluting the FSM state machine.
-//  - CANVAS_POINTER_MOVE is suppressed while secondPointerId is non-null so the
-//    FSM does not misinterpret a two-finger gesture as a drag.
-//  - Lifting the second finger clears secondPointerId, lastDist, and lastMidClient,
-//    restoring single-finger behaviour immediately — no FSM event is sent.
+//      zoom: |distChange| > midShift  → dispatch WHEEL_ZOOM (pinch)
+//      pan:  midShift >= |distChange| → update viewportStore.pan directly
+//  - CANVAS_POINTER_MOVE is suppressed while secondPointerId is non-null.
+//  - Lifting the second finger restores single-finger behaviour silently.
+//
+// Pen events update only `penActiveRef` (palm rejection) and never dispatch
+// from useTouch — pen flows through useMouse instead.
 const PINCH_ZOOM_FACTOR = 0.005;
+const LONG_PRESS_MS = 500;
+const PAN_THRESHOLD_PX = 8;
 
 // React Flow v12 doesn't stop propagation on node/edge pointer events, so a
 // touch on a node bubbles up to the wrapper-level useTouch handler too. Without
 // this filter, tapping a node fires both CANVAS_POINTER_DOWN (entering
 // selecting.rubberBand) AND React Flow's native node-click handling, producing
 // a phantom rubberband under the user's finger. Mirrors the same filter in
-// useMouse. We only filter pointerdown — a rubberband started on empty canvas
-// can legitimately end over a node.
+// useMouse.
 const isNodeOrEdgeTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof Element)) return false;
   return target.closest(".react-flow__node, .react-flow__edge") !== null;
 };
+
+type GestureMode = "idle" | "pending" | "panning" | "rubberband";
 
 export const useTouch = (): TouchHandlers => {
   const activePointerId = useRef<number | null>(null);
   const secondPointerId = useRef<number | null>(null);
   const lastDist = useRef<number>(0);
   const lastMidClient = useRef<{ x: number; y: number } | null>(null);
-  // Per-pointer last client-space position, keyed by pointerId. Used to compute
-  // pinch distance when only one of the two fingers moves.
+  // Per-pointer last client-space position, keyed by pointerId.
   const pointerById = useRef<Map<number, { x: number; y: number }>>(new Map());
-  // Palm rejection: track whether a pen pointer is currently down. When a pen
-  // is active, any simultaneous touch event is treated as an accidental palm
-  // contact and silently dropped. The pen itself flows through useMouse, so
-  // we never dispatch FSM events for pen here — only update this flag.
   const penActiveRef = useRef<boolean>(false);
+
+  // Single-finger gesture state.
+  // - 'idle': no finger down (or only the second finger, which is gesture-only)
+  // - 'pending': finger down on empty canvas, waiting to see if it's a
+  //     long-press, drag (pan), or quick tap.
+  // - 'panning': finger crossed PAN_THRESHOLD_PX before the long-press timer
+  //     fired — every subsequent move pans the viewport.
+  // - 'rubberband': long-press timer fired before the user moved — every
+  //     subsequent move grows the rubberband selection in the FSM.
+  const gestureMode = useRef<GestureMode>("idle");
+  const startClient = useRef<{ x: number; y: number } | null>(null);
+  const lastPanClient = useRef<{ x: number; y: number } | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const { screenToFlowPosition } = useReactFlow();
   const toFlow = (e: { clientX: number; clientY: number }) =>
     screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
+  const clearLongPress = (): void => {
+    if (longPressTimer.current !== null) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const resetSingleFingerState = (): void => {
+    clearLongPress();
+    gestureMode.current = "idle";
+    startClient.current = null;
+    lastPanClient.current = null;
+  };
+
   return {
     onPointerDown: (e) => {
       if (e.pointerType === "pen") {
-        // Record that a pen is in contact so concurrent touches can be rejected.
         penActiveRef.current = true;
         return;
       }
       if (e.pointerType !== "touch") return;
       if (penActiveRef.current) return; // palm rejection — pen is active, drop touch
-      // Skip when the gesture started on a node / edge — RF's onNodeClick will
-      // synthesise NODE_POINTER_DOWN; CANVAS_POINTER_DOWN here would produce a
-      // phantom rubberband under the user's finger.
       if (isNodeOrEdgeTarget(e.target)) return;
 
-      // Record pointer position regardless of which finger this is.
       pointerById.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (activePointerId.current === null) {
+        // First finger down on empty canvas. Enter 'pending' — long-press
+        // timer or movement threshold will decide whether this becomes a
+        // rubberband, a viewport pan, or a quick tap.
         activePointerId.current = e.pointerId;
-        useInteractionStore.getState().send({
-          type: "CANVAS_POINTER_DOWN",
-          point: toFlow(e),
-          modifiers: NO_MODIFIERS,
-          button: "left",
-        });
+        gestureMode.current = "pending";
+        startClient.current = { x: e.clientX, y: e.clientY };
+        lastPanClient.current = { x: e.clientX, y: e.clientY };
+        // Capture the start position by value — `e` is reused by React's
+        // synthetic event pool so the closure must not reference it directly.
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startPoint = toFlow({ clientX: startX, clientY: startY });
+        longPressTimer.current = setTimeout(() => {
+          // Long-press fired: enter rubberband mode and seed the FSM with a
+          // CANVAS_POINTER_DOWN at the original touch position.
+          if (gestureMode.current !== "pending") return;
+          gestureMode.current = "rubberband";
+          if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+            navigator.vibrate(50);
+          }
+          useInteractionStore.getState().send({
+            type: "CANVAS_POINTER_DOWN",
+            point: startPoint,
+            modifiers: NO_MODIFIERS,
+            button: "left",
+          });
+        }, LONG_PRESS_MS);
       } else if (
         secondPointerId.current === null &&
         e.pointerId !== activePointerId.current
       ) {
+        // Second finger landed — abandon any single-finger gesture in flight,
+        // switch to two-finger mode.
+        clearLongPress();
+        if (gestureMode.current === "rubberband") {
+          // Cancel the in-progress rubberband by sending a pointer-up at the
+          // current position so the FSM exits selecting.rubberBand cleanly.
+          useInteractionStore.getState().send({
+            type: "CANVAS_POINTER_UP",
+            point: toFlow(e),
+          });
+        }
+        gestureMode.current = "idle";
         secondPointerId.current = e.pointerId;
-        // Compute initial pinch distance and midpoint from both stored positions
-        // so the first move event produces a meaningful delta rather than jumping
-        // from zero / an uninitialised midpoint.
         const p1 = pointerById.current.get(activePointerId.current)!;
         const p2 = pointerById.current.get(e.pointerId)!;
         lastDist.current = Math.hypot(p2.x - p1.x, p2.y - p1.y);
         lastMidClient.current = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-        // Don't dispatch CANVAS_POINTER_DOWN — second finger is for gesture only.
       }
     },
     onPointerMove: (e) => {
       if (e.pointerType !== "touch") return;
-      // Only process moves for pointers we are already tracking.
       if (!pointerById.current.has(e.pointerId)) return;
-      // Update stored position before computing distance so both p1 and p2 are current.
       pointerById.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+      // Two-finger path takes priority.
       if (secondPointerId.current !== null) {
-        // Two-finger gesture path: decide between zoom (pinch) and pan (translate).
         const p1 = pointerById.current.get(activePointerId.current!)!;
         const p2 = pointerById.current.get(secondPointerId.current)!;
         const newDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
@@ -122,15 +176,12 @@ export const useTouch = (): TouchHandlers => {
         const midShift = Math.hypot(midShiftX, midShiftY);
 
         if (Math.abs(distChange) > midShift) {
-          // Zoom path: fingers are spreading/squeezing more than translating.
           const delta = distChange * PINCH_ZOOM_FACTOR;
           const anchor = screenToFlowPosition(midClient);
           useInteractionStore
             .getState()
             .send({ type: "WHEEL_ZOOM", anchor, delta });
         } else {
-          // Pan path: fingers are translating together — update viewport directly.
-          // Direct store call keeps pan transient (no FSM state change needed).
           const { zoom, pan } = useViewportStore.getState();
           useViewportStore.getState().setViewport({
             zoom,
@@ -140,20 +191,53 @@ export const useTouch = (): TouchHandlers => {
 
         lastDist.current = newDist;
         lastMidClient.current = midClient;
-        // Suppress CANVAS_POINTER_MOVE — the FSM must not see a drag while gesturing.
         return;
       }
 
-      // Single-finger path: only the active pointer triggers FSM moves.
       if (e.pointerId !== activePointerId.current) return;
-      useInteractionStore.getState().send({
-        type: "CANVAS_POINTER_MOVE",
-        point: toFlow(e),
-      });
+
+      // Single-finger path branches on gesture mode.
+      if (gestureMode.current === "pending") {
+        // Still waiting on the long-press timer — has the user moved enough
+        // to commit to a pan?
+        const start = startClient.current;
+        if (!start) return;
+        const dx = e.clientX - start.x;
+        const dy = e.clientY - start.y;
+        if (Math.hypot(dx, dy) >= PAN_THRESHOLD_PX) {
+          clearLongPress();
+          gestureMode.current = "panning";
+          lastPanClient.current = { x: e.clientX, y: e.clientY };
+          // Don't dispatch — pan is direct viewport store updates. Wait for
+          // the NEXT move event to start applying deltas (we just consumed
+          // the threshold-crossing move to detect the pan intent).
+        }
+        return;
+      }
+
+      if (gestureMode.current === "panning") {
+        const last = lastPanClient.current;
+        if (!last) return;
+        const dx = e.clientX - last.x;
+        const dy = e.clientY - last.y;
+        const { zoom, pan } = useViewportStore.getState();
+        useViewportStore.getState().setViewport({
+          zoom,
+          pan: { x: pan.x + dx, y: pan.y + dy },
+        });
+        lastPanClient.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      if (gestureMode.current === "rubberband") {
+        useInteractionStore.getState().send({
+          type: "CANVAS_POINTER_MOVE",
+          point: toFlow(e),
+        });
+      }
     },
     onPointerUp: (e) => {
       if (e.pointerType === "pen") {
-        // Clear the pen-active flag so subsequent touches are accepted again.
         penActiveRef.current = false;
         return;
       }
@@ -161,33 +245,37 @@ export const useTouch = (): TouchHandlers => {
       pointerById.current.delete(e.pointerId);
 
       if (e.pointerId === secondPointerId.current) {
-        // Second finger lifted: exit gesture mode, restore single-finger behaviour.
         secondPointerId.current = null;
         lastDist.current = 0;
         lastMidClient.current = null;
-        // No FSM event — lifting the second finger is a gesture boundary, not a selection.
         return;
       }
 
       if (e.pointerId !== activePointerId.current) return;
+
+      // The active finger lifted. Close out whatever single-finger gesture
+      // was in progress.
+      const wasRubberband = gestureMode.current === "rubberband";
       activePointerId.current = null;
-      // If a second finger is somehow still tracked (shouldn't happen in normal flow), clear it.
       secondPointerId.current = null;
       lastDist.current = 0;
       lastMidClient.current = null;
-      useInteractionStore.getState().send({
-        type: "CANVAS_POINTER_UP",
-        point: toFlow(e),
-      });
+      resetSingleFingerState();
+
+      if (wasRubberband) {
+        // Commit the marquee selection.
+        useInteractionStore.getState().send({
+          type: "CANVAS_POINTER_UP",
+          point: toFlow(e),
+        });
+        return;
+      }
+      // 'pending' (quick tap) and 'panning' both end silently from the
+      // FSM's point of view. Quick taps on empty pane are handled by RF's
+      // onPaneClick → useRfEvents PANE_CLICK; pans are direct viewport updates.
     },
-    // Recovery path for OS-level pointer interruptions (lost pointer capture,
-    // pen lifted outside the browser window, task-switch, etc.).  Without this,
-    // a pen whose pointerup is never delivered leaves penActiveRef=true forever,
-    // silently dropping every subsequent touch.  Similarly a touch whose
-    // pointerup is swallowed leaves the FSM parked in maybeDragging/rubberBand.
     onPointerCancel: (e) => {
       if (e.pointerType === "pen") {
-        // Treat a cancelled pen the same as a normal pen lift: unblock touches.
         penActiveRef.current = false;
         return;
       }
@@ -195,7 +283,6 @@ export const useTouch = (): TouchHandlers => {
       pointerById.current.delete(e.pointerId);
 
       if (e.pointerId === secondPointerId.current) {
-        // Second finger cancelled: exit gesture mode silently.
         secondPointerId.current = null;
         lastDist.current = 0;
         lastMidClient.current = null;
@@ -203,16 +290,22 @@ export const useTouch = (): TouchHandlers => {
       }
 
       if (e.pointerId !== activePointerId.current) return;
-      // Interrupted touch: clear the tracked pointer and tell the FSM the
-      // sequence ended so it doesn't stay stuck in an in-progress drag state.
+
+      const wasRubberband = gestureMode.current === "rubberband";
       activePointerId.current = null;
       secondPointerId.current = null;
       lastDist.current = 0;
       lastMidClient.current = null;
-      useInteractionStore.getState().send({
-        type: "CANVAS_POINTER_UP",
-        point: toFlow(e),
-      });
+      resetSingleFingerState();
+
+      if (wasRubberband) {
+        // Tell the FSM the rubberband sequence ended so it doesn't stay
+        // parked in selecting.rubberBand.
+        useInteractionStore.getState().send({
+          type: "CANVAS_POINTER_UP",
+          point: toFlow(e),
+        });
+      }
     },
   };
 };
