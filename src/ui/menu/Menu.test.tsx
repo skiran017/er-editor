@@ -8,6 +8,12 @@ import { useDiagramStore } from '@/state/diagramStore'
 import { useInteractionStore } from '@/interaction/interactionStore'
 import { emptyDiagram } from '@/domain/types'
 import { initI18n } from '@/platform/i18n'
+import * as fs from '@/platform/fs'
+
+vi.mock('@/platform/fs', () => ({
+  openFile: vi.fn().mockResolvedValue(null),
+  downloadBlob: vi.fn(),
+}))
 
 beforeAll(async () => { await initI18n() })
 
@@ -54,14 +60,14 @@ describe('Menu — hamburger dropdown', () => {
     expect(useUiStore.getState().language).toBe('it')
   })
 
-  it('Phase-5 file actions push an info toast with the "not yet available" key', async () => {
+  it('Open menu item invokes the file picker (openFile called once)', async () => {
+    vi.mocked(fs.openFile).mockResolvedValue(null)
     render(<Menu />)
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
     await userEvent.click(screen.getByRole('menuitem', { name: /Open/ }))
-    const toasts = useUiStore.getState().toasts
-    expect(toasts).toHaveLength(1)
-    expect(toasts[0]!.kind).toBe('info')
-    expect(toasts[0]!.messageKey).toBe('menu:notYetAvailable')
+    expect(fs.openFile).toHaveBeenCalledOnce()
+    // Cancel (null) produces no toast
+    expect(useUiStore.getState().toasts).toHaveLength(0)
   })
 
   it('validation toggle writes to the validation store', async () => {

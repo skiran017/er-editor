@@ -53,6 +53,10 @@
     "language": "Language",
     "languageEn": "English",
     "languageIt": "Italian",
+    "openSuccess": "Diagram opened.",
+    "openFailure": "Could not open the file. Check the format.",
+    "saveSuccess": "Diagram saved.",
+    "saveFailure": "Could not save the diagram.",
     "exportSuccess": "Diagram exported.",
     "exportFailure": "Export failed. See console for details.",
     "exporting": "Exporting…"
