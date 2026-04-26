@@ -211,3 +211,64 @@ describe('serializeJavaXml — options', () => {
     expect(withNl).toBe(withoutNl + '\n')
   })
 })
+
+describe('serializeJavaXml — diagram section', () => {
+  it('emits diagram positions in descending refid order with correct element names', () => {
+    const m: JavaModel = {
+      schema: {
+        name: 'T', lastId: 3,
+        entities: [{
+          _kind: 'StrongEntitySet', id: 1, name: 'E',
+          attributes: [{ _kind: 'SimpleAttribute', id: 2, name: 'x', multiValued: false, derived: false }],
+          primaryKey: [],
+        }],
+        relationships: [], generalizations: [],
+      },
+      diagram: { positions: new Map([[1, { x: 50, y: 60 }], [2, { x: 100, y: 200 }]]) },
+    }
+    const out = serializeJavaXml(m)
+    // 2 (SimpleAttribute) appears BEFORE 1 (StrongEntitySet)
+    const idxAttr = out.indexOf('<SimpleAttribute refid="2">')
+    const idxEnt = out.indexOf('<StrongEntitySet refid="1">')
+    expect(idxAttr).toBeGreaterThan(0)
+    expect(idxEnt).toBeGreaterThan(idxAttr)
+  })
+
+  it('emits Position with x then y attribute order', () => {
+    const m: JavaModel = {
+      schema: {
+        name: 'T', lastId: 1,
+        entities: [{ _kind: 'StrongEntitySet', id: 1, name: 'E', attributes: [], primaryKey: [] }],
+        relationships: [], generalizations: [],
+      },
+      diagram: { positions: new Map([[1, { x: 50, y: 60 }]]) },
+    }
+    const out = serializeJavaXml(m)
+    expect(out).toContain('<Position x="50" y="60" />')
+  })
+
+  it('omits diagram entries for ids not in positions map (e.g., relationship branches)', () => {
+    const m: JavaModel = {
+      schema: {
+        name: 'T', lastId: 4,
+        entities: [
+          { _kind: 'StrongEntitySet', id: 1, name: 'A', attributes: [], primaryKey: [] },
+          { _kind: 'StrongEntitySet', id: 2, name: 'B', attributes: [], primaryKey: [] },
+        ],
+        relationships: [{
+          _kind: 'RelationshipSetOneToN', id: 3, name: 'R',
+          attributes: [],
+          branches: [{
+            _kind: 'RelationshipSetBranch', id: 4, cardinality: '1', totalParticipation: false, role: '',
+            entityRef: { _kind: 'StrongEntitySet', refid: 1 },
+          }],
+        }],
+        generalizations: [],
+      },
+      diagram: { positions: new Map([[1, { x: 0, y: 0 }], [2, { x: 0, y: 0 }], [3, { x: 0, y: 0 }]]) },
+    }
+    const out = serializeJavaXml(m)
+    // Branch id=4 is not in positions, so no diagram entry for it.
+    expect(out).not.toContain('refid="4"')
+  })
+})

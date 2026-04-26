@@ -161,9 +161,47 @@ const writeSchema = (depth: number, s: JavaSchema): string => {
   return lines.join('\n')
 }
 
-// Diagram serialization lands in Task 6.
-const writeDiagram = (depth: number, _model: JavaModel): string =>
-  empty(depth, 'ERDatabaseDiagram', [])
+const buildKindLookup = (s: JavaSchema): ReadonlyMap<number, string> => {
+  const map = new Map<number, string>()
+  const recordAttr = (a: JavaAttribute): void => {
+    map.set(a.id, a._kind)
+    if (isCompositeAttribute(a)) for (const c of a.children) recordAttr(c)
+  }
+  for (const e of s.entities) {
+    map.set(e.id, e._kind)
+    for (const a of e.attributes) recordAttr(a)
+  }
+  for (const r of s.relationships) {
+    map.set(r.id, r._kind)
+    for (const a of r.attributes) recordAttr(a)
+  }
+  for (const g of s.generalizations) {
+    map.set(g.id, g._kind)
+  }
+  return map
+}
+
+const writeDiagram = (depth: number, model: JavaModel): string => {
+  const positions = Array.from(model.diagram.positions.entries())
+  if (positions.length === 0) return empty(depth, 'ERDatabaseDiagram', [])
+  const kinds = buildKindLookup(model.schema)
+  const sorted = positions
+    .filter(([id]) => kinds.has(id))
+    .sort(([a], [b]) => b - a)   // descending refid
+  const lines = [
+    open(depth, 'ERDatabaseDiagram', []),
+    ...sorted.map(([id, p]) => {
+      const kind = kinds.get(id)!
+      return [
+        open(depth + 1, kind, [attr('refid', id)]),
+        empty(depth + 2, 'Position', [attr('x', p.x), attr('y', p.y)]),
+        close(depth + 1, kind),
+      ].join('\n')
+    }),
+    close(depth, 'ERDatabaseDiagram'),
+  ]
+  return lines.join('\n')
+}
 
 export interface SerializeOptions {
   readonly trailingNewline?: boolean
