@@ -1,7 +1,13 @@
 // src/notation/chen/codecs/javaXml/transformer.test.ts
 import { describe, it, expect } from 'vitest'
-import { javaToDiagram } from './transformer'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { javaToDiagram, diagramToJava } from './transformer'
 import type { JavaModel } from './types'
+import { parseJavaXml } from './reader'
+
+const FIXTURE_DIR = join(__dirname, '../../../../../tests/fixtures/supsi')
+const loadXml = (name: string): string => readFileSync(join(FIXTURE_DIR, name), 'utf8')
 
 
 const wrap = (entities: JavaModel['schema']['entities']): JavaModel => ({
@@ -202,5 +208,122 @@ describe('javaToDiagram — generalizations', () => {
     const d = javaToDiagram(buildGenModel('TotalGeneralization'))
     const isa = Object.values(d.nodesById).find((n) => n.kind === 'isa')!
     expect(isa.kind === 'isa' && isa.isTotal).toBe(true)
+  })
+})
+
+describe('diagramToJava — reverse direction', () => {
+  it('round-trips a simple diagram (entity + 1 attribute) through both transformers', () => {
+    const original: JavaModel = {
+      schema: {
+        name: 'T', lastId: 2,
+        entities: [
+          {
+            _kind: 'StrongEntitySet', id: 1, name: 'Person',
+            attributes: [
+              { _kind: 'SimpleAttribute', id: 2, name: 'name', multiValued: false, derived: false },
+            ],
+            primaryKey: [2],
+          },
+        ],
+        relationships: [],
+        generalizations: [],
+      },
+      diagram: { positions: new Map([[1, { x: 100, y: 200 }], [2, { x: 150, y: 250 }]]) },
+    }
+    const diagram = javaToDiagram(original)
+    const result = diagramToJava(diagram, { databaseName: 'T' })
+
+    expect(result.schema.entities).toHaveLength(1)
+    expect(result.schema.entities[0]!.name).toBe('Person')
+    expect(result.schema.entities[0]!.attributes).toHaveLength(1)
+    expect(result.schema.entities[0]!.attributes[0]!.name).toBe('name')
+    // primaryKey should contain the re-assigned id of the 'name' attribute
+    const attrId = result.schema.entities[0]!.attributes[0]!.id
+    const entity = result.schema.entities[0]!
+    expect(entity._kind === 'StrongEntitySet' && entity.primaryKey).toContain(attrId)
+  })
+
+  it('derives RelationshipSetOneToN from two branches with cardinality (1, N)', () => {
+    const original: JavaModel = {
+      schema: {
+        name: 'T', lastId: 4,
+        entities: [
+          { _kind: 'StrongEntitySet', id: 1, name: 'A', attributes: [], primaryKey: [] },
+          { _kind: 'StrongEntitySet', id: 2, name: 'B', attributes: [], primaryKey: [] },
+        ],
+        relationships: [{
+          _kind: 'RelationshipSetOneToN', id: 3, name: 'Owns',
+          attributes: [],
+          branches: [
+            {
+              _kind: 'RelationshipSetBranch', id: 4, cardinality: '1', totalParticipation: false, role: '',
+              entityRef: { _kind: 'StrongEntitySet', refid: 1 },
+            },
+            {
+              _kind: 'RelationshipSetBranch', id: 5, cardinality: 'N', totalParticipation: false, role: '',
+              entityRef: { _kind: 'StrongEntitySet', refid: 2 },
+            },
+          ],
+        }],
+        generalizations: [],
+      },
+      diagram: { positions: new Map() },
+    }
+    const diagram = javaToDiagram(original)
+    const result = diagramToJava(diagram)
+
+    expect(result.schema.relationships).toHaveLength(1)
+    expect(result.schema.relationships[0]!._kind).toBe('RelationshipSetOneToN')
+    expect(result.schema.relationships[0]!.name).toBe('Owns')
+  })
+
+  it('emits TotalGeneralization when isa.isTotal is true', () => {
+    const original: JavaModel = {
+      schema: {
+        name: 'T', lastId: 4,
+        entities: [
+          { _kind: 'StrongEntitySet', id: 1, name: 'Animal', attributes: [], primaryKey: [] },
+          { _kind: 'StrongEntitySet', id: 2, name: 'Dog', attributes: [], primaryKey: [] },
+          { _kind: 'StrongEntitySet', id: 3, name: 'Cat', attributes: [], primaryKey: [] },
+        ],
+        relationships: [],
+        generalizations: [{
+          _kind: 'TotalGeneralization', id: 4, total: true,
+          parent: { _kind: 'StrongEntitySet', refid: 1 },
+          children: [
+            { _kind: 'StrongEntitySet', refid: 2 },
+            { _kind: 'StrongEntitySet', refid: 3 },
+          ],
+        }],
+      },
+      diagram: { positions: new Map() },
+    }
+    const diagram = javaToDiagram(original)
+    const result = diagramToJava(diagram)
+
+    expect(result.schema.generalizations).toHaveLength(1)
+    expect(result.schema.generalizations[0]!._kind).toBe('TotalGeneralization')
+  })
+
+  it('lifecycle: javaToDiagram(m1) → diagramToJava → semantic equality with m1', () => {
+    const xml = loadXml('test.xml')
+    const m1 = parseJavaXml(xml)
+    const diagram = javaToDiagram(m1)
+    const m2 = diagramToJava(diagram, { databaseName: m1.schema.name })
+
+    // Entity count + names should match.
+    expect(m2.schema.entities).toHaveLength(m1.schema.entities.length)
+    const originalNames = m1.schema.entities.map((e) => e.name).sort()
+    const resultNames = m2.schema.entities.map((e) => e.name).sort()
+    expect(resultNames).toEqual(originalNames)
+
+    // Relationship count + names should match.
+    expect(m2.schema.relationships).toHaveLength(m1.schema.relationships.length)
+    const origRelNames = m1.schema.relationships.map((r) => r.name).sort()
+    const resultRelNames = m2.schema.relationships.map((r) => r.name).sort()
+    expect(resultRelNames).toEqual(origRelNames)
+
+    // Generalization count should match.
+    expect(m2.schema.generalizations).toHaveLength(m1.schema.generalizations.length)
   })
 })

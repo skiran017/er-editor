@@ -26,6 +26,8 @@ import {
   isWeakEntity,
 } from './types'
 
+export { diagramToJava, type DiagramToJavaOptions } from './diagram-to-java'
+
 const DEFAULT_ENTITY_SIZE = { width: 120, height: 60 }
 const DEFAULT_ATTRIBUTE_SIZE = { width: 90, height: 50 }
 const DEFAULT_RELATIONSHIP_SIZE = { width: 140, height: 70 }
