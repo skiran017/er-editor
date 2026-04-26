@@ -154,12 +154,16 @@ const ERCanvasInner = () => {
 
   return (
     <div
-      // touch-manipulation disables iOS / Android double-tap-to-zoom on the
-      // canvas surface — without it, double-tapping a node to enter inline
-      // rename triggers the browser's pinch-zoom gesture and `dblclick`
-      // never fires. We still get pinch-zoom from useTouch's two-finger
-      // gesture, so this only suppresses the OS gesture, not ours.
-      className="relative h-full w-full flex-1 touch-manipulation"
+      // touch-none gives JavaScript full control of every touch event on the
+      // canvas. Without it the browser tries to interpret single-finger drag
+      // as a scroll attempt and cancels our pointer events partway through —
+      // the rubberband never finishes drawing on mobile, and our two-finger
+      // pan competes with the browser's pinch-zoom and feels jittery.
+      // touch-manipulation was tempting (only kills double-tap-zoom) but it
+      // still hands single-finger pan to the browser. dblclick still fires
+      // under touch-none because click events are synthesised from tap
+      // sequences regardless of touch-action, so inline rename keeps working.
+      className="relative h-full w-full flex-1 touch-none"
       onPointerDown={(e) => {
         mouse.onPointerDown(e)
         touch.onPointerDown(e)
