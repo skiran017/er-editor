@@ -8,6 +8,7 @@ export interface TouchHandlers {
   readonly onPointerDown: (e: ReactPointerEvent<HTMLElement>) => void
   readonly onPointerMove: (e: ReactPointerEvent<HTMLElement>) => void
   readonly onPointerUp: (e: ReactPointerEvent<HTMLElement>) => void
+  readonly onPointerCancel: (e: ReactPointerEvent<HTMLElement>) => void
 }
 
 // Points reported to the FSM are in WORLD / flow coordinates — see useMouse
@@ -60,6 +61,27 @@ export const useTouch = (): TouchHandlers => {
       }
       if (e.pointerType !== 'touch') return
       if (e.pointerId !== activePointerId.current) return
+      activePointerId.current = null
+      useInteractionStore.getState().send({
+        type: 'CANVAS_POINTER_UP',
+        point: toFlow(e),
+      })
+    },
+    // Recovery path for OS-level pointer interruptions (lost pointer capture,
+    // pen lifted outside the browser window, task-switch, etc.).  Without this,
+    // a pen whose pointerup is never delivered leaves penActiveRef=true forever,
+    // silently dropping every subsequent touch.  Similarly a touch whose
+    // pointerup is swallowed leaves the FSM parked in maybeDragging/rubberBand.
+    onPointerCancel: (e) => {
+      if (e.pointerType === 'pen') {
+        // Treat a cancelled pen the same as a normal pen lift: unblock touches.
+        penActiveRef.current = false
+        return
+      }
+      if (e.pointerType !== 'touch') return
+      if (e.pointerId !== activePointerId.current) return
+      // Interrupted touch: clear the tracked pointer and tell the FSM the
+      // sequence ended so it doesn't stay stuck in an in-progress drag state.
       activePointerId.current = null
       useInteractionStore.getState().send({
         type: 'CANVAS_POINTER_UP',

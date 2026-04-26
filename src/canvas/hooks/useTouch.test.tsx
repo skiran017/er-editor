@@ -120,4 +120,44 @@ describe('useTouch', () => {
       type: 'CANVAS_POINTER_DOWN',
     }))
   })
+
+  it('pen pointercancel clears the pen-active flag (recovery for lost pointer capture)', () => {
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
+    result.current.onPointerDown(makePointerEvent({
+      clientX: 0, clientY: 0, pointerType: 'pen', pointerId: 99,
+    }))
+    result.current.onPointerCancel(makePointerEvent({
+      clientX: 0, clientY: 0, pointerType: 'pen', pointerId: 99,
+    }))
+    // After the cancel, a touch must be accepted again.
+    result.current.onPointerDown(makePointerEvent({
+      clientX: 5, clientY: 5, pointerType: 'touch', pointerId: 1,
+    }))
+    expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'CANVAS_POINTER_DOWN',
+    }))
+  })
+
+  it('touch pointercancel for the active touch dispatches CANVAS_POINTER_UP and clears the active pointer', () => {
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
+    result.current.onPointerDown(makePointerEvent({
+      clientX: 10, clientY: 20, pointerType: 'touch', pointerId: 7,
+    }))
+    sendSpy.mockClear()
+    result.current.onPointerCancel(makePointerEvent({
+      clientX: 30, clientY: 40, pointerType: 'touch', pointerId: 7,
+    }))
+    expect(sendSpy).toHaveBeenCalledWith({
+      type: 'CANVAS_POINTER_UP',
+      point: { x: 30, y: 40 },
+    })
+    // A subsequent touchdown should now be accepted (not blocked by the stale activePointerId).
+    result.current.onPointerDown(makePointerEvent({
+      clientX: 50, clientY: 60, pointerType: 'touch', pointerId: 8,
+    }))
+    expect(sendSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+      type: 'CANVAS_POINTER_DOWN',
+      point: { x: 50, y: 60 },
+    }))
+  })
 })
