@@ -148,6 +148,21 @@ describe('Toolbar — readonly mode', () => {
   })
 })
 
+describe('Toolbar — responsive positioning', () => {
+  beforeEach(reset)
+
+  it('pins to the bottom on mobile (no sm breakpoint) and to the top on sm+', () => {
+    // Toolbar uses Tailwind utility classes; the bottom-pinned position must
+    // appear unprefixed (default = mobile-first) and the top-pinned class must
+    // appear with the sm: prefix so it overrides at >=640px.
+    const { container } = render(<Toolbar />)
+    const nav = container.querySelector('[data-role="toolbar"]')!
+    expect(nav.className).toContain('bottom-4')
+    expect(nav.className).toContain('sm:top-4')
+    expect(nav.className).toContain('sm:bottom-auto')
+  })
+})
+
 describe('Toolbar — delete button', () => {
   beforeEach(reset)
 

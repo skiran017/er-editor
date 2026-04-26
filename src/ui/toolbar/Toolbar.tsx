@@ -61,7 +61,7 @@ export const Toolbar = memo(() => {
     <nav
       aria-label={t('toolbar:group.elements')}
       data-role="toolbar"
-      className="fixed left-1/2 top-4 z-40 flex h-12 -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white/90 px-3 text-slate-700 shadow-lg backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200"
+      className="fixed left-1/2 bottom-4 z-40 flex h-12 -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white/90 px-3 text-slate-700 shadow-lg backdrop-blur-md sm:bottom-auto sm:top-4 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200"
     >
       {/* Element / tool groups from chenPlugin (select, elements, connections).
           Every group is followed by a separator (history group sits after).
