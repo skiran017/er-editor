@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { IconButton } from '@/ui/primitives'
 
@@ -17,6 +17,15 @@ export interface PropertyDrawerProps {
  * this component never mounts at desktop sizes.
  */
 export const PropertyDrawer = ({ mode, open, onClose, children }: PropertyDrawerProps) => {
+  useEffect(() => {
+    if (!open) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [open, onClose])
+
   if (!open) return null
   const sheetClass =
     mode === 'mobile'
@@ -33,10 +42,13 @@ export const PropertyDrawer = ({ mode, open, onClose, children }: PropertyDrawer
       <aside
         data-role="property-drawer"
         data-mode={mode}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="property-drawer-title"
         className={`z-40 flex flex-col overflow-y-auto bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800 ${sheetClass}`}
       >
         <header className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-700">
-          <span className="text-sm font-semibold">Properties</span>
+          <span id="property-drawer-title" className="text-sm font-semibold">Properties</span>
           <IconButton
             aria-label="Close properties panel"
             icon={<X size={18} aria-hidden />}
