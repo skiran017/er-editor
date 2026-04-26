@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel>
+  <ERDatabaseSchema name="Unnamed_DB_Schema_1" lastId="24">
+    <EntitySets>
+      <StrongEntitySet id="1" name="ENTITA'">
+        <Attributes>
+          <SimpleAttribute id="2" name="attributo" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="2" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="3" name="ENTITA'_2">
+        <Attributes />
+      </StrongEntitySet>
+      <WeakEntitySet id="4" name="ENTITA'_3">
+        <Attributes>
+          <SimpleAttribute id="5" name="attributo" multiValued="false" derived="false" />
+        </Attributes>
+        <Discriminant>
+          <SimpleAttribute refid="5" />
+        </Discriminant>
+      </WeakEntitySet>
+      <StrongEntitySet id="6" name="ENTITA'_4">
+        <Attributes />
+      </StrongEntitySet>
+      <StrongEntitySet id="7" name="ENTITA'_5">
+        <Attributes />
+      </StrongEntitySet>
+      <StrongEntitySet id="8" name="ENTITA'_6">
+        <Attributes>
+          <SimpleAttribute id="9" name="attributo" multiValued="false" derived="false" />
+          <SimpleAttribute id="10" name="attributo_2" multiValued="false" derived="true" />
+          <SimpleAttribute id="11" name="attributo_3" multiValued="false" derived="false" />
+          <SimpleAttribute id="12" name="attributo_4" multiValued="true" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="11" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="13" name="ENTITA'_7">
+        <Attributes />
+      </StrongEntitySet>
+    </EntitySets>
+    <RelationshipSets>
+      <RelationshipSetOneToOne id="14" name="RELAZIONE">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="15" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="1" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="16" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="3" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToOne>
+      <RelationshipSetOneToN id="17" name="RELAZIONE_2">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="18" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="1" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="19" cardinality="N" totalParticipation="false" role="">
+            <WeakEntitySet refid="4" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToN>
+      <RelationshipSetNToN id="20" name="RELAZIONE_3">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="21" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="1" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="22" cardinality="N" totalParticipation="true" role="">
+            <StrongEntitySet refid="6" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="23" cardinality="N" totalParticipation="true" role="">
+            <StrongEntitySet refid="7" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="24" cardinality="N" totalParticipation="true" role="">
+            <WeakEntitySet refid="4" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetNToN>
+    </RelationshipSets>
+    <Generalizations />
+  </ERDatabaseSchema>
+  <ERDatabaseDiagram>
+    <RelationshipSetNToN refid="20">
+      <Position x="437" y="169" />
+    </RelationshipSetNToN>
+    <RelationshipSetOneToN refid="17">
+      <Position x="98" y="124" />
+    </RelationshipSetOneToN>
+    <RelationshipSetOneToOne refid="14">
+      <Position x="345" y="337" />
+    </RelationshipSetOneToOne>
+    <StrongEntitySet refid="13">
+      <Position x="861" y="306" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="12">
+      <Position x="765" y="118" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="11">
+      <Position x="823" y="56" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="10">
+      <Position x="958" y="55" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="9">
+      <Position x="953" y="164" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="8">
+      <Position x="884" y="128" />
+    </StrongEntitySet>
+    <StrongEntitySet refid="7">
+      <Position x="666" y="340" />
+    </StrongEntitySet>
+    <StrongEntitySet refid="6">
+      <Position x="648" y="126" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="5">
+      <Position x="64" y="376" />
+    </SimpleAttribute>
+    <WeakEntitySet refid="4">
+      <Position x="74" y="284" />
+    </WeakEntitySet>
+    <StrongEntitySet refid="3">
+      <Position x="274" y="413" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="2">
+      <Position x="269" y="63" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="1">
+      <Position x="219" y="178" />
+    </StrongEntitySet>
+  </ERDatabaseDiagram>
+</ERDatabaseModel>
+

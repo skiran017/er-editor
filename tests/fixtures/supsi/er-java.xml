@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel>
+  <ERDatabaseSchema name="Unnamed_DB_Schema_1" lastId="7">
+    <EntitySets>
+      <StrongEntitySet id="1" name="ENTITA'">
+        <Attributes>
+          <SimpleAttribute id="2" name="attributo" multiValued="false" derived="false" />
+        </Attributes>
+      </StrongEntitySet>
+      <StrongEntitySet id="3" name="ENTITA'_2">
+        <Attributes>
+          <SimpleAttribute id="4" name="attributo" multiValued="false" derived="false" />
+        </Attributes>
+      </StrongEntitySet>
+    </EntitySets>
+    <RelationshipSets>
+      <RelationshipSetOneToOne id="5" name="RELAZIONE">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="6" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="1" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="7" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="3" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToOne>
+    </RelationshipSets>
+    <Generalizations />
+  </ERDatabaseSchema>
+  <ERDatabaseDiagram>
+    <RelationshipSetOneToOne refid="5">
+      <Position x="247" y="192" />
+    </RelationshipSetOneToOne>
+    <SimpleAttribute refid="4">
+      <Position x="349" y="331" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="3">
+      <Position x="198" y="437" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="2">
+      <Position x="461" y="43" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="1">
+      <Position x="95" y="67" />
+    </StrongEntitySet>
+  </ERDatabaseDiagram>
+</ERDatabaseModel>
+

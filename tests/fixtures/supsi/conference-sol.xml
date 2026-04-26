@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel>
+  <ERDatabaseSchema name="Unnamed_DB_Schema_1" lastId="78">
+    <EntitySets>
+      <StrongEntitySet id="1" name="CATEGORIES">
+        <Attributes>
+          <SimpleAttribute id="2" name="name" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="2" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="3" name="HOTELS">
+        <Attributes>
+          <SimpleAttribute id="4" name="address" multiValued="false" derived="false" />
+          <SimpleAttribute id="5" name="name" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="5" />
+          <SimpleAttribute refid="4" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="6" name="CITIES">
+        <Attributes>
+          <SimpleAttribute id="7" name="name" multiValued="false" derived="false" />
+          <SimpleAttribute id="8" name="country" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="7" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="9" name="PERSONS">
+        <Attributes>
+          <SimpleAttribute id="10" name="id" multiValued="false" derived="false" />
+          <SimpleAttribute id="11" name="name" multiValued="false" derived="false" />
+          <SimpleAttribute id="12" name="lastname" multiValued="false" derived="false" />
+          <SimpleAttribute id="13" name="address" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="10" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="14" name="CONFERENCES">
+        <Attributes>
+          <SimpleAttribute id="15" name="title" multiValued="false" derived="false" />
+          <SimpleAttribute id="16" name="start_date" multiValued="false" derived="false" />
+          <SimpleAttribute id="17" name="end_date" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="15" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="18" name="DOMAINS">
+        <Attributes>
+          <SimpleAttribute id="19" name="name" multiValued="false" derived="false" />
+          <SimpleAttribute id="20" name="description" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="19" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="21" name="LOCATIONS">
+        <Attributes>
+          <SimpleAttribute id="22" name="name" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="22" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <WeakEntitySet id="23" name="ROOMS">
+        <Attributes>
+          <SimpleAttribute id="24" name="name" multiValued="false" derived="false" />
+        </Attributes>
+        <Discriminant>
+          <SimpleAttribute refid="24" />
+        </Discriminant>
+      </WeakEntitySet>
+      <WeakEntitySet id="25" name="SPEECHES">
+        <Attributes>
+          <SimpleAttribute id="26" name="title" multiValued="false" derived="false" />
+          <SimpleAttribute id="27" name="duration" multiValued="false" derived="false" />
+          <SimpleAttribute id="28" name="time" multiValued="false" derived="false" />
+          <SimpleAttribute id="29" name="date" multiValued="false" derived="false" />
+        </Attributes>
+        <Discriminant>
+          <SimpleAttribute refid="29" />
+          <SimpleAttribute refid="28" />
+        </Discriminant>
+      </WeakEntitySet>
+      <StrongEntitySet id="30" name="ROLES">
+        <Attributes>
+          <SimpleAttribute id="31" name="name" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="31" />
+        </PrimaryKey>
+      </StrongEntitySet>
+      <StrongEntitySet id="32" name="EMPLOYEES">
+        <Attributes>
+          <SimpleAttribute id="33" name="social_num" multiValued="false" derived="false" />
+          <SimpleAttribute id="34" name="name" multiValued="false" derived="false" />
+          <SimpleAttribute id="35" name="lastname" multiValued="false" derived="false" />
+        </Attributes>
+        <PrimaryKey>
+          <SimpleAttribute refid="33" />
+        </PrimaryKey>
+      </StrongEntitySet>
+    </EntitySets>
+    <RelationshipSets>
+      <RelationshipSetOneToN id="36" name="HAVE">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="37" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="1" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="38" cardinality="N" totalParticipation="true" role="">
+            <StrongEntitySet refid="3" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToN>
+      <RelationshipSetOneToN id="39" name="ARE_IN">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="40" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="6" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="41" cardinality="N" totalParticipation="true" role="">
+            <StrongEntitySet refid="3" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToN>
+      <RelationshipSetNToN id="42" name="ARE_REGISTERED">
+        <Attributes>
+          <SimpleAttribute id="43" name="payment_status" multiValued="false" derived="false" />
+        </Attributes>
+        <Branches>
+          <RelationshipSetBranch id="44" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="9" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="45" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="14" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetNToN>
+      <RelationshipSetNToN id="46" name="ARE_INTERESTED">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="47" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="9" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="48" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="18" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetNToN>
+      <RelationshipSetNToN id="49" name="COVER">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="50" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="18" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="51" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="14" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetNToN>
+      <RelationshipSetOneToN id="52" name="LOCATED">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="53" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="6" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="54" cardinality="N" totalParticipation="true" role="">
+            <StrongEntitySet refid="21" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToN>
+      <IdentifyingRelationshipSetOneToN id="55" name="BELONG_TO">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="56" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="21" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="57" cardinality="N" totalParticipation="true" role="">
+            <WeakEntitySet refid="23" />
+          </RelationshipSetBranch>
+        </Branches>
+      </IdentifyingRelationshipSetOneToN>
+      <IdentifyingRelationshipSetOneToN id="58" name="GIVEN_BY">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="59" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="9" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="60" cardinality="N" totalParticipation="true" role="">
+            <WeakEntitySet refid="25" />
+          </RelationshipSetBranch>
+        </Branches>
+      </IdentifyingRelationshipSetOneToN>
+      <RelationshipSetOneToN id="61" name="COMPOSED_BY">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="62" cardinality="1" totalParticipation="false" role="">
+            <StrongEntitySet refid="14" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="63" cardinality="N" totalParticipation="true" role="">
+            <WeakEntitySet refid="25" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToN>
+      <RelationshipSetNToN id="64" name="CAN_DO">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="65" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="32" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="66" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="30" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetNToN>
+      <RelationshipSetNToN id="67" name="WORK">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="68" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="14" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="69" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="32" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="70" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="30" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetNToN>
+      <RelationshipSetOneToN id="71" name="ARE_GIVEN">
+        <Attributes />
+        <Branches>
+          <RelationshipSetBranch id="72" cardinality="1" totalParticipation="false" role="">
+            <WeakEntitySet refid="23" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="73" cardinality="N" totalParticipation="true" role="">
+            <WeakEntitySet refid="25" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetOneToN>
+      <RelationshipSetNToN id="74" name="BOOK">
+        <Attributes>
+          <SimpleAttribute id="75" name="to" multiValued="false" derived="false" />
+          <SimpleAttribute id="76" name="from" multiValued="false" derived="false" />
+        </Attributes>
+        <Branches>
+          <RelationshipSetBranch id="77" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="9" />
+          </RelationshipSetBranch>
+          <RelationshipSetBranch id="78" cardinality="N" totalParticipation="false" role="">
+            <StrongEntitySet refid="3" />
+          </RelationshipSetBranch>
+        </Branches>
+      </RelationshipSetNToN>
+    </RelationshipSets>
+    <Generalizations />
+  </ERDatabaseSchema>
+  <ERDatabaseDiagram>
+    <SimpleAttribute refid="76">
+      <Position x="187" y="129" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="75">
+      <Position x="254" y="124" />
+    </SimpleAttribute>
+    <RelationshipSetNToN refid="74">
+      <Position x="191" y="106" />
+    </RelationshipSetNToN>
+    <RelationshipSetOneToN refid="71">
+      <Position x="639" y="620" />
+    </RelationshipSetOneToN>
+    <RelationshipSetNToN refid="67">
+      <Position x="658" y="171" />
+    </RelationshipSetNToN>
+    <RelationshipSetNToN refid="64">
+      <Position x="527" y="522" />
+    </RelationshipSetNToN>
+    <RelationshipSetOneToN refid="61">
+      <Position x="557" y="235" />
+    </RelationshipSetOneToN>
+    <IdentifyingRelationshipSetOneToN refid="58">
+      <Position x="32" y="429" />
+    </IdentifyingRelationshipSetOneToN>
+    <IdentifyingRelationshipSetOneToN refid="55">
+      <Position x="799" y="321" />
+    </IdentifyingRelationshipSetOneToN>
+    <RelationshipSetOneToN refid="52">
+      <Position x="695" y="112" />
+    </RelationshipSetOneToN>
+    <RelationshipSetNToN refid="49">
+      <Position x="509" y="367" />
+    </RelationshipSetNToN>
+    <RelationshipSetNToN refid="46">
+      <Position x="172" y="324" />
+    </RelationshipSetNToN>
+    <SimpleAttribute refid="43">
+      <Position x="178" y="255" />
+    </SimpleAttribute>
+    <RelationshipSetNToN refid="42">
+      <Position x="170" y="213" />
+    </RelationshipSetNToN>
+    <RelationshipSetOneToN refid="39">
+      <Position x="468" y="67" />
+    </RelationshipSetOneToN>
+    <RelationshipSetOneToN refid="36">
+      <Position x="212" y="65" />
+    </RelationshipSetOneToN>
+    <SimpleAttribute refid="35">
+      <Position x="596" y="473" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="34">
+      <Position x="543" y="463" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="33">
+      <Position x="496" y="428" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="32">
+      <Position x="656" y="408" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="31">
+      <Position x="681" y="551" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="30">
+      <Position x="726" y="518" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="29">
+      <Position x="94" y="477" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="28">
+      <Position x="146" y="476" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="27">
+      <Position x="232" y="475" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="26">
+      <Position x="195" y="476" />
+    </SimpleAttribute>
+    <WeakEntitySet refid="25">
+      <Position x="192" y="407" />
+    </WeakEntitySet>
+    <SimpleAttribute refid="24">
+      <Position x="870" y="431" />
+    </SimpleAttribute>
+    <WeakEntitySet refid="23">
+      <Position x="821" y="496" />
+    </WeakEntitySet>
+    <SimpleAttribute refid="22">
+      <Position x="853" y="118" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="21">
+      <Position x="798" y="171" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="20">
+      <Position x="396" y="293" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="19">
+      <Position x="341" y="293" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="18">
+      <Position x="345" y="347" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="17">
+      <Position x="452" y="179" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="16">
+      <Position x="379" y="156" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="15">
+      <Position x="333" y="156" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="14">
+      <Position x="360" y="218" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="13">
+      <Position x="8" y="241" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="12">
+      <Position x="30" y="127" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="11">
+      <Position x="97" y="175" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="10">
+      <Position x="26" y="173" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="9">
+      <Position x="77" y="215" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="8">
+      <Position x="588" y="105" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="7">
+      <Position x="642" y="15" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="6">
+      <Position x="601" y="55" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="5">
+      <Position x="303" y="7" />
+    </SimpleAttribute>
+    <SimpleAttribute refid="4">
+      <Position x="371" y="9" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="3">
+      <Position x="362" y="55" />
+    </StrongEntitySet>
+    <SimpleAttribute refid="2">
+      <Position x="28" y="7" />
+    </SimpleAttribute>
+    <StrongEntitySet refid="1">
+      <Position x="66" y="54" />
+    </StrongEntitySet>
+  </ERDatabaseDiagram>
+</ERDatabaseModel>
+
