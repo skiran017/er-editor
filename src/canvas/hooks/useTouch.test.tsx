@@ -3,6 +3,7 @@ import { renderHook } from '@testing-library/react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { useTouch } from './useTouch'
 import { useInteractionStore } from '@/interaction/interactionStore'
+import { useViewportStore } from '@/state/viewportStore'
 
 // useTouch calls useReactFlow(); with no <ReactFlow> mounted,
 // screenToFlowPosition is identity, so existing assertions still hold.
@@ -16,6 +17,7 @@ beforeEach(() => {
     snapshot: useInteractionStore.getState().snapshot,
     send: sendSpy,
   })
+  useViewportStore.setState({ zoom: 1, pan: { x: 0, y: 0 } })
 })
 afterEach(() => { vi.restoreAllMocks() })
 
@@ -227,5 +229,39 @@ describe('useTouch', () => {
       type: 'CANVAS_POINTER_MOVE',
       point: { x: 120, y: 110 },
     })
+  })
+
+  it('two-finger drag with constant distance pans the viewport (does NOT dispatch WHEEL_ZOOM)', () => {
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
+    // Set the viewport to a known state.
+    useViewportStore.setState({ zoom: 1, pan: { x: 0, y: 0 } })
+    // Two fingers down at (100, 100) and (200, 100) — horizontal separation, distance 100.
+    result.current.onPointerDown(makePointerEvent({ clientX: 100, clientY: 100, pointerType: 'touch', pointerId: 1 }))
+    result.current.onPointerDown(makePointerEvent({ clientX: 200, clientY: 100, pointerType: 'touch', pointerId: 2 }))
+    sendSpy.mockClear()
+    // Both fingers move +50 px DOWN (perpendicular to the inter-finger axis).
+    // Moving perpendicular to the pinch axis keeps |distChange| < midShift on each event,
+    // so the algorithm correctly classifies each event as pan rather than zoom.
+    result.current.onPointerMove(makePointerEvent({ clientX: 100, clientY: 150, pointerType: 'touch', pointerId: 1 }))
+    result.current.onPointerMove(makePointerEvent({ clientX: 200, clientY: 150, pointerType: 'touch', pointerId: 2 }))
+    // No WHEEL_ZOOM should have fired.
+    expect(sendSpy.mock.calls.find(([ev]) => ev.type === 'WHEEL_ZOOM')).toBeUndefined()
+    // The viewport pan should have shifted by approximately +50 in y (cumulative across both moves).
+    const finalPan = useViewportStore.getState().pan
+    expect(finalPan.x).toBe(0)
+    expect(finalPan.y).toBeGreaterThan(0)
+  })
+
+  it('two-finger pinch (distance change dominant) still dispatches WHEEL_ZOOM and does NOT pan', () => {
+    const { result } = renderHook(() => useTouch(), RF_OPTS)
+    useViewportStore.setState({ zoom: 1, pan: { x: 0, y: 0 } })
+    result.current.onPointerDown(makePointerEvent({ clientX: 100, clientY: 100, pointerType: 'touch', pointerId: 1 }))
+    result.current.onPointerDown(makePointerEvent({ clientX: 200, clientY: 100, pointerType: 'touch', pointerId: 2 }))
+    sendSpy.mockClear()
+    // Spread finger 2 by 100px — distance 100→200, midpoint shifts only 50.
+    result.current.onPointerMove(makePointerEvent({ clientX: 300, clientY: 100, pointerType: 'touch', pointerId: 2 }))
+    expect(sendSpy.mock.calls.find(([ev]) => ev.type === 'WHEEL_ZOOM')).toBeDefined()
+    // Pan unchanged (zoom path was taken).
+    expect(useViewportStore.getState().pan).toEqual({ x: 0, y: 0 })
   })
 })
