@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { javaToDiagram } from './transformer'
 import type { JavaModel } from './types'
 
+
 const wrap = (entities: JavaModel['schema']['entities']): JavaModel => ({
   schema: { name: 'T', lastId: 0, entities, relationships: [], generalizations: [] },
   diagram: { positions: new Map() },
@@ -111,5 +112,95 @@ describe('javaToDiagram — entities + attributes', () => {
     const d = javaToDiagram(m)
     const node = d.nodesById[d.nodeOrder[0]!]!
     expect(node.position).toEqual({ x: 50, y: 60 })
+  })
+})
+
+describe('javaToDiagram — relationships', () => {
+  const buildXmlModel = (kind: JavaModel['schema']['relationships'][number]['_kind']): JavaModel => ({
+    schema: {
+      name: 'T', lastId: 5,
+      entities: [
+        { _kind: 'StrongEntitySet', id: 1, name: 'A', attributes: [], primaryKey: [] },
+        { _kind: 'StrongEntitySet', id: 2, name: 'B', attributes: [], primaryKey: [] },
+      ],
+      relationships: [{
+        _kind: kind, id: 3, name: 'R',
+        attributes: [],
+        branches: [
+          {
+            _kind: 'RelationshipSetBranch', id: 4, cardinality: '1', totalParticipation: false, role: '',
+            entityRef: { _kind: 'StrongEntitySet', refid: 1 },
+          },
+          {
+            _kind: 'RelationshipSetBranch', id: 5, cardinality: 'N', totalParticipation: true, role: '',
+            entityRef: { _kind: 'StrongEntitySet', refid: 2 },
+          },
+        ],
+      }],
+      generalizations: [],
+    },
+    diagram: { positions: new Map() },
+  })
+
+  it('maps RelationshipSetOneToN to relationship node + 2 entity-relationship edges', () => {
+    const d = javaToDiagram(buildXmlModel('RelationshipSetOneToN'))
+    const rel = Object.values(d.nodesById).find((n) => n.kind === 'relationship')!
+    expect(rel).toBeTruthy()
+    const edges = Object.values(d.edgesById).filter((e) => e.kind === 'entity-relationship')
+    expect(edges).toHaveLength(2)
+  })
+
+  it('flips Identifying* class names to isIdentifying=true', () => {
+    const d = javaToDiagram(buildXmlModel('IdentifyingRelationshipSetOneToN'))
+    const rel = Object.values(d.nodesById).find((n) => n.kind === 'relationship')!
+    expect(rel.kind === 'relationship' && rel.isIdentifying).toBe(true)
+  })
+
+  it('preserves per-branch cardinality + participation on the entity-relationship edge', () => {
+    const d = javaToDiagram(buildXmlModel('RelationshipSetOneToN'))
+    const edges = Object.values(d.edgesById).filter((e) => e.kind === 'entity-relationship')
+    const cards = edges.map((e) => e.kind === 'entity-relationship' ? e.cardinality : '?').sort()
+    expect(cards).toEqual(['1', 'N'])
+    const totals = edges.map((e) => e.kind === 'entity-relationship' ? e.participation : '?').sort()
+    expect(totals).toEqual(['partial', 'total'])
+  })
+})
+
+describe('javaToDiagram — generalizations', () => {
+  const buildGenModel = (kind: 'Generalization' | 'TotalGeneralization'): JavaModel => ({
+    schema: {
+      name: 'T', lastId: 4,
+      entities: [
+        { _kind: 'StrongEntitySet', id: 1, name: 'P', attributes: [], primaryKey: [] },
+        { _kind: 'StrongEntitySet', id: 2, name: 'C1', attributes: [], primaryKey: [] },
+        { _kind: 'StrongEntitySet', id: 3, name: 'C2', attributes: [], primaryKey: [] },
+      ],
+      relationships: [],
+      generalizations: [{
+        _kind: kind, id: 4, total: kind === 'TotalGeneralization',
+        parent: { _kind: 'StrongEntitySet', refid: 1 },
+        children: [
+          { _kind: 'StrongEntitySet', refid: 2 },
+          { _kind: 'StrongEntitySet', refid: 3 },
+        ],
+      }],
+    },
+    diagram: { positions: new Map() },
+  })
+
+  it('Generalization (partial) → isa node with isTotal=false + 3 isa-link edges (1 parent + 2 children)', () => {
+    const d = javaToDiagram(buildGenModel('Generalization'))
+    const isa = Object.values(d.nodesById).find((n) => n.kind === 'isa')!
+    expect(isa.kind === 'isa' && isa.isTotal).toBe(false)
+    const edges = Object.values(d.edgesById).filter((e) => e.kind === 'isa-link')
+    expect(edges).toHaveLength(3)
+    const roles = edges.map((e) => e.kind === 'isa-link' ? e.role : '?').sort()
+    expect(roles).toEqual(['child', 'child', 'parent'])
+  })
+
+  it('TotalGeneralization → isa node with isTotal=true', () => {
+    const d = javaToDiagram(buildGenModel('TotalGeneralization'))
+    const isa = Object.values(d.nodesById).find((n) => n.kind === 'isa')!
+    expect(isa.kind === 'isa' && isa.isTotal).toBe(true)
   })
 })

@@ -7,17 +7,29 @@ import {
   type EntityNode,
   type ERLink,
   type ERNode,
+  type ISANode,
   type NodeId,
+  type RelationshipNode,
 } from '@/domain/types'
 import type {
   JavaAttribute,
   JavaEntitySet,
+  JavaGeneralization,
   JavaModel,
+  JavaRelationshipSet,
 } from './types'
-import { isCompositeAttribute, isStrongEntity, isWeakEntity } from './types'
+import {
+  isCompositeAttribute,
+  isIdentifyingRelationship,
+  isStrongEntity,
+  isTotalGeneralization,
+  isWeakEntity,
+} from './types'
 
 const DEFAULT_ENTITY_SIZE = { width: 120, height: 60 }
 const DEFAULT_ATTRIBUTE_SIZE = { width: 90, height: 50 }
+const DEFAULT_RELATIONSHIP_SIZE = { width: 140, height: 70 }
+const DEFAULT_ISA_SIZE = { width: 100, height: 60 }
 
 const positionOf = (model: JavaModel, id: number): { x: number; y: number } =>
   model.diagram.positions.get(id) ?? { x: 0, y: 0 }
@@ -49,6 +61,23 @@ const buildAttributeNode = (
   size: DEFAULT_ATTRIBUTE_SIZE,
 })
 
+const buildRelationshipNode = (model: JavaModel, r: JavaRelationshipSet): RelationshipNode => ({
+  id: newNodeId(),
+  kind: 'relationship',
+  name: r.name,
+  isIdentifying: isIdentifyingRelationship(r),
+  position: positionOf(model, r.id),
+  size: DEFAULT_RELATIONSHIP_SIZE,
+})
+
+const buildIsaNode = (model: JavaModel, g: JavaGeneralization): ISANode => ({
+  id: newNodeId(),
+  kind: 'isa',
+  isTotal: isTotalGeneralization(g),
+  position: positionOf(model, g.id),
+  size: DEFAULT_ISA_SIZE,
+})
+
 const addNode = (d: Diagram, n: ERNode): Diagram => ({
   ...d,
   nodesById: { ...d.nodesById, [n.id]: n },
@@ -69,6 +98,15 @@ const isAttributeKeyMember = (e: JavaEntitySet, a: JavaAttribute): boolean => {
 const isAttributeDiscriminantMember = (e: JavaEntitySet, a: JavaAttribute): boolean => {
   if (isWeakEntity(e)) return e.discriminant.includes(a.id)
   return false
+}
+
+// Sentinel entity used for relationship attributes — they never have isKey / isDiscriminant.
+const NO_ENTITY: JavaEntitySet = {
+  _kind: 'StrongEntitySet',
+  id: -1,
+  name: '',
+  attributes: [],
+  primaryKey: [],
 }
 
 const addAttributeWithEdge = (
@@ -101,15 +139,94 @@ const addAttributeWithEdge = (
   return next
 }
 
+const cardinalityToParticipation = (totalParticipation: boolean): 'total' | 'partial' =>
+  totalParticipation ? 'total' : 'partial'
+
+// Internal state threaded through the transformer so relationship branches can
+// resolve which entity node corresponds to a given Java entity id.
+interface TransformState {
+  diagram: Diagram
+  /** Java integer id → our NodeId (entities only). */
+  entityNodeIdByJavaId: Map<number, NodeId>
+}
+
 export const javaToDiagram = (model: JavaModel): Diagram => {
-  let d = emptyDiagram()
+  const state: TransformState = {
+    diagram: emptyDiagram(),
+    entityNodeIdByJavaId: new Map(),
+  }
+
+  // --- Entities ---
   for (const e of model.schema.entities) {
     const node = buildEntityNode(model, e)
-    d = addNode(d, node)
+    state.entityNodeIdByJavaId.set(e.id, node.id)
+    state.diagram = addNode(state.diagram, node)
     for (const a of e.attributes) {
-      d = addAttributeWithEdge(d, model, node.id, a, e)
+      state.diagram = addAttributeWithEdge(state.diagram, model, node.id, a, e)
     }
   }
-  // Relationships + generalizations land in Task 9.
-  return d
+
+  // --- Relationships ---
+  for (const r of model.schema.relationships) {
+    const relNode = buildRelationshipNode(model, r)
+    state.diagram = addNode(state.diagram, relNode)
+
+    // Relationship attributes attach to the relationship node.
+    for (const a of r.attributes) {
+      state.diagram = addAttributeWithEdge(state.diagram, model, relNode.id, a, NO_ENTITY)
+    }
+
+    // One entity-relationship edge per branch.
+    for (const branch of r.branches) {
+      const entityNodeId = state.entityNodeIdByJavaId.get(branch.entityRef.refid)
+      if (entityNodeId === undefined) continue
+      const edge: ERLink = {
+        id: newEdgeId(),
+        kind: 'entity-relationship',
+        sourceId: entityNodeId,
+        targetId: relNode.id,
+        cardinality: branch.cardinality,
+        participation: cardinalityToParticipation(branch.totalParticipation),
+        waypoints: [],
+      }
+      state.diagram = addEdge(state.diagram, edge)
+    }
+  }
+
+  // --- Generalizations ---
+  for (const g of model.schema.generalizations) {
+    const isaNode = buildIsaNode(model, g)
+    state.diagram = addNode(state.diagram, isaNode)
+
+    // Parent edge.
+    const parentEntityId = state.entityNodeIdByJavaId.get(g.parent.refid)
+    if (parentEntityId !== undefined) {
+      const parentEdge: ERLink = {
+        id: newEdgeId(),
+        kind: 'isa-link',
+        sourceId: isaNode.id,
+        targetId: parentEntityId,
+        role: 'parent',
+        waypoints: [],
+      }
+      state.diagram = addEdge(state.diagram, parentEdge)
+    }
+
+    // Child edges.
+    for (const child of g.children) {
+      const childEntityId = state.entityNodeIdByJavaId.get(child.refid)
+      if (childEntityId === undefined) continue
+      const childEdge: ERLink = {
+        id: newEdgeId(),
+        kind: 'isa-link',
+        sourceId: isaNode.id,
+        targetId: childEntityId,
+        role: 'child',
+        waypoints: [],
+      }
+      state.diagram = addEdge(state.diagram, childEdge)
+    }
+  }
+
+  return state.diagram
 }
