@@ -22,7 +22,7 @@ export const ExportOverlay = () => {
       role="status"
       aria-live="polite"
       data-role="export-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-white/40 backdrop-blur-md dark:bg-slate-900/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-md dark:bg-slate-900/95"
     >
       <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white/90 px-5 py-3 text-slate-700 shadow-xl backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200">
         <Loader2 size={20} className="animate-spin text-blue-500" aria-hidden />

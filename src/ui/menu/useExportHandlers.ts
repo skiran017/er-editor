@@ -12,11 +12,15 @@ const timestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-').s
 const findCanvas = (): HTMLElement | null =>
   document.querySelector('.react-flow__viewport') as HTMLElement | null
 
-/** Yield one animation frame so React commits the overlay before we flip the
- * dark class — otherwise same-frame batching makes the overlay and the theme
- * flip happen simultaneously and the flicker leaks through. */
-const nextFrame = (): Promise<void> =>
-  new Promise<void>((r) => requestAnimationFrame(() => r()))
+/** Yield two animation frames so React (a) commits the overlay and (b) the
+ * browser actually paints it before we flip the dark class. One frame lets
+ * React commit but the paint may still be pending in some browsers; the
+ * second frame guarantees the overlay is on screen, which is what masks
+ * the brief light-mode flicker during async export. */
+const nextFrame = async (): Promise<void> => {
+  await new Promise<void>((r) => requestAnimationFrame(() => r()))
+  await new Promise<void>((r) => requestAnimationFrame(() => r()))
+}
 
 export interface ExportHandlers {
   readonly exportPng: () => Promise<void>
