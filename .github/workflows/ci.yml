@@ -27,6 +27,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Lint locales
+        run: pnpm lint:locales
+
       - name: Typecheck
         run: pnpm typecheck
 
