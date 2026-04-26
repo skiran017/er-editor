@@ -65,6 +65,59 @@ describe('useFileActions', () => {
     expect(close).toHaveBeenCalled()
   })
 
+  it('open: with non-empty canvas, pushes a confirm modal instead of opening the file picker', async () => {
+    // Seed the canvas with one node so the open() flow has to ask before
+    // clobbering. We assert that no openFile call happens — only the modal.
+    useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const close = vi.fn()
+    const { result } = renderHook(() => useFileActions(close))
+
+    await act(async () => { await result.current.open() })
+
+    expect(fs.openFile).not.toHaveBeenCalled()
+    const modal = useUiStore.getState().modals.at(-1)
+    expect(modal?.kind).toBe('confirm')
+    expect((modal?.props as { messageKey: string }).messageKey).toBe('menu:app.openConfirmReplace')
+    // Dropdown still closes so focus shifts to the dialog.
+    expect(close).toHaveBeenCalled()
+  })
+
+  it('open: confirm modal\'s onConfirm runs the actual file picker + replaces the diagram', async () => {
+    useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ERDatabaseModel><ERDatabaseSchema name="X" lastId="1"><EntitySets><StrongEntitySet id="1" name="B"><Attributes /></StrongEntitySet></EntitySets><RelationshipSets /><Generalizations /></ERDatabaseSchema><ERDatabaseDiagram /></ERDatabaseModel>`
+    const file = new File([xml], 'b.xml')
+    if (typeof file.text !== 'function') {
+      Object.defineProperty(file, 'text', { value: () => Promise.resolve(xml) })
+    }
+    vi.mocked(fs.openFile).mockResolvedValue(file)
+    const close = vi.fn()
+    const { result } = renderHook(() => useFileActions(close))
+
+    await act(async () => { await result.current.open() })
+    const modal = useUiStore.getState().modals.at(-1)
+    expect(modal?.kind).toBe('confirm')
+    // Drive the confirm path explicitly — the real ConfirmModal would do this
+    // via its primary button.
+    await act(async () => {
+      await (modal!.props as { onConfirm: () => void | Promise<void> }).onConfirm()
+    })
+
+    expect(fs.openFile).toHaveBeenCalledOnce()
+    expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(1)
+    expect(
+      useDiagramStore.getState().diagram.nodesById[
+        useDiagramStore.getState().diagram.nodeOrder[0]!
+      ]!.kind,
+    ).toBe('entity')
+  })
+
   it('save: serializes via chenJavaXmlCodec and downloads', async () => {
     const close = vi.fn()
     const { result } = renderHook(() => useFileActions(close))

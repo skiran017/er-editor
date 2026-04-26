@@ -79,6 +79,10 @@ export interface FileAction {
   readonly icon: ComponentType<{ size?: number; className?: string }>
   readonly shortcut?: string
   readonly onSelect: () => void
+  // UX-level disable (e.g. Save / Export when the canvas is empty). NOT a
+  // security gate — exam-mode lockdown still hides rather than disables; a
+  // disabled attribute is one devtools flick from being flipped on.
+  readonly disabled?: boolean
 }
 
 export interface ThemeOption {

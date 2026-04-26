@@ -187,4 +187,58 @@ describe('useMouse — wheel', () => {
     expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'CANVAS_POINTER_DOWN' }))
     document.body.removeChild(pane)
   })
+
+  it('pointerdown on a node target does NOT fire CANVAS_POINTER_DOWN (rubberband-during-drag fix)', () => {
+    // RF v12 doesn't stop propagation on node-wrapper pointer events. Without
+    // the node-target filter, clicking-and-dragging a node would dispatch
+    // CANVAS_POINTER_DOWN (entering rubberBand) AND let RF native node-drag
+    // run — the user sees a phantom rubberband under their cursor.
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
+    const node = document.createElement('div')
+    node.className = 'react-flow__node'
+    const inner = document.createElement('span')
+    node.appendChild(inner)
+    document.body.appendChild(node)
+    result.current.onPointerDown({
+      clientX: 30, clientY: 40, button: 0,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      pointerType: 'mouse',
+      target: inner,
+      preventDefault: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>)
+    expect(sendSpy).not.toHaveBeenCalled()
+    document.body.removeChild(node)
+  })
+
+  it('pointerdown on an edge target does NOT fire CANVAS_POINTER_DOWN', () => {
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
+    const edge = document.createElement('div')
+    edge.className = 'react-flow__edge'
+    document.body.appendChild(edge)
+    result.current.onPointerDown({
+      clientX: 30, clientY: 40, button: 0,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      pointerType: 'mouse',
+      target: edge,
+      preventDefault: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>)
+    expect(sendSpy).not.toHaveBeenCalled()
+    document.body.removeChild(edge)
+  })
+
+  it('pointerup on a node target STILL fires CANVAS_POINTER_UP (rubberband ending over a node must commit)', () => {
+    const { result } = renderHook(() => useMouse(), RF_OPTS)
+    const node = document.createElement('div')
+    node.className = 'react-flow__node'
+    document.body.appendChild(node)
+    result.current.onPointerUp({
+      clientX: 30, clientY: 40, button: 0,
+      shiftKey: false, ctrlKey: false, altKey: false, metaKey: false,
+      pointerType: 'mouse',
+      target: node,
+      preventDefault: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>)
+    expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'CANVAS_POINTER_UP' }))
+    document.body.removeChild(node)
+  })
 })

@@ -117,7 +117,7 @@ describe('machine — drawing', () => {
     actor.stop()
   })
 
-  it('ESCAPE from drawing.connection.fromPicked cancels back to selecting.idle', () => {
+  it('two-stage ESCAPE: first ESC from fromPicked cancels partial → drawing.idle (stays in connect tool)', () => {
     const e = useDiagramStore.getState().addNode({
       kind: 'entity', name: 'E', isWeak: false,
       position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
@@ -131,6 +131,19 @@ describe('machine — drawing', () => {
     actor.send({ type: 'ESCAPE' })
     expect(useDiagramStore.getState().diagram.edgeOrder).toHaveLength(0)
     expect(actor.getSnapshot().context.connectionFromId).toBeNull()
+    // Still in the connect tool (drawing.idle), not back in selecting.
+    expect(actor.getSnapshot().matches({ drawing: 'idle' })).toBe(true)
+    actor.stop()
+  })
+
+  it('two-stage ESCAPE: second ESC from drawing.idle exits the tool to selecting and resets context.tool', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'connect' })
+    expect(actor.getSnapshot().matches({ drawing: 'idle' })).toBe(true)
+    actor.send({ type: 'ESCAPE' })
+    expect(actor.getSnapshot().matches('selecting')).toBe(true)
+    // Tool field must flip back to 'select' so the toolbar highlight follows.
+    expect(actor.getSnapshot().context.tool).toBe('select')
     actor.stop()
   })
 })
@@ -186,6 +199,33 @@ describe('machine — quickRelationship', () => {
     })
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(1)
     expect(actor.getSnapshot().matches({ quickRelationship: 'firstPicked' })).toBe(true)
+    actor.stop()
+  })
+
+  it('two-stage ESCAPE: first ESC from firstPicked cancels partial → quickRelationship.idle', () => {
+    const a = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'A', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship1N' })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: a, point: { x: 0, y: 0 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    expect(actor.getSnapshot().matches({ quickRelationship: 'firstPicked' })).toBe(true)
+    actor.send({ type: 'ESCAPE' })
+    expect(actor.getSnapshot().matches({ quickRelationship: 'idle' })).toBe(true)
+    expect(actor.getSnapshot().context.quickFirstId).toBeNull()
+    actor.stop()
+  })
+
+  it('two-stage ESCAPE: second ESC from quickRelationship.idle exits to selecting and resets context.tool', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'quickRelationship1N' })
+    actor.send({ type: 'ESCAPE' })
+    expect(actor.getSnapshot().matches('selecting')).toBe(true)
+    expect(actor.getSnapshot().context.tool).toBe('select')
     actor.stop()
   })
 })
@@ -298,6 +338,33 @@ describe('machine — quickGeneralization', () => {
     const d = useDiagramStore.getState().diagram
     expect(d.nodeOrder).toHaveLength(3)
     expect(d.edgeOrder).toHaveLength(2)
+    actor.stop()
+  })
+
+  it('two-stage ESCAPE: first ESC from firstPicked cancels partial → quickGeneralization.idle', () => {
+    const p = useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'P', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'quickGeneralization' })
+    actor.send({
+      type: 'NODE_POINTER_DOWN', nodeId: p, point: { x: 0, y: 0 },
+      modifiers: NO_MODIFIERS, button: 'left',
+    })
+    expect(actor.getSnapshot().matches({ quickGeneralization: 'firstPicked' })).toBe(true)
+    actor.send({ type: 'ESCAPE' })
+    expect(actor.getSnapshot().matches({ quickGeneralization: 'idle' })).toBe(true)
+    expect(actor.getSnapshot().context.quickFirstId).toBeNull()
+    actor.stop()
+  })
+
+  it('two-stage ESCAPE: second ESC from quickGeneralization.idle exits to selecting and resets context.tool', () => {
+    const actor = startActor()
+    actor.send({ type: 'PICK_TOOL', tool: 'quickGeneralization' })
+    actor.send({ type: 'ESCAPE' })
+    expect(actor.getSnapshot().matches('selecting')).toBe(true)
+    expect(actor.getSnapshot().context.tool).toBe('select')
     actor.stop()
   })
 })

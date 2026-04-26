@@ -51,6 +51,7 @@ export const Menu = () => {
   const language = useUiStore((s) => s.language)
   const setLanguage = useUiStore((s) => s.setLanguage)
   const pushToast = useUiStore((s) => s.pushToast)
+  const pushModal = useUiStore((s) => s.pushModal)
   // Exam mode gates file I/O + the Validation toggle. Sourced from the URL
   // (`?examMode=true` or default-on under `?embed=true`) during startup.
   const examMode = useUiStore((s) => s.examMode)
@@ -59,6 +60,11 @@ export const Menu = () => {
 
   const validationEnabled = useValidationStore((s) => s.enabled)
   const setValidationEnabled = useValidationStore((s) => s.setEnabled)
+  // Save / Export are pointless on a blank canvas — gate them on whether the
+  // diagram has any nodes at all. Subscribed via a length selector so the
+  // Menu re-renders the disabled state as soon as the first node is added
+  // (or the last one removed).
+  const isCanvasEmpty = useDiagramStore((s) => s.diagram.nodeOrder.length === 0)
 
   // Close on Escape so the menu feels like a real dropdown.
   useEffect(() => {
@@ -86,17 +92,28 @@ export const Menu = () => {
     // call this handler — which writes diagramStore directly, bypassing the
     // FSM gate from Task 8. Mirror the examMode-locked file actions.
     if (readonly) return
-    // Confirm via window.confirm — modal-less for now. Phase 6 can replace
-    // this with a ModalStack-driven AlertDialog once a modal primitive exists.
-    if (!window.confirm(t('menu:app.resetConfirm'))) return
-    useDiagramStore.setState({ diagram: emptyDiagram() })
-    useDiagramStore.temporal.getState().clear()
-    pushToast({
-      id: `reset-${Date.now()}`,
-      kind: 'success',
-      messageKey: 'menu:app.resetDone',
-    })
+    // Defer the destructive write into the ConfirmModal's onConfirm callback;
+    // the modal lives in ModalStack so close the dropdown first to keep the
+    // visual focus on the dialog.
     close()
+    pushModal({
+      id: `reset-confirm-${Date.now()}`,
+      kind: 'confirm',
+      props: {
+        titleKey: 'menu:app.reset',
+        messageKey: 'menu:app.resetConfirm',
+        danger: true,
+        onConfirm: () => {
+          useDiagramStore.setState({ diagram: emptyDiagram() })
+          useDiagramStore.temporal.getState().clear()
+          pushToast({
+            id: `reset-${Date.now()}`,
+            kind: 'success',
+            messageKey: 'menu:app.resetDone',
+          })
+        },
+      },
+    })
   }
 
   // Hide entire menu chrome under embed (iframe/Moodle host provides its own UI).
@@ -106,18 +123,26 @@ export const Menu = () => {
   // disabling is the honest lockdown — a disabled attribute on a button is
   // one devtools flick away from being re-enabled and clicked. The Reset,
   // Shortcuts, and Theme controls stay live because they're UX, not data.
+  //
+  // Save / Export are additionally UX-disabled when the canvas is empty —
+  // there's nothing to write to disk. Open stays enabled so the user can
+  // load a file into the empty canvas.
   const fileActions: readonly FileAction[] = examMode
     ? []
     : [
         { id: 'open', labelKey: 'menu:file.open', icon: Upload, shortcut: 'Ctrl+O',
           onSelect: () => { void fileActionsHook.open() } },
         { id: 'save', labelKey: 'menu:file.save', icon: Download, shortcut: 'Ctrl+S',
+          disabled: isCanvasEmpty,
           onSelect: () => { void fileActionsHook.save() } },
         { id: 'exportPng', labelKey: 'menu:file.exportPng', icon: ImageIcon,
+          disabled: isCanvasEmpty,
           onSelect: () => { void exportPng() } },
         { id: 'exportSvg', labelKey: 'menu:file.exportSvg', icon: ImageIcon,
+          disabled: isCanvasEmpty,
           onSelect: () => { void exportSvg() } },
         { id: 'exportMermaid', labelKey: 'menu:file.exportMermaid', icon: ImageIcon,
+          disabled: isCanvasEmpty,
           onSelect: () => { void fileActionsHook.exportMermaid() } },
       ]
 

@@ -95,31 +95,34 @@ describe('Menu — hamburger dropdown', () => {
     sendSpy.mockRestore()
   })
 
-  it('reset canvas empties the diagram store when the user confirms', async () => {
+  it('reset canvas pushes a confirm modal that empties the diagram store on confirm', async () => {
     useDiagramStore.getState().addNode({
       kind: 'entity', name: 'E', isWeak: false,
       position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
     })
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(1)
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<Menu />)
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
     await userEvent.click(screen.getByRole('menuitem', { name: /Reset/ }))
+    // Reset clicks now spawn a ConfirmModal via uiStore.pushModal — drive
+    // the action through the modal's primary button, mirroring the real flow.
+    const modal = useUiStore.getState().modals.at(-1)
+    expect(modal?.kind).toBe('confirm')
+    ;(modal?.props as { onConfirm: () => void }).onConfirm()
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(0)
-    confirmSpy.mockRestore()
   })
 
-  it('reset canvas is a no-op when the user declines the confirm', async () => {
+  it('reset canvas is a no-op when the modal is dismissed without confirming', async () => {
     useDiagramStore.getState().addNode({
       kind: 'entity', name: 'E', isWeak: false,
       position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
     })
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     render(<Menu />)
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
     await userEvent.click(screen.getByRole('menuitem', { name: /Reset/ }))
+    // Dismiss without invoking onConfirm — diagram is untouched.
+    useUiStore.getState().popModal()
     expect(useDiagramStore.getState().diagram.nodeOrder).toHaveLength(1)
-    confirmSpy.mockRestore()
   })
 
   it('pressing Escape while the dropdown is open closes it', async () => {
