@@ -34,7 +34,7 @@ export const ToastStack = () => {
   // events, so the × is still clickable.
   return (
     <div
-      className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+      className="pointer-events-none fixed left-2 right-2 top-4 z-50 flex flex-col gap-2 sm:left-auto sm:top-auto sm:right-4 sm:bottom-4"
       role="region"
       aria-label="Notifications"
       data-role="toast-stack"

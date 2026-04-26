@@ -32,7 +32,7 @@ export const ContextMenu = () => {
       <ul
         role="menu"
         data-role="context-menu"
-        className="fixed z-50 min-w-[200px] rounded border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+        className="fixed z-50 min-w-[200px] max-w-[calc(100vw-1rem)] rounded border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         style={{ left: at.x, top: at.y }}
       >
         {items.map((it) => (
