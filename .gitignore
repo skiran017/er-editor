@@ -38,3 +38,5 @@ coverage/**
 # Generated docs
 docs/api/
 docs/user/_keybindings-table.md
+docs/.vitepress/cache/
+docs/.vitepress/dist/
