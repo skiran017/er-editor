@@ -20,6 +20,21 @@ export type EditorIncoming =
  * down listeners and pending timers.
  */
 export const installMoodleBridge = (): (() => void) => {
-  // Filled in by subsequent tasks.
-  return () => {}
+  const params = new URLSearchParams(window.location.search)
+  const embedMode = params.get('embed')?.toLowerCase() === 'true'
+  if (!embedMode || window.parent === window) return () => {}
+
+  // Placeholder handlers — filled in by Tasks 3-6.
+  const handleMessage = (_e: MessageEvent) => {}
+  const handlePageHide = () => {}
+
+  window.addEventListener('message', handleMessage)
+  window.addEventListener('pagehide', handlePageHide)
+  window.addEventListener('beforeunload', handlePageHide)
+
+  return () => {
+    window.removeEventListener('message', handleMessage)
+    window.removeEventListener('pagehide', handlePageHide)
+    window.removeEventListener('beforeunload', handlePageHide)
+  }
 }
