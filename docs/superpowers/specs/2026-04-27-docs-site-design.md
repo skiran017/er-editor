@@ -76,7 +76,7 @@ er-editor/
 │   ├── public/
 │   │   └── screenshots/                 (committed PNGs referenced by user docs)
 │   ├── changelog.md                     (mirrors root CHANGELOG.md via include)
-│   ├── archive/                         (historical snapshots — see §6)
+│   ├── archive/                         (historical snapshots — see §7)
 │   │   ├── README.md
 │   │   ├── compatibility-gaps.md
 │   │   ├── fix-tracker.md
@@ -90,7 +90,10 @@ er-editor/
 │       └── plans/
 ├── scripts/
 │   └── gen-keybindings-table.ts         (build-time keybindings → markdown)
-└── package.json                         (new docs scripts — see §5)
+├── src/app/
+│   ├── moodleBridge.ts                  (NEW — postMessage host bridge, ported from legacy)
+│   └── moodleBridge.test.ts             (NEW)
+└── package.json                         (new docs scripts — see §6)
 ```
 
 **`.gitignore` additions:**
@@ -122,7 +125,7 @@ Each page is sized to its job — short tour pages 100-300 words, deep task page
 | `user/tasks/files.md` | Open / Save / Reset. XML format (round-trips with the Java app). Empty-canvas Open/Save behavior, replace-vs-merge dialog. |
 | `user/tasks/exporting.md` | XML, Mermaid, PNG, SVG. When to use each. Embed-mode caveats (no export). |
 | `user/shortcuts.md` | Includes the build-time-generated `_keybindings-table.md` — never drifts from `keybindings.ts`. |
-| `user/moodle.md` | URL flags reference: `?embed`, `?examMode`, `?readonly`, `?lang`, `?validation`. Iframe snippet. |
+| `user/moodle.md` | Teacher-facing setup guide. Sections: (a) iframe snippet with sizing recommendations; (b) URL flags reference (`?embed`, `?examMode`, `?readonly`, `?lang`, `?validation`, `?parentOrigin`); (c) recommended flag combos for assignment / quiz / exam scenarios; (d) postMessage host integration — full HTML+JS sample showing how to load XML into the editor and receive autosave/save events; (e) common LMS gotchas (X-Frame-Options, CSP, missing referrer); (f) what students see. |
 
 ### 4.3 Dev docs
 
@@ -144,6 +147,7 @@ Each page is sized to its job — short tour pages 100-300 words, deep task page
 | `dev/reference/java-xml-format.md` | Cleaned-up reference derived from `JAVA.md`: package layout, key constants, XML element/attribute reference. |
 | `dev/reference/chen-validation-rules.md` | Cleaned-up rules reference derived from `VALIDATION.md`. Implementation-detail asides removed. |
 | `dev/reference/url-parameters.md` | Same flags as `user/moodle.md` but framed for the implementer (which store sets them, which middleware reads). |
+| `dev/reference/moodle-integration.md` | Implementer view of the Moodle bridge: where the handler lives (`src/app/moodleBridge.ts`), how it's wired in `bootstrap.ts`, full message schemas (TypeScript types), origin-resolution algorithm, autosave debounce, error handling, security model (`*` fallback rationale + console.warn), test strategy. |
 | `dev/testing.md` | Test layers (unit, integration, e2e), coverage thresholds per package from `vitest.config.ts`, when to use which. |
 | `dev/build-deploy.md` | `pnpm build` produces a static SPA. **Deployment section is a placeholder until a hosting target is chosen.** |
 
@@ -158,9 +162,95 @@ Each page is sized to its job — short tour pages 100-300 words, deep task page
 - **Recipes use diff-style code blocks** (`+` and `-` lines) showing exactly which lines to add to which file. Narrative-only recipes that say "add a property to the type" without showing where always rot.
 - **Screenshots live in `docs/public/screenshots/`** with stable filenames (`tools-toolbar.png`, `quick-start-step-1.png`). Re-take on visual changes; commit to git so the docs build is offline-buildable.
 
-## 5. Build pipeline
+## 5. Moodle integration scope
 
-### 5.1 `package.json` scripts
+The v2 codebase parses URL flags (`embed`, `examMode`, `readonly`, `lang`, `validation`) but does not yet talk to a Moodle host via `postMessage`. The legacy app (`src/legacy/App.tsx` lines 34-149) implements a working bridge that we port to v2 as a prerequisite for documenting Moodle integration.
+
+### 5.1 Activation & file layout
+
+- **Activation:** the bridge sets up listeners only when `?embed=true` AND `window.parent !== window`. Standalone pages skip it entirely (no listeners, no overhead).
+- **New module:** `src/app/moodleBridge.ts` exporting `installMoodleBridge(): () => void` (returns a cleanup function).
+- **Wire-up:** called from `src/app/bootstrap.ts` after the existing URL-parsing pipeline (`applyMode`, `applyLanguage`, `applyValidation`, `applyExamMode`). The cleanup function is stored so React StrictMode double-mount and HMR don't leak listeners.
+- **Tests:** `src/app/moodleBridge.test.ts` — uses jsdom, mocks `window.parent.postMessage`, fires synthetic `MessageEvent`s, asserts on store state and outgoing payloads.
+
+### 5.2 URL parameters
+
+Existing flags unchanged. One new flag introduced by the bridge:
+
+- `?parentOrigin=<origin>` — explicit lock for the postMessage origin. Highest priority in the resolution chain. Strongly recommended for production embeds.
+
+### 5.3 Origin resolution
+
+Resolved once at bridge init, cached for the session:
+
+1. `?parentOrigin=...` URL param if present and parses as a valid `URL`.
+2. Otherwise `new URL(document.referrer).origin` if `document.referrer` is non-empty and parseable.
+3. Otherwise `"*"` (wildcard).
+
+When the resolved origin is `"*"`, the bridge logs `console.warn("[er-editor] postMessage running with origin=*; pass ?parentOrigin=... to lock down")`. This is new behavior, not in legacy — it surfaces unlocked deploys in DevTools.
+
+For incoming messages: if origin is exact, only accept events whose `event.origin` matches; otherwise (wildcard) accept all.
+
+### 5.4 Message schemas
+
+**Outgoing (child → parent), all carrying `source: "er-editor"`:**
+
+```typescript
+type EditorOutgoing =
+  | { source: "er-editor"; type: "ready" }
+  | { source: "er-editor"; type: "save"; xml: string }
+  | { source: "er-editor"; type: "autosave"; xml: string }
+  | { source: "er-editor"; type: "error"; message: string }
+```
+
+- `ready` — fired once after the bridge initializes. Signals to host that the editor is ready to receive `init`/`load`.
+- `autosave` — fired 800ms after the last `useDiagramStore` change (debounced). Carries the current diagram serialized via the Java-XML codec (the same format `Save` produces).
+- `save` — fired on `pagehide` and `beforeunload`. Final flush. Same payload shape as `autosave`.
+- `error` — fired when serialization (outgoing) or parsing (incoming) throws. Carries the error message; never carries stack traces.
+
+**Incoming (parent → child), all expected to carry `source: "moodle-er-host"`:**
+
+```typescript
+type EditorIncoming =
+  | { source: "moodle-er-host"; type: "init" | "load"; xml: string }
+```
+
+- `init` and `load` are aliases — both replace the current diagram with the parsed XML. If `xml` is empty/whitespace-only, the editor loads an empty diagram.
+- Parsing uses the Java-XML codec already in `src/notation/chen/codecs/javaXml/reader.ts`.
+- Parse failures emit a child→parent `error` message rather than throwing.
+
+Messages with unrecognized `source`, `type`, or shape are silently ignored.
+
+### 5.5 Autosave debounce
+
+- 800ms (preserved from legacy).
+- Trigger: any change to `useDiagramStore.getState().diagram`. Subscribe via the store's selector to get fine-grained notifications without re-running on viewport / selection / UI-only changes.
+- A pending autosave timer is cancelled by the next `pagehide`/`beforeunload` — those flush a `save` immediately, preventing a duplicate `autosave` from firing after.
+
+### 5.6 What gets refined from legacy
+
+| Legacy behavior | v2 behavior | Reason |
+|---|---|---|
+| Wildcard `*` falls through silently | `*` triggers a `console.warn` | Surfaces unlocked deploys during dev / staging |
+| Subscribes to whole `editorStore` | Subscribes to `useDiagramStore` only via diagram-selector | v2 has separate stores for selection / viewport / ui; we don't want those triggering autosave |
+| Inline serializer call (`serializeDiagramToXML`) | Calls into the Java-XML codec from `src/notation/chen/codecs/javaXml/` | Codec is already the public XML surface in v2 |
+| Untyped event payloads | Discriminated unions (`EditorOutgoing`, `EditorIncoming`) exported from `src/app/moodleBridge.ts` | Lets host implementers import the types |
+
+Everything else (activation gate, origin resolution algorithm, message names, debounce timing) is preserved 1:1.
+
+### 5.7 Test strategy
+
+- **Activation gate** — `?embed=false` or no parent → no listeners installed.
+- **Origin resolution** — table-driven: for each (parentOrigin, referrer) pair, assert the resolved target.
+- **Outgoing flow** — mutate `useDiagramStore`, advance timers (vi.useFakeTimers), assert `window.parent.postMessage` was called with the right shape and origin.
+- **Incoming flow** — fire a `MessageEvent` with each schema variant; assert `useDiagramStore.getState().diagram` reflects the parsed XML or stayed empty.
+- **Origin enforcement** — when targetOrigin is exact, fire a message from a different origin; assert it's ignored.
+- **Error path** — feed malformed XML; assert `error` is posted and store is unchanged.
+- **Cleanup** — call the returned cleanup function; mutate the store; assert no further outgoing messages.
+
+## 6. Build pipeline
+
+### 6.1 `package.json` scripts
 
 ```json
 {
@@ -176,7 +266,7 @@ Each page is sized to its job — short tour pages 100-300 words, deep task page
 
 `docs:keybindings` and `docs:api` are chained before both `docs:dev` and `docs:build` so the generated content is always fresh.
 
-### 5.2 TypeDoc config (`docs/.vitepress/typedoc.json`)
+### 6.2 TypeDoc config (`docs/.vitepress/typedoc.json`)
 
 ```json
 {
@@ -197,18 +287,18 @@ Each page is sized to its job — short tour pages 100-300 words, deep task page
 
 Restricting entry points to public barrels prevents internal helpers leaking into the API reference. Anything not re-exported from the three barrels stays hidden.
 
-### 5.3 Keybindings generator (`scripts/gen-keybindings-table.ts`)
+### 6.3 Keybindings generator (`scripts/gen-keybindings-table.ts`)
 
 Imports `keybindings` from `src/interaction/keybindings.ts`, groups by `category`, formats a Markdown table per category with columns `Action | Keys | When`, writes to `docs/user/_keybindings-table.md`. Plain Node script, run via `tsx`. No tests — failure is loud (script exits non-zero, build fails).
 
-### 5.4 VitePress config (`docs/.vitepress/config.ts`)
+### 6.4 VitePress config (`docs/.vitepress/config.ts`)
 
 Top nav: User Docs, Dev Docs, API Reference, Changelog.
 Footer: GitHub repo link.
 Sidebars: defined per section (user, dev, api).
 **Excluded from build/nav:** `docs/superpowers/**`, `docs/archive/**` (`srcExclude` setting). Files remain on disk and reachable by direct URL but invisible to navigation.
 
-## 6. Migration of existing files
+## 7. Migration of existing files
 
 | Existing file | Action | Destination |
 |---|---|---|
@@ -226,7 +316,7 @@ Sidebars: defined per section (user, dev, api).
 
 `docs/archive/README.md` contains a single paragraph: "These files are historical snapshots from earlier project phases. They're preserved for context but **may be inaccurate** for the current codebase. Authoritative information lives under `/user/` and `/dev/`."
 
-## 7. Out of scope / deferred
+## 8. Out of scope / deferred
 
 - **Deployment.** No hosting target chosen. Site builds locally; deploy story is a follow-up. `dev/build-deploy.md` carries a placeholder until then.
 - **i18n.** English only. VitePress's locale support can be added later without restructuring.
@@ -234,18 +324,19 @@ Sidebars: defined per section (user, dev, api).
 - **Search.** VitePress ships local search by default; sufficient for now. Algolia DocSearch can be added if hosted.
 - **In-app help / contextual links.** The existing in-app Cheatsheet modal stays as-is — the docs site is the canonical reference. A "Help" link from the menu pointing to the docs site can be added later.
 
-## 8. Acceptance criteria
+## 9. Acceptance criteria
 
 The work is done when:
 
+- **Moodle bridge:** `src/app/moodleBridge.ts` exists, is wired into `bootstrap.ts`, and the test suite in §5.7 passes. Embedding the editor in a parent page with `?embed=true` produces a working `ready` → `init` → `autosave` round trip.
 - `pnpm docs:dev` opens a working local site at `localhost:5173` (or VitePress default port).
 - `pnpm docs:build` produces a static `docs/.vitepress/dist/` with no errors.
 - Every page listed in §4.2 and §4.3 exists with real content (not "TODO").
 - The API reference under `/api/` covers every public symbol from `domain/`, `state/`, `notation/`.
 - The keybindings table on `/user/shortcuts/` matches `src/interaction/keybindings.ts`.
-- All migrations in §6 are complete: archive files moved, originals deleted from root where appropriate.
-- `pnpm typecheck && pnpm lint && pnpm test --run` still pass (no regressions in the source tree from doc edits).
+- All migrations in §7 are complete: archive files moved, originals deleted from root where appropriate.
+- `pnpm typecheck && pnpm lint && pnpm test --run` still pass (no regressions in the source tree).
 
-## 9. Open questions
+## 10. Open questions
 
-None. Deployment + i18n deferred per §7.
+None. Deployment + i18n deferred per §8.
