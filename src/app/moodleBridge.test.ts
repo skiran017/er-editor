@@ -183,3 +183,70 @@ describe('installMoodleBridge — outgoing autosave / save', () => {
     cleanup()
   })
 })
+
+const fireMessage = (data: unknown, origin: string) => {
+  window.dispatchEvent(new MessageEvent('message', { data, origin }))
+}
+
+const VALID_XML = `<ERDatabaseModel><ERDatabaseSchema name="X" lastId="1"><EntitySets><StrongEntitySet id="1" name="E"><Attributes /></StrongEntitySet></EntitySets><RelationshipSets /><Generalizations /></ERDatabaseSchema><ERDatabaseDiagram /></ERDatabaseModel>`
+
+describe('installMoodleBridge — incoming init / load', () => {
+  let postMessageSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn()
+    Object.defineProperty(window, 'parent', {
+      value: { postMessage: postMessageSpy },
+      configurable: true,
+    })
+    window.history.replaceState({}, '', '/?embed=true&parentOrigin=https%3A%2F%2Fhost.test')
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+    useDiagramStore.temporal.getState().clear()
+  })
+
+  it.each(['init', 'load'] as const)('replaces diagram on %s with valid XML', (type) => {
+    const cleanup = installMoodleBridge()
+    fireMessage({ source: 'moodle-er-host', type, xml: VALID_XML }, 'https://host.test')
+    expect(useDiagramStore.getState().diagram.nodeOrder.length).toBe(1)
+    cleanup()
+  })
+
+  it('loads empty diagram when xml is whitespace', () => {
+    const cleanup = installMoodleBridge()
+    useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'X', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    fireMessage({ source: 'moodle-er-host', type: 'init', xml: '   ' }, 'https://host.test')
+    expect(useDiagramStore.getState().diagram.nodeOrder.length).toBe(0)
+    cleanup()
+  })
+
+  it('emits error and leaves diagram unchanged on malformed xml', () => {
+    const cleanup = installMoodleBridge()
+    postMessageSpy.mockClear()
+    fireMessage({ source: 'moodle-er-host', type: 'init', xml: '<not-xml' }, 'https://host.test')
+    expect(useDiagramStore.getState().diagram.nodeOrder.length).toBe(0)
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'er-editor', type: 'error' }),
+      'https://host.test',
+    )
+    cleanup()
+  })
+
+  it('rejects messages from a different origin when targetOrigin is exact', () => {
+    const cleanup = installMoodleBridge()
+    fireMessage({ source: 'moodle-er-host', type: 'init', xml: VALID_XML }, 'https://attacker.test')
+    expect(useDiagramStore.getState().diagram.nodeOrder.length).toBe(0)
+    cleanup()
+  })
+
+  it('ignores messages with unknown source or type', () => {
+    const cleanup = installMoodleBridge()
+    fireMessage({ source: 'random', type: 'init', xml: VALID_XML }, 'https://host.test')
+    fireMessage({ source: 'moodle-er-host', type: 'unknown' }, 'https://host.test')
+    fireMessage('not an object', 'https://host.test')
+    expect(useDiagramStore.getState().diagram.nodeOrder.length).toBe(0)
+    cleanup()
+  })
+})

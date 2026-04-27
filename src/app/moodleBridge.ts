@@ -2,6 +2,7 @@
 import { useDiagramStore } from '@/state/diagramStore'
 import { chenJavaXmlCodec } from '@/notation/chen/codecs/javaXml'
 import type { Diagram } from '@/domain/types'
+import { emptyDiagram } from '@/domain/types'
 
 /** Outgoing messages from the editor (child) to the embedding host (parent). */
 export type EditorOutgoing =
@@ -85,7 +86,30 @@ export const installMoodleBridge = (): (() => void) => {
     () => { scheduleAutosave() },
   )
 
-  const handleMessage = (_e: MessageEvent) => {}
+  const handleMessage = (event: MessageEvent) => {
+    if (targetOrigin !== '*' && event.origin !== targetOrigin) return
+    const data: unknown = event.data
+    if (data === null || typeof data !== 'object') return
+    const obj = data as { source?: unknown; type?: unknown; xml?: unknown }
+    if (obj.source !== 'moodle-er-host') return
+    if (obj.type !== 'init' && obj.type !== 'load') return
+
+    const rawXml = typeof obj.xml === 'string' ? obj.xml : ''
+    if (rawXml.trim() === '') {
+      useDiagramStore.getState().replaceDiagram(emptyDiagram())
+      return
+    }
+    const result = chenJavaXmlCodec.parse!(rawXml)
+    if (result.ok) {
+      useDiagramStore.getState().replaceDiagram(result.value)
+    } else {
+      post({
+        source: 'er-editor',
+        type: 'error',
+        message: result.error.message || 'Failed to load provided XML',
+      })
+    }
+  }
   const handlePageHide = () => { flush('save') }
 
   window.addEventListener('message', handleMessage)
