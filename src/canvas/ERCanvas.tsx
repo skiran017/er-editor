@@ -92,7 +92,6 @@ const ERCanvasInner = () => {
   const touch = useTouch();
   const toolbarDrop = useToolbarDrop();
 
-
   const [activeGuides, setActiveGuides] = useState<readonly SnapGuide[]>([]);
   const dragging = useRef(false);
 
@@ -212,6 +211,7 @@ const ERCanvasInner = () => {
         panOnDrag={false}
         fitView={false}
       >
+        <Background />
         <Controls />
       </ReactFlow>
       <SnapOverlay guides={activeGuides} pan={pan} zoom={zoom} />
