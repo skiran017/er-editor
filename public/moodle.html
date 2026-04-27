@@ -137,8 +137,16 @@
 			const xmlPreviewEl = document.getElementById("debug-xml-preview");
 			const copyBtn = document.getElementById("copy-latest-xml");
 			const clearBtn = document.getElementById("clear-debug-log");
-			const iframe = document.querySelector("#er_editor iframe");
-			const expectedOrigin = iframe ? new URL(iframe.src).origin : "https://er-editor.vercel.app";
+			// expectedOrigin is computed lazily inside the message listener —
+			// the iframe is created by the host script on DOMContentLoaded,
+			// AFTER this inline IIFE runs, so a one-time read here would
+			// always be null and fall through to a hardcoded URL that
+			// breaks local dev (origin mismatch → silent message reject).
+			const getExpectedOrigin = () => {
+				const iframe = document.querySelector("#er_editor iframe");
+				if (iframe) return new URL(iframe.src).origin;
+				return window.location.origin;
+			};
 			const MAX_LOG_ITEMS = 12;
 			const PREVIEW_LIMIT = 1200;
 			let latestXml = "";
@@ -166,7 +174,7 @@
 			}
 
 			window.addEventListener("message", function (evt) {
-				if (evt.origin !== expectedOrigin) return;
+				if (evt.origin !== getExpectedOrigin()) return;
 				const data = evt.data;
 				if (!data || data.source !== "er-editor" || typeof data.type !== "string") {
 					return;
