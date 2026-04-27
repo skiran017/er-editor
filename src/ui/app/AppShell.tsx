@@ -37,7 +37,14 @@ export const AppShell = ({ canvas, properties, chrome, overlays }: AppShellProps
     setDrawerDismissed(false)
   }, [selectedNodeIds, selectedEdgeIds])
   return (
-    <div className="relative flex h-screen w-screen bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <div
+      // h-dvh tracks the visible viewport, excluding mobile browser chrome
+      // (Samsung Internet, mobile Safari address bars). h-screen (=100vh)
+      // would include that chrome and push absolutely-positioned bottom
+      // children — the React Flow zoom controls in particular — partially
+      // off-screen.
+      className="relative flex h-dvh w-screen bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+    >
       <main className="flex flex-1 overflow-hidden">{canvas}</main>
       {mode === 'desktop' && showProperties && (
         <aside

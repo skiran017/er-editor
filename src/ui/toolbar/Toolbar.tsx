@@ -23,12 +23,18 @@ const ICON_SIZE = 18
 // In readonly mode only the viewport/selection tools remain visible.
 const SELECT_ONLY = new Set(['select', 'pan'])
 
-// max-h leaves ~12rem (192px) at the bottom of the viewport so the React
-// Flow zoom/fit controls (bottom-left by default) stay reachable. If the
-// rail content exceeds this height (touch buttons stack to ~44px each on
-// mobile), the rail scrolls vertically inside its own bounds.
+// max-h leaves ~14rem (224px) at the bottom of the viewport for the React
+// Flow zoom/fit controls (which sit in the same left column on touch
+// breakpoints) plus mobile browser chrome. Plain `vh` is used over `dvh`
+// for portable behaviour — if the calc() unit isn't supported the rule is
+// dropped entirely and the rail loses its cap. Rail content scrolls inside
+// these bounds when it overflows (touch buttons stack to ~44px on mobile).
+//
+// top-16 (not sm:top-4) on every non-desktop size — the hamburger menu
+// lives at left-4 top-4 and the rail's left-2 column would otherwise sit
+// directly on top of it on tablets.
 const NAV_VERTICAL =
-  'fixed left-2 top-16 z-40 flex max-h-[calc(100dvh-12rem)] w-12 flex-col items-center gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white/90 px-1 py-2 text-slate-700 shadow-lg backdrop-blur-md sm:top-4 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200'
+  'fixed left-2 top-16 z-40 flex max-h-[calc(100vh-14rem)] w-12 flex-col items-center gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white/90 px-1 py-2 text-slate-700 shadow-lg backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200'
 const NAV_HORIZONTAL =
   'fixed left-1/2 top-4 z-40 flex h-12 max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white/90 px-3 text-slate-700 shadow-lg backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200'
 const GROUP_VERTICAL =
