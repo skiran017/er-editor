@@ -1,4 +1,7 @@
 // src/app/moodleBridge.ts
+import { useDiagramStore } from '@/state/diagramStore'
+import { chenJavaXmlCodec } from '@/notation/chen/codecs/javaXml'
+import type { Diagram } from '@/domain/types'
 
 /** Outgoing messages from the editor (child) to the embedding host (parent). */
 export type EditorOutgoing =
@@ -47,8 +50,43 @@ export const installMoodleBridge = (): (() => void) => {
     window.parent.postMessage(payload, targetOrigin)
   }
 
+  const serializeOrError = (diagram: Diagram): string | null => {
+    try {
+      return chenJavaXmlCodec.serialize!(diagram)
+    } catch (err) {
+      post({
+        source: 'er-editor',
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to serialize diagram',
+      })
+      return null
+    }
+  }
+
+  const AUTOSAVE_DEBOUNCE_MS = 800
+  let autosaveTimer: ReturnType<typeof setTimeout> | null = null
+
+  const flush = (kind: 'save' | 'autosave') => {
+    if (autosaveTimer !== null) {
+      clearTimeout(autosaveTimer)
+      autosaveTimer = null
+    }
+    const xml = serializeOrError(useDiagramStore.getState().diagram)
+    if (xml !== null) post({ source: 'er-editor', type: kind, xml })
+  }
+
+  const scheduleAutosave = () => {
+    if (autosaveTimer !== null) clearTimeout(autosaveTimer)
+    autosaveTimer = setTimeout(() => { flush('autosave') }, AUTOSAVE_DEBOUNCE_MS)
+  }
+
+  const unsubscribeDiagram = useDiagramStore.subscribe(
+    (s) => s.diagram,
+    () => { scheduleAutosave() },
+  )
+
   const handleMessage = (_e: MessageEvent) => {}
-  const handlePageHide = () => {}
+  const handlePageHide = () => { flush('save') }
 
   window.addEventListener('message', handleMessage)
   window.addEventListener('pagehide', handlePageHide)
@@ -57,6 +95,8 @@ export const installMoodleBridge = (): (() => void) => {
   post({ source: 'er-editor', type: 'ready' })
 
   return () => {
+    if (autosaveTimer !== null) clearTimeout(autosaveTimer)
+    unsubscribeDiagram()
     window.removeEventListener('message', handleMessage)
     window.removeEventListener('pagehide', handlePageHide)
     window.removeEventListener('beforeunload', handlePageHide)
