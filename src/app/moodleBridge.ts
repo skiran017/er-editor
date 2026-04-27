@@ -11,6 +11,18 @@ export type EditorOutgoing =
 export type EditorIncoming =
   | { source: 'moodle-er-host'; type: 'init' | 'load'; xml: string }
 
+const resolveTargetOrigin = (params: URLSearchParams): string => {
+  const explicit = params.get('parentOrigin')
+  if (explicit) {
+    try { return new URL(explicit).origin } catch { /* fall through */ }
+  }
+  const referrer = document.referrer
+  if (referrer) {
+    try { return new URL(referrer).origin } catch { /* fall through */ }
+  }
+  return '*'
+}
+
 /**
  * Install the Moodle / iframe-host postMessage bridge. Activates only when
  * `?embed=true` AND a parent window is present; otherwise installs nothing
@@ -24,13 +36,25 @@ export const installMoodleBridge = (): (() => void) => {
   const embedMode = params.get('embed')?.toLowerCase() === 'true'
   if (!embedMode || window.parent === window) return () => {}
 
-  // Placeholder handlers — filled in by Tasks 3-6.
+  const targetOrigin = resolveTargetOrigin(params)
+  if (targetOrigin === '*') {
+    console.warn(
+      '[er-editor] postMessage running with origin=*; pass ?parentOrigin=... to lock down',
+    )
+  }
+
+  const post = (payload: EditorOutgoing) => {
+    window.parent.postMessage(payload, targetOrigin)
+  }
+
   const handleMessage = (_e: MessageEvent) => {}
   const handlePageHide = () => {}
 
   window.addEventListener('message', handleMessage)
   window.addEventListener('pagehide', handlePageHide)
   window.addEventListener('beforeunload', handlePageHide)
+
+  post({ source: 'er-editor', type: 'ready' })
 
   return () => {
     window.removeEventListener('message', handleMessage)

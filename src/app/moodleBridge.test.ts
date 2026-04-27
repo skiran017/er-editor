@@ -45,3 +45,56 @@ describe('installMoodleBridge — activation gate', () => {
     cleanup()
   })
 })
+
+describe('installMoodleBridge — origin resolution', () => {
+  let postMessageSpy: ReturnType<typeof vi.fn>
+  let warnSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn()
+    Object.defineProperty(window, 'parent', {
+      value: { postMessage: postMessageSpy },
+      configurable: true,
+    })
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    warnSpy.mockRestore()
+    Object.defineProperty(window, 'document', {
+      value: { ...document, referrer: '' },
+      configurable: true,
+    })
+  })
+
+  it.each([
+    // [search, referrer, expected target]
+    ['?embed=true&parentOrigin=https%3A%2F%2Fmoodle.example', '',                          'https://moodle.example'],
+    ['?embed=true',                                          'https://moodle.example/x',  'https://moodle.example'],
+    ['?embed=true',                                          '',                          '*'],
+    ['?embed=true&parentOrigin=not-a-url',                   'https://moodle.example/x',  'https://moodle.example'],
+  ])('search=%s referrer=%s → target=%s', (search, referrer, expected) => {
+    window.history.replaceState({}, '', `/${search}`)
+    Object.defineProperty(document, 'referrer', { value: referrer, configurable: true })
+    const cleanup = installMoodleBridge()
+    // The bridge sends `ready` on init; assert its targetOrigin matches.
+    expect(postMessageSpy).toHaveBeenCalledTimes(1)
+    expect(postMessageSpy.mock.calls[0][1]).toBe(expected)
+    cleanup()
+  })
+
+  it('logs console.warn when origin falls back to wildcard', () => {
+    window.history.replaceState({}, '', '/?embed=true')
+    Object.defineProperty(document, 'referrer', { value: '', configurable: true })
+    installMoodleBridge()
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('postMessage running with origin=*'),
+    )
+  })
+
+  it('does NOT warn when origin is exact', () => {
+    window.history.replaceState({}, '', '/?embed=true&parentOrigin=https%3A%2F%2Fmoodle.example')
+    installMoodleBridge()
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+})
