@@ -51,7 +51,7 @@ const layerRule = (forbidden) => ({
 // #endregion
 
 export default defineConfig([
-  globalIgnores(['dist', 'src/legacy/**', 'playwright-report', 'test-results', 'coverage']),
+  globalIgnores(['dist', 'src/legacy/**', 'playwright-report', 'test-results', 'coverage', 'docs/**']),
 
   // Base config for all TS/TSX files in src/ and tests/.
   {
