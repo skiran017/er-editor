@@ -2,7 +2,7 @@ import { memo } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from 'zustand'
-import { Undo2, Redo2, Trash2 } from 'lucide-react'
+import { Undo2, Redo2, Trash2, ChevronRight, ChevronLeft } from 'lucide-react'
 import { ToolButton } from './ToolButton'
 import { writeToolToDataTransfer } from './dragFromToolbar'
 import { useInteractionStore } from '@/interaction/interactionStore'
@@ -11,8 +11,10 @@ import { useSelectionStore } from '@/state/selectionStore'
 import { useUiStore } from '@/state/uiStore'
 import { IconButton } from '@/ui/primitives'
 import type { Tool } from '@/interaction/events'
+import type { ToolbarGroup } from '@/notation/types'
 import { chenPlugin } from '@/notation/chen'
 import { ICONS } from './icons'
+import { usePanelMode } from '@/ui/app/usePanelMode'
 
 // Only element tools are drag-placeable onto the canvas.
 const DRAG_TOOLS = new Set(['entity', 'relationship', 'attribute', 'isa'])
@@ -21,66 +23,60 @@ const ICON_SIZE = 18
 // In readonly mode only the viewport/selection tools remain visible.
 const SELECT_ONLY = new Set(['select', 'pan'])
 
-export const Toolbar = memo(() => {
+// max-h leaves ~12rem (192px) at the bottom of the viewport so the React
+// Flow zoom/fit controls (bottom-left by default) stay reachable. If the
+// rail content exceeds this height (touch buttons stack to ~44px each on
+// mobile), the rail scrolls vertically inside its own bounds.
+const NAV_VERTICAL =
+  'fixed left-2 top-16 z-40 flex max-h-[calc(100dvh-12rem)] w-12 flex-col items-center gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white/90 px-1 py-2 text-slate-700 shadow-lg backdrop-blur-md sm:top-4 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200'
+const NAV_HORIZONTAL =
+  'fixed left-1/2 top-4 z-40 flex h-12 max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white/90 px-3 text-slate-700 shadow-lg backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200'
+const GROUP_VERTICAL =
+  'mb-2 flex flex-col items-center gap-0.5 border-b border-slate-200 pb-2 dark:border-slate-700'
+const GROUP_HORIZONTAL =
+  'mr-2 flex items-center gap-0.5 border-r border-slate-200 pr-2 dark:border-slate-700'
+
+interface RailProps {
+  readonly isVertical: boolean
+  readonly isMobile: boolean
+  readonly visibleGroups: readonly ToolbarGroup[]
+  readonly currentTool: Tool
+  readonly canUndo: boolean
+  readonly canRedo: boolean
+  readonly readonly: boolean
+  readonly selectionCount: number
+  readonly onPick: (toolId: string) => void
+  readonly onDragStart: (toolId: string, e: ReactDragEvent<HTMLDivElement>) => void
+  readonly onCollapse: () => void
+  readonly onUndo: () => void
+  readonly onRedo: () => void
+  readonly onDelete: () => void
+}
+
+const ToolbarRail = ({
+  isVertical, isMobile, visibleGroups, currentTool, canUndo, canRedo, readonly,
+  selectionCount, onPick, onDragStart, onCollapse, onUndo, onRedo, onDelete,
+}: RailProps) => {
   const { t } = useTranslation(['toolbar', 'menu'])
-  const currentTool = useInteractionStore((s) => s.snapshot.context.tool)
-  const readonly = useUiStore((s) => s.readonly)
-  const embed = useUiStore((s) => s.embed)
-
-  // zundo exposes `temporal` as a zustand store; subscribe via useStore so the
-  // undo/redo buttons disable/enable reactively as history grows and shrinks.
-  const canUndo = useStore(useDiagramStore.temporal, (s) => s.pastStates.length > 0)
-  const canRedo = useStore(useDiagramStore.temporal, (s) => s.futureStates.length > 0)
-
-  // Delete button appears only when SOMETHING is selected (node or edge).
-  const selectionCount = useSelectionStore(
-    (s) => s.selectedNodeIds.size + s.selectedEdgeIds.size,
-  )
-
-  const send = useInteractionStore.getState().send
-
-  // Hide entire toolbar chrome under embed (iframe/Moodle host provides its own UI).
-  if (embed) return null
-
-  // In readonly mode, filter out element + connection groups; keep select group only.
-  const visibleGroups = readonly
-    ? chenPlugin.tools.groups
-        .map((g) => ({ ...g, tools: g.tools.filter((id) => SELECT_ONLY.has(id)) }))
-        .filter((g) => g.tools.length > 0)
-    : chenPlugin.tools.groups
-
-  const handlePick = (toolId: string): void => {
-    send({ type: 'PICK_TOOL', tool: toolId as Tool })
-  }
-
-  const handleDragStart = (toolId: string, e: ReactDragEvent<HTMLDivElement>): void => {
-    writeToolToDataTransfer(e, toolId)
-  }
-
+  const groupClassName = isVertical ? GROUP_VERTICAL : GROUP_HORIZONTAL
+  const deleteGroupClassName = isVertical ? 'flex flex-col items-center gap-0.5' : 'flex items-center gap-0.5'
   return (
     <nav
       aria-label={t('toolbar:group.elements')}
       data-role="toolbar"
-      // Top-pinned at every breakpoint, but pushed one row down on mobile so
-      // the centered toolbar doesn't sit on top of the top-left hamburger
-      // menu — at <sm widths the toolbar is wide enough (max 100vw - 1rem)
-      // to fully cover that corner. On sm+ there's enough horizontal room
-      // for both to share the top-4 row.
-      // max-w + overflow-x-auto keeps the toolbar inside the viewport on
-      // narrow phones; horizontal scroll feels natural on a thin pill and
-      // lets the user reach every tool.
-      className="fixed left-1/2 top-16 z-40 flex h-12 max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white/90 px-3 text-slate-700 shadow-lg backdrop-blur-md sm:top-4 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200"
+      data-orientation={isVertical ? 'vertical' : 'horizontal'}
+      className={isVertical ? NAV_VERTICAL : NAV_HORIZONTAL}
     >
-      {/* Element / tool groups from chenPlugin (select, elements, connections).
-          Every group is followed by a separator (history group sits after).
-          In readonly mode only the select group is rendered. */}
+      {isMobile && (
+        <IconButton
+          aria-label={t('toolbar:collapse')}
+          title={t('toolbar:collapse')}
+          icon={<ChevronLeft size={ICON_SIZE} aria-hidden />}
+          onClick={onCollapse}
+        />
+      )}
       {visibleGroups.map((group) => (
-        <div
-          key={group.id}
-          data-role="toolbar-group"
-          data-group-id={group.id}
-          className="mr-2 flex items-center gap-0.5 border-r border-slate-200 pr-2 dark:border-slate-700"
-        >
+        <div key={group.id} data-role="toolbar-group" data-group-id={group.id} className={groupClassName}>
           {group.tools.map((toolId) => (
             <ToolButton
               key={toolId}
@@ -88,54 +84,114 @@ export const Toolbar = memo(() => {
               labelKey={`toolbar:tool.${toolId}`}
               icon={ICONS[toolId] ?? '?'}
               isActive={currentTool === toolId}
-              onPick={handlePick}
-              onDragStart={DRAG_TOOLS.has(toolId) ? handleDragStart : undefined}
+              onPick={onPick}
+              onDragStart={DRAG_TOOLS.has(toolId) ? onDragStart : undefined}
             />
           ))}
         </div>
       ))}
-
-      {/* History group — undo / redo dispatch through the FSM so keyboard
-          shortcuts and the toolbar fire the same EditorEvents. */}
-      <div
-        data-role="toolbar-group"
-        data-group-id="history"
-        className="mr-2 flex items-center gap-0.5 border-r border-slate-200 pr-2 dark:border-slate-700"
-      >
-        {/* Undo/Redo stay visible but disabled under readonly — the user gets a
-            visible signal that the session is locked. The UNDO/REDO actions are
-            also gated in actions.ts (Task 8), so there is no DevTools bypass. */}
+      <div data-role="toolbar-group" data-group-id="history" className={groupClassName}>
         <IconButton
           aria-label={t('menu:edit.undo')}
           title={`${t('menu:edit.undo')} (Ctrl+Z)`}
           icon={<Undo2 size={ICON_SIZE} aria-hidden />}
           disabled={!canUndo || readonly}
-          onClick={() => send({ type: 'UNDO' })}
+          onClick={onUndo}
         />
         <IconButton
           aria-label={t('menu:edit.redo')}
           title={`${t('menu:edit.redo')} (Ctrl+Shift+Z)`}
           icon={<Redo2 size={ICON_SIZE} aria-hidden />}
           disabled={!canRedo || readonly}
-          onClick={() => send({ type: 'REDO' })}
+          onClick={onRedo}
         />
       </div>
-
-      {/* Delete — only renders when at least one node or edge is selected.
-          Dispatches DELETE event so the machine can apply deletion semantics
-          consistent with keyboard (Del / Backspace). */}
       {selectionCount > 0 && !readonly && (
-        <div data-role="toolbar-group" data-group-id="delete" className="flex items-center gap-0.5">
+        <div data-role="toolbar-group" data-group-id="delete" className={deleteGroupClassName}>
           <IconButton
             aria-label={t('menu:edit.delete')}
             title={`${t('menu:edit.delete')} (${selectionCount})`}
             icon={<Trash2 size={ICON_SIZE} aria-hidden />}
-            onClick={() => send({ type: 'DELETE' })}
+            onClick={onDelete}
             className="text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
           />
         </div>
       )}
     </nav>
+  )
+}
+
+export const Toolbar = memo(() => {
+  const { t } = useTranslation(['toolbar'])
+  const currentTool = useInteractionStore((s) => s.snapshot.context.tool)
+  const readonly = useUiStore((s) => s.readonly)
+  const embed = useUiStore((s) => s.embed)
+  // panels.toolbar: persisted open/closed state for the mobile rail. Undefined
+  // (default) → closed, so first paint on a phone shows a clean canvas.
+  const toolbarOpen = useUiStore((s) => !!s.panels.toolbar)
+  const togglePanel = useUiStore((s) => s.togglePanel)
+  const mode = usePanelMode()
+
+  const canUndo = useStore(useDiagramStore.temporal, (s) => s.pastStates.length > 0)
+  const canRedo = useStore(useDiagramStore.temporal, (s) => s.futureStates.length > 0)
+  const selectionCount = useSelectionStore(
+    (s) => s.selectedNodeIds.size + s.selectedEdgeIds.size,
+  )
+
+  const send = useInteractionStore.getState().send
+
+  if (embed) return null
+
+  const visibleGroups = readonly
+    ? chenPlugin.tools.groups
+        .map((g) => ({ ...g, tools: g.tools.filter((id) => SELECT_ONLY.has(id)) }))
+        .filter((g) => g.tools.length > 0)
+    : chenPlugin.tools.groups
+
+  const isMobile = mode === 'mobile'
+  const isVertical = mode !== 'desktop'
+  // Mobile: rail visible only when explicitly opened. Tablet/desktop: always.
+  const showRail = !isMobile || toolbarOpen
+
+  const handlePick = (toolId: string): void => {
+    send({ type: 'PICK_TOOL', tool: toolId as Tool })
+    // Auto-collapse on mobile so the user can immediately use the tool
+    // without the rail covering the canvas.
+    if (isMobile && toolbarOpen) togglePanel('toolbar')
+  }
+
+  // Mobile collapsed: render only the chevron at the rail's would-be top.
+  if (isMobile && !showRail) {
+    return (
+      <div className="fixed left-2 top-16 z-40" data-role="toolbar-toggle">
+        <IconButton
+          aria-label={t('toolbar:expand')}
+          title={t('toolbar:expand')}
+          icon={<ChevronRight size={ICON_SIZE} aria-hidden />}
+          onClick={() => togglePanel('toolbar')}
+          className="border border-slate-200 bg-white/90 shadow-lg backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/90"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <ToolbarRail
+      isVertical={isVertical}
+      isMobile={isMobile}
+      visibleGroups={visibleGroups}
+      currentTool={currentTool}
+      canUndo={canUndo}
+      canRedo={canRedo}
+      readonly={readonly}
+      selectionCount={selectionCount}
+      onPick={handlePick}
+      onDragStart={(toolId, e) => writeToolToDataTransfer(e, toolId)}
+      onCollapse={() => togglePanel('toolbar')}
+      onUndo={() => send({ type: 'UNDO' })}
+      onRedo={() => send({ type: 'REDO' })}
+      onDelete={() => send({ type: 'DELETE' })}
+    />
   )
 })
 Toolbar.displayName = 'Toolbar'

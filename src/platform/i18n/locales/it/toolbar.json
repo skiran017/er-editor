@@ -4,6 +4,8 @@
     "elements": "Elementi",
     "connections": "Collegamenti"
   },
+  "expand": "Mostra barra strumenti",
+  "collapse": "Nascondi barra strumenti",
   "tool": {
     "select": "Seleziona",
     "pan": "Sposta vista",

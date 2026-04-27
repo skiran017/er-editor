@@ -28,7 +28,12 @@ const resetAll = () => {
   useViewportStore.setState({ zoom: 1, pan: { x: 0, y: 0 } })
   useSelectionStore.setState({ selectedNodeIds: new Set(), selectedEdgeIds: new Set(), rubberband: null })
   useValidationStore.setState({ errorsById: {}, enabled: false })
-  useUiStore.setState({ modals: [], toasts: [], contextMenu: null, inlineRename: null })
+  useUiStore.setState({
+    modals: [], toasts: [], contextMenu: null, inlineRename: null,
+    // jsdom has no matchMedia, so usePanelMode reports 'mobile' here. The rail
+    // defaults to collapsed on mobile — open it so tool buttons are queryable.
+    panels: { properties: true, minimap: false, toolbar: true },
+  })
   useInteractionStore.getState().send({ type: 'PICK_TOOL', tool: 'select' })
 }
 

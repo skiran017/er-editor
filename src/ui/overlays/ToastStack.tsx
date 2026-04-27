@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '@/state/uiStore'
-import { IconButton } from '@/ui/primitives'
 
 const AUTO_DISMISS_MS: Record<string, number> = { info: 4000, success: 4000, warning: 6000 }
 // 'error' → no auto-dismiss.
@@ -45,17 +44,22 @@ export const ToastStack = () => {
           role="alert"
           data-role="toast"
           data-kind={toast.kind}
-          className={`pointer-events-none flex w-[min(280px,calc(100vw-1rem))] items-start gap-1.5 rounded border px-2.5 py-1.5 text-xs shadow ${KIND_CLASS[toast.kind]}`}
+          className={`pointer-events-none flex w-[min(320px,calc(100vw-1rem))] items-center gap-2 rounded-md border px-3 py-2 text-sm shadow-md ${KIND_CLASS[toast.kind]}`}
         >
-          <span className="flex-1">{t(toast.messageKey, toast.messageParams)}</span>
-          <span className="pointer-events-auto">
-            <IconButton
-              aria-label="Dismiss notification"
-              size="sm"
-              onClick={() => dismiss(toast.id)}
-              icon={<span aria-hidden>×</span>}
-            />
-          </span>
+          <span className="flex-1 leading-snug">{t(toast.messageKey, toast.messageParams)}</span>
+          {/* Plain button — IconButton would force a 44×44 touch target via
+              pointer-coarse, which makes the toast row taller than its
+              content. Auto-dismiss covers most cases; this × is a small
+              visual hint with `pointer-events-auto` so the toast itself can
+              stay click-through to the canvas. */}
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            onClick={() => dismiss(toast.id)}
+            className="pointer-events-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-base leading-none opacity-70 transition-colors hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
+          >
+            <span aria-hidden>×</span>
+          </button>
         </div>
       ))}
     </div>
