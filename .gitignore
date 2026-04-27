@@ -34,3 +34,7 @@ blob-report/
 # Vitest coverage output
 coverage/
 coverage/**
+
+# Generated docs
+docs/api/
+docs/user/_keybindings-table.md

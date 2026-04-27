@@ -1,0 +1,14 @@
+{
+  "entryPoints": [
+    "../../src/domain/index.ts",
+    "../../src/state/index.ts",
+    "../../src/notation/index.ts"
+  ],
+  "out": "../../docs/api",
+  "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
+  "readme": "none",
+  "githubPages": false,
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "sort": ["alphabetical"]
+}

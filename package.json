@@ -13,7 +13,12 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "preview": "vite preview",
-    "lint:locales": "tsx scripts/check-locales.ts"
+    "lint:locales": "tsx scripts/check-locales.ts",
+    "docs:api": "typedoc --options docs/.vitepress/typedoc.json",
+    "docs:keybindings": "tsx scripts/gen-keybindings-table.ts",
+    "docs:dev": "pnpm docs:keybindings && pnpm docs:api && vitepress dev docs",
+    "docs:build": "pnpm docs:keybindings && pnpm docs:api && vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
