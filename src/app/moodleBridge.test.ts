@@ -250,3 +250,28 @@ describe('installMoodleBridge — incoming init / load', () => {
     cleanup()
   })
 })
+
+describe('installMoodleBridge — cleanup', () => {
+  it('cleanup stops further outgoing messages and pending autosaves', () => {
+    vi.useFakeTimers()
+    const postMessageSpy = vi.fn()
+    Object.defineProperty(window, 'parent', {
+      value: { postMessage: postMessageSpy },
+      configurable: true,
+    })
+    window.history.replaceState({}, '', '/?embed=true&parentOrigin=https%3A%2F%2Fhost.test')
+    useDiagramStore.setState({ diagram: emptyDiagram() })
+
+    const cleanup = installMoodleBridge()
+    cleanup()
+
+    postMessageSpy.mockClear()
+    useDiagramStore.getState().addNode({
+      kind: 'entity', name: 'E', isWeak: false,
+      position: { x: 0, y: 0 }, size: { width: 120, height: 60 },
+    })
+    vi.advanceTimersByTime(2000)
+    expect(postMessageSpy).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+})
