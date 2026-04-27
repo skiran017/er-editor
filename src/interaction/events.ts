@@ -23,20 +23,25 @@ export type PointerButton = 'left' | 'middle' | 'right'
 
 export type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
+// #region modifiers
 export interface Modifiers {
   readonly shift: boolean
   readonly ctrl: boolean
   readonly alt: boolean
   readonly meta: boolean
 }
+// #endregion
 
 export const NO_MODIFIERS: Modifiers = Object.freeze({
   shift: false, ctrl: false, alt: false, meta: false,
 })
 
+// #region editor-event
 export type EditorEvent =
   // Tool picker
+  // #region pick-tool
   | { readonly type: 'PICK_TOOL'; readonly tool: Tool }
+  // #endregion
   // Canvas pointer lifecycle
   | { readonly type: 'CANVAS_POINTER_DOWN'; readonly point: Point; readonly modifiers: Modifiers; readonly button: PointerButton }
   | { readonly type: 'CANVAS_POINTER_MOVE'; readonly point: Point }
@@ -83,5 +88,6 @@ export type EditorEvent =
   | { readonly type: 'TOGGLE_CHEATSHEET' }
   // Generalization: start connecting an ISA node to a child entity (right-click on ISA → "Add child entity")
   | { readonly type: 'CONNECT_CHILD_TO_ISA'; readonly isaId: NodeId }
+// #endregion
 
 export type EditorEventType = EditorEvent['type']
