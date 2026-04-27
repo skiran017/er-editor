@@ -3,6 +3,12 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'ER Editor',
   description: 'A web-based ER diagram editor for educational use (Chen notation).',
+  // Mount the docs site under /docs/ so the editor app can occupy / when
+  // both are served from the same domain. VitePress auto-prefixes every
+  // internal link, sidebar/nav entry, and asset reference (e.g.
+  // /screenshots/foo.png becomes /docs/screenshots/foo.png) — markdown
+  // pages keep their plain absolute paths and don't need to be rewritten.
+  base: '/docs/',
   // Hide internal/historical pages from the public site nav.
   srcExclude: ['archive/**', 'superpowers/**'],
   // The mirrored CHANGELOG.md links to repo source paths (e.g. `./src/...`)
