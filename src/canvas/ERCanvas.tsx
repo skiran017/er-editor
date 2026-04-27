@@ -30,7 +30,6 @@ import { chenNodeTypes, chenEdgeTypes } from "./notation-adapters/chenBindings";
 import { InlineRenameOverlay } from "./InlineRenameOverlay";
 import { ConnectionPreviewOverlay } from "./ConnectionPreviewOverlay";
 import { RubberbandOverlay } from "./RubberbandOverlay";
-import { usePanelMode } from "@/ui/app/usePanelMode";
 
 // chenBindings exports `Record<NodeKind, ComponentType<NodeProps>>` — structurally
 // compatible with React-Flow's `NodeTypes` at runtime, but TS is stricter about the
@@ -92,18 +91,7 @@ const ERCanvasInner = () => {
   const mouse = useMouse();
   const touch = useTouch();
   const toolbarDrop = useToolbarDrop();
-  const mode = usePanelMode();
-  // Controls live at the React Flow default (bottom-left) on every mode —
-  // the vertical rail's max-h leaves a clear band at the bottom of the
-  // left column, so the Controls slot in below it in the same strip. On
-  // touch breakpoints we still push the panel up ~5rem (plus the
-  // home-indicator safe area) so Samsung Internet / mobile Safari address
-  // bars can't clip the bottom rows. Galaxy Tab testing showed only the
-  // zoom-in (+) button visible without this lift.
-  const controlsStyle =
-    mode === "desktop"
-      ? undefined
-      : { bottom: "calc(0.25rem + env(safe-area-inset-bottom, 0px))" };
+
 
   const [activeGuides, setActiveGuides] = useState<readonly SnapGuide[]>([]);
   const dragging = useRef(false);
@@ -224,9 +212,7 @@ const ERCanvasInner = () => {
         panOnDrag={false}
         fitView={false}
       >
-        <Background />
-        <Controls style={controlsStyle} />
-        {/* <Controls /> */}
+        <Controls />
       </ReactFlow>
       <SnapOverlay guides={activeGuides} pan={pan} zoom={zoom} />
       <InlineRenameOverlay />
