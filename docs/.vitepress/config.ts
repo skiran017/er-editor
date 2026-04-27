@@ -5,6 +5,36 @@ export default defineConfig({
   description: 'A web-based ER diagram editor for educational use (Chen notation).',
   // Hide internal/historical pages from the public site nav.
   srcExclude: ['archive/**', 'superpowers/**'],
+  // The mirrored CHANGELOG.md links to repo source paths (e.g. `./src/...`)
+  // that resolve from the repo root, not from `docs/`. User-docs pages also
+  // link to siblings that are added in later phases. Allow these so the
+  // build does not regress while Phase D pages roll in incrementally.
+  ignoreDeadLinks: [
+    /^\.\/src\//,
+    /^\.\/tests\//,
+    /^\.\/tools$/,
+    /^\.\/moodle$/,
+    /^\.\/tasks\//,
+  ],
+  // Screenshots referenced from markdown live in `docs/public/screenshots/`
+  // and are served at runtime as static assets. Some PNGs are captured in a
+  // separate manual pass; until they exist, prevent the Vue SFC compiler
+  // from turning `<img src="/screenshots/...">` into an ES import (which
+  // would fail to resolve at build time). Disabling `img.src` in
+  // `transformAssetUrls` leaves the literal absolute URL in the rendered
+  // HTML — the browser shows a broken image until the PNG is added,
+  // which is acceptable.
+  vue: {
+    template: {
+      transformAssetUrls: {
+        video: ['src', 'poster'],
+        source: 'src',
+        img: [],
+        image: ['xlink:href', 'href'],
+        use: ['xlink:href', 'href'],
+      },
+    },
+  },
   themeConfig: {
     nav: [
       { text: 'User Docs', link: '/user/' },
