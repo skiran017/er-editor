@@ -1,5 +1,6 @@
 {
+  "cleanUrls": true,
   "rewrites": [
-    { "source": "/((?!docs/|docs$|assets/|.*\\.[\\w]+$).*)", "destination": "/index.html" }
+    { "source": "/((?!docs/|docs$|moodle$|moodle\\.html$|assets/|.*\\.[\\w]+$).*)", "destination": "/index.html" }
   ]
 }

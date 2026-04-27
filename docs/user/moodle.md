@@ -2,6 +2,8 @@
 
 Embed ER Editor as an iframe inside a Moodle activity. Students see the editor; their work is loaded from and saved back into Moodle. This guide is for instructors / admins setting up the activity.
 
+> **Want to see it live?** A working host simulator is deployed alongside the editor at [`/moodle`](/moodle) — load it to see autosave, save-on-pagehide, and the full postMessage round-trip in action against a textarea-backed Moodle stand-in.
+
 ## Iframe snippet
 
 The simplest possible embed:

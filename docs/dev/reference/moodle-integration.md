@@ -7,6 +7,7 @@ Implementer view of the postMessage host bridge. User-facing setup is at [Embedd
 - `src/app/moodleBridge.ts` — the bridge module. Exports `installMoodleBridge(): () => void` and types `EditorOutgoing`, `EditorIncoming`.
 - `src/app/moodleBridge.test.ts` — full test suite.
 - `src/main.tsx` — calls `installMoodleBridge()` once at boot, after the URL-apply pipeline.
+- `public/moodle.html` + `public/moodle-essay-er-editor.js` — a self-contained Moodle host simulator served at [`/moodle`](/moodle). The page iframes the editor with `?embed=true&examMode=true&parentOrigin=...` and displays every postMessage in a debug panel — handy for verifying autosave / save / init flows live. The host script auto-detects `localhost` and points the iframe at the same Vite dev server; in production it points at the deployed editor.
 
 ## Activation
 
