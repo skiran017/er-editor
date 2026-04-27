@@ -131,7 +131,11 @@ export const Toolbar = memo(() => {
   const { t } = useTranslation(['toolbar'])
   const currentTool = useInteractionStore((s) => s.snapshot.context.tool)
   const readonly = useUiStore((s) => s.readonly)
-  const embed = useUiStore((s) => s.embed)
+  // The toolbar stays visible under `?embed=true` — students embedded inside
+  // a Moodle activity still need it to actually draw the diagram. Only the
+  // hamburger menu (Save/Open/Export) is hidden under embed; the host owns
+  // those flows via postMessage. `readonly` still filters tools down to just
+  // selection/pan when set, regardless of embed.
   // panels.toolbar: persisted open/closed state for the mobile rail. Undefined
   // (default) → closed, so first paint on a phone shows a clean canvas.
   const toolbarOpen = useUiStore((s) => !!s.panels.toolbar)
@@ -145,8 +149,6 @@ export const Toolbar = memo(() => {
   )
 
   const send = useInteractionStore.getState().send
-
-  if (embed) return null
 
   const visibleGroups = readonly
     ? chenPlugin.tools.groups

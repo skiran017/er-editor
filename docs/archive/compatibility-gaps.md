@@ -1,3 +1,5 @@
+> **Archived note (2026-04-27):** This file is the v1 → Java compatibility tracker, written before the v2 rewrite. Its "missing" / "needs verification" items are no longer accurate; v2 implements all of them differently. Kept for historical context.
+
 # Compatibility Gaps Analysis
 
 ## Overview

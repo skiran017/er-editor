@@ -180,7 +180,7 @@ describe('Phase 7 — URL-driven session', () => {
     expect(useValidationStore.getState().enabled).toBe(false)
   })
 
-  it('?embed=true hides Menu + Toolbar; canvas remains', async () => {
+  it('?embed=true hides the Menu but keeps the Toolbar so students can draw', async () => {
     resetAll()
     const search = '?embed=true'
     applyModeFromUrl(search)
@@ -189,10 +189,12 @@ describe('Phase 7 — URL-driven session', () => {
 
     render(<App />)
 
-    // Menu returns null under embed.
+    // Menu (Save/Open/Export) is hidden under embed — host owns those flows.
     expect(screen.queryByRole('button', { name: /^menu$/i })).toBeNull()
-    // Toolbar returns null under embed (it has data-role="toolbar" on a <nav>).
-    expect(document.querySelector('[data-role="toolbar"]')).toBeNull()
+    // Toolbar stays visible — embedded students still need it to place
+    // entities, draw relationships, etc. (matches the `data-role="toolbar"`
+    // on the rail/pill OR `data-role="toolbar-toggle"` for the mobile chevron).
+    expect(document.querySelector('[data-role^="toolbar"]')).toBeTruthy()
     // React Flow canvas still mounted.
     expect(document.querySelector('.react-flow')).toBeTruthy()
   })

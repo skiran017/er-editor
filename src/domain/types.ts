@@ -46,7 +46,9 @@ export interface ISANode extends NodeBase {
   readonly isTotal: boolean
 }
 
+// #region node-discrim
 export type ERNode = EntityNode | RelationshipNode | AttributeNode | ISANode
+// #endregion
 export type NodeKind = ERNode['kind']
 
 // ——— Edges ———
@@ -74,11 +76,14 @@ export interface ISAEdge extends EdgeBase {
   readonly role: 'parent' | 'child'
 }
 
+// #region edge-discrim
 export type ERLink = EntityRelationshipEdge | AttributeEdge | ISAEdge
+// #endregion
 export type EdgeKind = ERLink['kind']
 
 // ——— Diagram ———
 
+// #region diagram-type
 export interface Diagram {
   readonly schemaVersion: 1
   readonly nodesById: Readonly<Record<NodeId, ERNode>>
@@ -106,6 +111,7 @@ export interface Diagram {
     readonly discriminantAttrNodeIds: readonly NodeId[]
   }[]
 }
+// #endregion
 
 // Canonical empty-diagram factory.
 export const emptyDiagram = (): Diagram => ({

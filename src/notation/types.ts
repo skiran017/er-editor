@@ -88,6 +88,7 @@ export type NotationEdgeData = Record<string, unknown> & {
 
 // ——— Plugin ———
 
+// #region notation-plugin
 export interface NotationPlugin {
   readonly id: string
   readonly label: string
@@ -104,3 +105,4 @@ export interface NotationPlugin {
     readonly mermaid?: Codec
   }
 }
+// #endregion

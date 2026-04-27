@@ -96,6 +96,7 @@ const reorderTo = (
 
 // ——— public store ———
 
+// #region diagram-store-state
 export interface DiagramStoreState {
   readonly diagram: Diagram
   // Node operations
@@ -116,6 +117,7 @@ export interface DiagramStoreState {
   bringToFront: (id: NodeId | EdgeId) => void
   sendToBack: (id: NodeId | EdgeId) => void
 }
+// #endregion
 
 export const useDiagramStore = create<DiagramStoreState>()(
   subscribeWithSelector(

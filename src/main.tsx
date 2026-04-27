@@ -7,6 +7,7 @@ import { applyExamModeFromUrl } from '@/app/examMode'
 import { applyLanguageFromUrl } from '@/app/applyLanguage'
 import { applyValidationFromUrl } from '@/app/applyValidation'
 import { applyModeFromUrl } from '@/app/applyMode'
+import { installMoodleBridge } from '@/app/moodleBridge'
 import { initI18n } from '@/platform/i18n'
 import { useUiStore } from '@/state/uiStore'
 import './index.css'
@@ -17,6 +18,7 @@ applyExamModeFromUrl()
 applyLanguageFromUrl(window.location.search)
 applyValidationFromUrl(window.location.search)
 applyModeFromUrl(window.location.search)
+installMoodleBridge()
 
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('#root element not found')

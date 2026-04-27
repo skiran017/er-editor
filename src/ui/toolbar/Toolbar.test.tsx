@@ -120,10 +120,12 @@ describe('Toolbar — embed mode', () => {
   beforeEach(reset)
   afterEach(() => useUiStore.setState({ embed: false }))
 
-  it('renders nothing when uiStore.embed is true', () => {
+  it('still renders the toolbar when uiStore.embed is true (students need it to draw)', () => {
     useUiStore.setState({ embed: true })
     const { container } = render(<Toolbar />)
-    expect(container.firstChild).toBeNull()
+    // Toolbar chrome (data-role="toolbar" or the collapsed mobile toggle)
+    // must be present under embed — only the hamburger Menu is hidden.
+    expect(container.querySelector('[data-role^="toolbar"]')).not.toBeNull()
   })
 })
 

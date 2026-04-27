@@ -6,8 +6,15 @@
 (function () {
 	"use strict";
 
-	// Configure these for your deployment.
-	const ER_EDITOR_ORIGIN = "https://er-editor.vercel.app";
+	// Editor origin — same as the host page when running locally
+	// (Vite serves both this file and the editor SPA from one dev server),
+	// otherwise points at the deployed editor on Vercel.
+	const isLocal =
+		window.location.hostname === "localhost" ||
+		window.location.hostname === "127.0.0.1";
+	const ER_EDITOR_ORIGIN = isLocal
+		? window.location.origin
+		: "https://er-editor.vercel.app";
 	const ER_EDITOR_URL = `${ER_EDITOR_ORIGIN}/?embed=true&examMode=true&parentOrigin=${encodeURIComponent(window.location.origin)}`;
 
 	const HOST_SOURCE = "moodle-er-host";
