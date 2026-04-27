@@ -1,3 +1,5 @@
+> **Archived note (2026-04-27):** This is the v1 → Java catch-up roadmap, written before the v2 rewrite. The v2 architecture spec at [`docs/superpowers/specs/2026-04-22-target-architecture-design.md`](../superpowers/specs/2026-04-22-target-architecture-design.md) is the current source of truth.
+
 # Implementation Roadmap - Java App Compatibility
 
 ## Executive Summary
