@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '@/state/uiStore'
-import { IconButton } from '@/ui/primitives'
 
 const AUTO_DISMISS_MS: Record<string, number> = { info: 4000, success: 4000, warning: 6000 }
 // 'error' → no auto-dismiss.
@@ -28,13 +27,13 @@ export const ToastStack = () => {
   if (toasts.length === 0) return null
   // Toast cards stay `pointer-events-none` so clicks pass through to the
   // canvas underneath — otherwise a flow-hint toast (e.g. "pick first")
-  // pinned to the bottom-right would block clicks on any node placed near
-  // it for the toast's 4-second lifetime, and users would have to wait or
-  // double-click to interact. Only the dismiss button re-enables pointer
-  // events, so the × is still clickable.
+  // would block clicks on any node behind it for the toast's lifetime.
+  // Only the × button re-enables pointer events, so it's still clickable.
+  // Pinned top-right at every breakpoint with a tight width so the toast
+  // doesn't dominate the canvas; on phones the max-w prevents overflow.
   return (
     <div
-      className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+      className="pointer-events-none fixed right-2 top-2 z-50 flex max-w-[calc(100vw-1rem)] flex-col gap-1.5 sm:right-4 sm:top-4"
       role="region"
       aria-label="Notifications"
       data-role="toast-stack"
@@ -45,17 +44,22 @@ export const ToastStack = () => {
           role="alert"
           data-role="toast"
           data-kind={toast.kind}
-          className={`pointer-events-none flex min-w-[240px] items-start gap-2 rounded border px-3 py-2 text-sm shadow ${KIND_CLASS[toast.kind]}`}
+          className={`pointer-events-none flex w-[min(320px,calc(100vw-1rem))] items-center gap-2 rounded-md border px-3 py-2 text-sm shadow-md ${KIND_CLASS[toast.kind]}`}
         >
-          <span className="flex-1">{t(toast.messageKey, toast.messageParams)}</span>
-          <span className="pointer-events-auto">
-            <IconButton
-              aria-label="Dismiss notification"
-              size="sm"
-              onClick={() => dismiss(toast.id)}
-              icon={<span aria-hidden>×</span>}
-            />
-          </span>
+          <span className="flex-1 leading-snug">{t(toast.messageKey, toast.messageParams)}</span>
+          {/* Plain button — IconButton would force a 44×44 touch target via
+              pointer-coarse, which makes the toast row taller than its
+              content. Auto-dismiss covers most cases; this × is a small
+              visual hint with `pointer-events-auto` so the toast itself can
+              stay click-through to the canvas. */}
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            onClick={() => dismiss(toast.id)}
+            className="pointer-events-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-base leading-none opacity-70 transition-colors hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
+          >
+            <span aria-hidden>×</span>
+          </button>
         </div>
       ))}
     </div>

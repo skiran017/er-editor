@@ -36,7 +36,7 @@ export const CheatsheetModal = ({ modalId }: CheatsheetModalProps) => {
       data-modal-id={modalId}
       data-kind="cheatsheet"
     >
-      <div className="flex max-h-[80vh] w-[min(640px,90vw)] flex-col rounded bg-white p-4 text-slate-900 shadow-lg dark:bg-slate-800 dark:text-slate-100">
+      <div className="flex max-h-[80vh] w-[min(640px,calc(100vw-1rem))] flex-col rounded bg-white p-4 text-slate-900 shadow-lg dark:bg-slate-800 dark:text-slate-100">
         <h2 id={`${modalId}-title`} className="mb-3 text-base font-semibold">{t('cheatsheet.title')}</h2>
         <div className="flex-1 overflow-auto">
           {CATEGORIES.map(

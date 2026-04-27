@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v2 / Responsive editing] — 2026-04-27
+
+### Added
+- [src/ui/app/usePanelMode.ts](src/ui/app/usePanelMode.ts) — viewport-width hook returning `'mobile' | 'tablet' | 'desktop'` based on `sm:` (640px) and `lg:` (1024px) media queries. Re-renders consumers when the viewport crosses a threshold.
+- [src/ui/app/PropertyDrawer.tsx](src/ui/app/PropertyDrawer.tsx) — bottom-sheet drawer (mobile, slides up, max-h 70vh) and right-side drawer (tablet, 320px wide). Backdrop dismisses on tap; Escape closes; full dialog semantics (`role="dialog"`, `aria-modal`, `aria-labelledby`).
+- Two-finger touch gestures in [src/canvas/hooks/useTouch.ts](src/canvas/hooks/useTouch.ts):
+  - **Pinch-to-zoom** dispatches `WHEEL_ZOOM` with anchor at the gesture midpoint and delta proportional to distance change.
+  - **Two-finger drag** pans the viewport directly (bypasses FSM — transient gesture). Branch heuristic: `|distChange| > midShift` → zoom; else → pan.
+- **Palm rejection**: while a pen pointer is active, `useTouch` drops touch pointer events. Pen events flow through `useMouse` unaffected.
+- `onPointerCancel` recovery on `useTouch` for OS-level pointer interruptions (lost capture, pen lifted outside the browser, task switch).
+- Pen-event contract tests in [src/canvas/hooks/useMouse.test.tsx](src/canvas/hooks/useMouse.test.tsx) — locks down that `pointerType === 'pen'` flows through `useMouse` like a mouse.
+
+### Changed
+- [src/ui/app/AppShell.tsx](src/ui/app/AppShell.tsx) — switches on `usePanelMode`. Desktop renders the inline `<aside data-role="properties-panel">` (now widens to `2xl:w-96` on viewports ≥1536px). Mobile/tablet render `<PropertyDrawer mode={mode} ...>` with full-width canvas behind it.
+- [src/ui/toolbar/Toolbar.tsx](src/ui/toolbar/Toolbar.tsx) — bottom-pinned on mobile (within thumb reach), top-center on `sm:`+.
+- [src/ui/primitives/IconButton.tsx](src/ui/primitives/IconButton.tsx) and [src/ui/primitives/Button.tsx](src/ui/primitives/Button.tsx) — `pointer-coarse:min-h-[44px]` (and `min-w` on IconButton) plus `touch-manipulation` so coarse-pointer devices get the 44×44 hit-target minimum.
+- [src/ui/menu/FileActionRow.tsx](src/ui/menu/FileActionRow.tsx) — keyboard-shortcut hints hidden on mobile, shown from `sm:`+. Touch users have no keyboard.
+- [src/ui/overlays/ToastStack.tsx](src/ui/overlays/ToastStack.tsx) — top-pinned full-width on mobile, bottom-right on `sm:`+. Prevents toasts spilling off small phone widths.
+- [src/ui/overlays/ContextMenu.tsx](src/ui/overlays/ContextMenu.tsx) — `max-w-[calc(100vw-1rem)]` clamps the menu within the viewport.
+- [src/ui/overlays/CheatsheetModal.tsx](src/ui/overlays/CheatsheetModal.tsx) — inner card width changed from `w-[min(640px,90vw)]` to `w-[min(640px,calc(100vw-1rem))]` so it never touches the viewport edge.
+- [src/canvas/ERCanvas.tsx](src/canvas/ERCanvas.tsx) — wires `useTouch` handlers (down/move/up/cancel) on the same wrapper that already hosts `useMouse`. The two hooks self-filter by `pointerType` so they don't fight.
+
+### Notes
+- Pen pressure / tilt intentionally not visualised — pens are treated as mouse-equivalent.
+- Long-press → context menu remains as a future follow-up; right-click context menu unchanged.
+
 ## [v2 / Phase 5] — 2026-04-26
 
 ### Added

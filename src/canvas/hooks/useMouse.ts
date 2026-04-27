@@ -57,6 +57,14 @@ export const useMouse = (): MouseHandlers => {
   const toFlow = (e: { clientX: number; clientY: number }) =>
     screenToFlowPosition({ x: e.clientX, y: e.clientY })
 
+  // Pen events (`pointerType === 'pen'`) intentionally pass through this hook
+  // alongside mouse events. Pens have hover, accurate coordinates, and modifier
+  // keys — from the FSM's perspective they behave like a mouse, so we don't
+  // need a separate code path. The dedicated `useTouch` hook handles only
+  // `pointerType === 'touch'` and includes palm rejection that drops touch
+  // events while a pen pointer is active. The pen-event contract is locked
+  // down by `pen pointerdown/move/up fires CANVAS_POINTER_*` tests in
+  // useMouse.test.tsx.
   return {
     onPointerDown: (e) => {
       if (e.pointerType === 'touch') return

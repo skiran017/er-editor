@@ -12,7 +12,9 @@ describe('App', () => {
   it('mounts the hamburger menu button, toolbar, canvas; property panel is hidden until something is selected', () => {
     const { container } = render(<App />)
     expect(screen.getByRole('button', { name: 'Menu' })).toBeInTheDocument()
-    expect(container.querySelector('[data-role="toolbar"]')).toBeInTheDocument()
+    // Either the expanded rail/pill (data-role="toolbar") or the mobile
+    // collapsed chevron (data-role="toolbar-toggle") qualifies as "mounted".
+    expect(container.querySelector('[data-role^="toolbar"]')).toBeInTheDocument()
     expect(container.querySelector('.react-flow')).toBeInTheDocument()
     expect(container.querySelector('[data-role="properties-panel"]')).not.toBeInTheDocument()
   })

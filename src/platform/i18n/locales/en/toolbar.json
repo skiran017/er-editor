@@ -4,6 +4,8 @@
     "elements": "Elements",
     "connections": "Connections"
   },
+  "expand": "Show toolbar",
+  "collapse": "Hide toolbar",
   "tool": {
     "select": "Select",
     "pan": "Pan",

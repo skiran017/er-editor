@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, beforeAll, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Toolbar } from './Toolbar'
@@ -9,6 +9,11 @@ import { useUiStore } from '@/state/uiStore'
 import { emptyDiagram } from '@/domain/types'
 import type { NodeId } from '@/domain/types'
 import { initI18n } from '@/platform/i18n'
+import { usePanelMode } from '@/ui/app/usePanelMode'
+
+vi.mock('@/ui/app/usePanelMode', () => ({
+  usePanelMode: vi.fn(() => 'desktop' as const),
+}))
 
 beforeAll(async () => { await initI18n() })
 
@@ -19,7 +24,11 @@ const reset = () => {
   useSelectionStore.setState({
     selectedNodeIds: new Set<NodeId>(), selectedEdgeIds: new Set(), rubberband: null,
   })
-  useUiStore.setState({ readonly: false })
+  useUiStore.setState({
+    readonly: false,
+    panels: { properties: true, minimap: false, toolbar: false },
+  })
+  vi.mocked(usePanelMode).mockReturnValue('desktop')
 }
 
 describe('Toolbar — tool picker', () => {
@@ -145,6 +154,79 @@ describe('Toolbar — readonly mode', () => {
     useUiStore.setState({ readonly: true })
     render(<Toolbar />)
     expect(screen.queryByRole('button', { name: /delete/i })).toBeNull()
+  })
+})
+
+describe('Toolbar — responsive layout', () => {
+  beforeEach(reset)
+
+  it('desktop: horizontal pill, top-centered', () => {
+    vi.mocked(usePanelMode).mockReturnValue('desktop')
+    const { container } = render(<Toolbar />)
+    const nav = container.querySelector('[data-role="toolbar"]')!
+    expect(nav.getAttribute('data-orientation')).toBe('horizontal')
+    expect(nav.className).toContain('top-4')
+    expect(nav.className).toContain('left-1/2')
+    expect(nav.className).toContain('-translate-x-1/2')
+    expect(nav.className).toContain('overflow-x-auto')
+  })
+
+  it('tablet: vertical rail pinned to the left, always visible', () => {
+    vi.mocked(usePanelMode).mockReturnValue('tablet')
+    useUiStore.setState({ panels: { properties: true, minimap: false, toolbar: false } })
+    const { container } = render(<Toolbar />)
+    const nav = container.querySelector('[data-role="toolbar"]')!
+    // Vertical rail renders even when panels.toolbar is false — the toggle
+    // is mobile-only.
+    expect(nav.getAttribute('data-orientation')).toBe('vertical')
+    expect(nav.className).toContain('left-2')
+    expect(nav.className).toContain('flex-col')
+    expect(nav.className).toContain('overflow-y-auto')
+    // No mobile-only collapse chevron on tablet.
+    expect(screen.queryByRole('button', { name: /hide toolbar/i })).toBeNull()
+  })
+
+  it('mobile collapsed: only the expand chevron is rendered', () => {
+    vi.mocked(usePanelMode).mockReturnValue('mobile')
+    useUiStore.setState({ panels: { properties: true, minimap: false, toolbar: false } })
+    const { container } = render(<Toolbar />)
+    expect(container.querySelector('[data-role="toolbar"]')).toBeNull()
+    expect(container.querySelector('[data-role="toolbar-toggle"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: /show toolbar/i })).toBeInTheDocument()
+  })
+
+  it('mobile: clicking the expand chevron opens the rail (sets panels.toolbar=true)', async () => {
+    vi.mocked(usePanelMode).mockReturnValue('mobile')
+    useUiStore.setState({ panels: { properties: true, minimap: false, toolbar: false } })
+    render(<Toolbar />)
+    await userEvent.click(screen.getByRole('button', { name: /show toolbar/i }))
+    expect(useUiStore.getState().panels.toolbar).toBe(true)
+  })
+
+  it('mobile expanded: vertical rail with a collapse chevron at the top', () => {
+    vi.mocked(usePanelMode).mockReturnValue('mobile')
+    useUiStore.setState({ panels: { properties: true, minimap: false, toolbar: true } })
+    const { container } = render(<Toolbar />)
+    const nav = container.querySelector('[data-role="toolbar"]')!
+    expect(nav.getAttribute('data-orientation')).toBe('vertical')
+    expect(screen.getByRole('button', { name: /hide toolbar/i })).toBeInTheDocument()
+  })
+
+  it('mobile: picking a tool auto-collapses the rail', async () => {
+    vi.mocked(usePanelMode).mockReturnValue('mobile')
+    useUiStore.setState({ panels: { properties: true, minimap: false, toolbar: true } })
+    render(<Toolbar />)
+    await userEvent.click(screen.getByRole('button', { name: 'Entity' }))
+    expect(useInteractionStore.getState().snapshot.context.tool).toBe('entity')
+    expect(useUiStore.getState().panels.toolbar).toBe(false)
+  })
+
+  it('tablet: picking a tool does NOT collapse the rail (no auto-collapse outside mobile)', async () => {
+    vi.mocked(usePanelMode).mockReturnValue('tablet')
+    useUiStore.setState({ panels: { properties: true, minimap: false, toolbar: true } })
+    render(<Toolbar />)
+    await userEvent.click(screen.getByRole('button', { name: 'Entity' }))
+    expect(useUiStore.getState().panels.toolbar).toBe(true)
   })
 })
 
